@@ -1,0 +1,205 @@
+<div class="card">
+
+  <!-- Marca -->
+  <div class="brand">
+    <div class="brand-mark">U</div>
+    <span class="brand-name">unita</span>
+  </div>
+
+  <!-- Cabeçalho -->
+  <div class="header">
+    <h1>Criar conta</h1>
+    <p>Comece a controlar suas finanças hoje</p>
+  </div>
+
+  <!-- Banner de erro -->
+  @if (errorMessage()) {
+    <div class="banner banner--error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <!-- Formulário -->
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+
+    <!-- Nome e Sobrenome (lado a lado no desktop) -->
+    <div class="name-row">
+
+      <div class="field" [class.field--invalid]="firstNameControl.invalid && firstNameControl.touched">
+        <label for="firstName">Nome</label>
+        <input
+          id="firstName"
+          type="text"
+          formControlName="firstName"
+          placeholder="João"
+          autocomplete="given-name"
+        />
+        @if (firstNameControl.invalid && firstNameControl.touched) {
+          <span class="field-error">
+            @if (firstNameControl.hasError('required')) { Obrigatório }
+            @else if (firstNameControl.hasError('maxlength')) { Muito longo }
+          </span>
+        }
+      </div>
+
+      <div class="field" [class.field--invalid]="lastNameControl.invalid && lastNameControl.touched">
+        <label for="lastName">Sobrenome</label>
+        <input
+          id="lastName"
+          type="text"
+          formControlName="lastName"
+          placeholder="Silva"
+          autocomplete="family-name"
+        />
+        @if (lastNameControl.invalid && lastNameControl.touched) {
+          <span class="field-error">
+            @if (lastNameControl.hasError('required')) { Obrigatório }
+            @else if (lastNameControl.hasError('maxlength')) { Muito longo }
+          </span>
+        }
+      </div>
+
+    </div>
+
+    <!-- E-mail -->
+    <div class="field" [class.field--invalid]="emailControl.invalid && emailControl.touched">
+      <label for="email">E-mail</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        placeholder="seu@email.com"
+        autocomplete="email"
+        inputmode="email"
+      />
+      @if (emailControl.invalid && emailControl.touched) {
+        <span class="field-error">
+          @if (emailControl.hasError('required')) { E-mail é obrigatório }
+          @else if (emailControl.hasError('email')) { E-mail inválido }
+        </span>
+      }
+    </div>
+
+    <!-- Data de nascimento -->
+    <div class="field" [class.field--invalid]="dateOfBirthControl.invalid && dateOfBirthControl.touched">
+      <label for="dateOfBirth">Data de nascimento</label>
+      <input
+        id="dateOfBirth"
+        type="date"
+        formControlName="dateOfBirth"
+        [max]="maxDate"
+        autocomplete="bday"
+      />
+      @if (dateOfBirthControl.invalid && dateOfBirthControl.touched) {
+        <span class="field-error">
+          @if (dateOfBirthControl.hasError('required')) { Data de nascimento é obrigatória }
+        </span>
+      }
+    </div>
+
+    <!-- Senha -->
+    <div class="field" [class.field--invalid]="passwordControl.invalid && passwordControl.touched">
+      <label for="password">Senha</label>
+      <div class="input-wrapper">
+        <input
+          [type]="showPassword() ? 'text' : 'password'"
+          id="password"
+          formControlName="password"
+          placeholder="Mínimo 8 caracteres"
+          autocomplete="new-password"
+        />
+        <button
+          type="button"
+          class="btn-eye"
+          (click)="togglePassword()"
+          [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+          tabindex="-1"
+        >
+          @if (showPassword()) {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          }
+        </button>
+      </div>
+      @if (passwordControl.invalid && passwordControl.touched) {
+        <span class="field-error">
+          @if (passwordControl.hasError('required')) { Senha é obrigatória }
+          @else if (passwordControl.hasError('minlength')) { Mínimo de 8 caracteres }
+        </span>
+      }
+    </div>
+
+    <!-- Confirmar senha -->
+    <div class="field" [class.field--invalid]="(confirmPasswordControl.invalid && confirmPasswordControl.touched) || hasPasswordMismatch">
+      <label for="confirmPassword">Confirmar senha</label>
+      <div class="input-wrapper">
+        <input
+          [type]="showConfirmPassword() ? 'text' : 'password'"
+          id="confirmPassword"
+          formControlName="confirmPassword"
+          placeholder="••••••••"
+          autocomplete="new-password"
+        />
+        <button
+          type="button"
+          class="btn-eye"
+          (click)="toggleConfirmPassword()"
+          [attr.aria-label]="showConfirmPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+          tabindex="-1"
+        >
+          @if (showConfirmPassword()) {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          }
+        </button>
+      </div>
+      @if (confirmPasswordControl.invalid && confirmPasswordControl.touched) {
+        <span class="field-error">
+          @if (confirmPasswordControl.hasError('required')) { Confirmação é obrigatória }
+        </span>
+      }
+      @if (hasPasswordMismatch) {
+        <span class="field-error">As senhas não coincidem</span>
+      }
+    </div>
+
+    <!-- Botão -->
+    <button type="submit" class="btn-primary" [disabled]="isLoading()">
+      @if (isLoading()) {
+        <span class="spinner"></span>
+        Criando conta...
+      } @else {
+        Criar conta
+      }
+    </button>
+
+  </form>
+
+  <!-- Rodapé -->
+  <p class="footer-text">
+    Já tem uma conta?
+    <a routerLink="/login" class="link-accent">Entrar</a>
+  </p>
+
+</div>

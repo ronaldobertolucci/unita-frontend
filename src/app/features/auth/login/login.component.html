@@ -1,0 +1,122 @@
+<div class="card">
+
+  <!-- Marca -->
+  <div class="brand">
+    <div class="brand-mark">U</div>
+    <span class="brand-name">unita</span>
+  </div>
+
+  <!-- Cabeçalho -->
+  <div class="header">
+    <h1>Bem-vindo de volta</h1>
+    <p>Acesse sua conta para continuar</p>
+  </div>
+
+  <!-- Banner de cadastro bem-sucedido -->
+  @if (justRegistered) {
+    <div class="banner banner--success">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      Conta criada com sucesso! Faça login para continuar.
+    </div>
+  }
+
+  <!-- Banner de erro -->
+  @if (errorMessage()) {
+    <div class="banner banner--error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <!-- Formulário -->
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+
+    <!-- E-mail -->
+    <div class="field" [class.field--invalid]="emailControl.invalid && emailControl.touched">
+      <label for="email">E-mail</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        placeholder="seu@email.com"
+        autocomplete="email"
+        inputmode="email"
+      />
+      @if (emailControl.invalid && emailControl.touched) {
+        <span class="field-error">
+          @if (emailControl.hasError('required')) { E-mail é obrigatório }
+          @else if (emailControl.hasError('email')) { E-mail inválido }
+        </span>
+      }
+    </div>
+
+    <!-- Senha -->
+    <div class="field" [class.field--invalid]="passwordControl.invalid && passwordControl.touched">
+      <label for="password">Senha</label>
+      <div class="input-wrapper">
+        <input
+          [type]="showPassword() ? 'text' : 'password'"
+          id="password"
+          formControlName="password"
+          placeholder="••••••••"
+          autocomplete="current-password"
+        />
+        <button
+          type="button"
+          class="btn-eye"
+          (click)="togglePassword()"
+          [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+          tabindex="-1"
+        >
+          @if (showPassword()) {
+            <!-- Olho fechado -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          } @else {
+            <!-- Olho aberto -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          }
+        </button>
+      </div>
+      @if (passwordControl.invalid && passwordControl.touched) {
+        <span class="field-error">
+          @if (passwordControl.hasError('required')) { Senha é obrigatória }
+        </span>
+      }
+    </div>
+
+    <!-- Esqueci a senha -->
+    <div class="forgot-row">
+      <a routerLink="/forgot-password" class="link-secondary">Esqueceu a senha?</a>
+    </div>
+
+    <!-- Botão -->
+    <button type="submit" class="btn-primary" [disabled]="isLoading()">
+      @if (isLoading()) {
+        <span class="spinner"></span>
+        Entrando...
+      } @else {
+        Entrar
+      }
+    </button>
+
+  </form>
+
+  <!-- Rodapé -->
+  <p class="footer-text">
+    Não tem uma conta?
+    <a routerLink="/register" class="link-accent">Criar conta</a>
+  </p>
+
+</div>

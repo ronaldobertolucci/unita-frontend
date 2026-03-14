@@ -1,0 +1,43 @@
+.auth-layout {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+/* Blobs decorativos de fundo — fixed para não interferir no scroll */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.2;
+}
+
+.blob-1 {
+  width: 640px;
+  height: 640px;
+  top: -220px;
+  right: -180px;
+  background: radial-gradient(circle, #19e5a8 0%, transparent 65%);
+}
+
+.blob-2 {
+  width: 540px;
+  height: 540px;
+  bottom: -180px;
+  left: -120px;
+  background: radial-gradient(circle, #4f46e5 0%, transparent 65%);
+}
+
+/* Grade sutil de fundo */
+.grid-pattern {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}

@@ -1,1 +1,58 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Cores */
+  --bg-primary: #060b17;
+  --bg-card: rgba(10, 18, 40, 0.88);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-focus: rgba(25, 229, 168, 0.55);
+
+  --accent: #19e5a8;
+  --accent-hover: #10c98f;
+  --accent-dim: rgba(25, 229, 168, 0.1);
+  --accent-glow: rgba(25, 229, 168, 0.22);
+
+  --text-primary: #dce9f8;
+  --text-secondary: #6b87a6;
+  --text-muted: #344f6a;
+
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(255, 255, 255, 0.09);
+
+  --error: #ff6b6b;
+  --error-dim: rgba(255, 107, 107, 0.1);
+  --error-border: rgba(255, 107, 107, 0.3);
+
+  --success: #19e5a8;
+  --success-dim: rgba(25, 229, 168, 0.1);
+  --success-border: rgba(25, 229, 168, 0.3);
+
+  /* Bordas */
+  --radius-card: 24px;
+  --radius-input: 12px;
+  --radius-btn: 12px;
+
+  /* Tipografia */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
