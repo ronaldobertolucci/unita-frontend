@@ -1,0 +1,261 @@
+<div class="layout">
+
+  <!-- ═══════════════════════════════════════════ SIDEBAR (desktop) -->
+  <aside class="sidebar">
+
+    <!-- Brand -->
+    <div class="sidebar-brand">
+      <div class="brand-mark">U</div>
+      <span class="brand-name">unita</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav">
+      @for (item of navItems; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="nav-item--active"
+          class="nav-item"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path [attr.d]="item.icon" />
+          </svg>
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <!-- Notificações -->
+    <div class="sidebar-notif">
+      <button
+        class="notif-btn"
+        data-notif-btn
+        (click)="toggleNotifications('sidebar')"
+        [class.notif-btn--active]="notificationSource() === 'sidebar'"
+      >
+        <div class="notif-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          @if (pendingCount() > 0) {
+            <span class="badge">{{ pendingCount() > 9 ? '9+' : pendingCount() }}</span>
+          }
+        </div>
+        <span>Notificações</span>
+      </button>
+
+      @if (notificationSource() === 'sidebar') {
+        <div class="notif-panel notif-panel--sidebar" data-notif-panel>
+          <ng-container *ngTemplateOutlet="notifPanelContent" />
+        </div>
+      }
+    </div>
+
+    <!-- Usuário -->
+    <div class="sidebar-user">
+      <button class="user-btn" data-user-btn (click)="toggleUserMenu('sidebar')">
+        <div class="avatar">{{ userInitials() }}</div>
+        <div class="user-info">
+          <span class="user-name">{{ currentUser()?.firstName }} {{ currentUser()?.lastName }}</span>
+          <span class="user-email">{{ currentUser()?.email }}</span>
+        </div>
+        <svg class="chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6l4 4 4-4"/>
+        </svg>
+      </button>
+
+      @if (userMenuSource() === 'sidebar') {
+        <div class="user-menu user-menu--sidebar" data-user-menu>
+          <div class="user-menu-header">
+            <span class="user-menu-name">{{ currentUser()?.firstName }} {{ currentUser()?.lastName }}</span>
+            <span class="user-menu-email">{{ currentUser()?.email }}</span>
+          </div>
+          <hr class="menu-divider" />
+          <button class="menu-item menu-item--danger" (click)="logout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sair
+          </button>
+        </div>
+      }
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════════════════════════════════ ÁREA PRINCIPAL -->
+  <div class="main">
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+
+      <h1 class="page-title">{{ pageTitle() }}</h1>
+
+      <div class="top-bar-actions">
+
+        <!-- Notificações (topbar — visível apenas no mobile) -->
+        <button
+          class="topbar-icon-btn"
+          data-notif-btn
+          (click)="toggleNotifications('topbar')"
+          [class.topbar-icon-btn--active]="notificationSource() === 'topbar'"
+          aria-label="Notificações"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          @if (pendingCount() > 0) {
+            <span class="badge">{{ pendingCount() > 9 ? '9+' : pendingCount() }}</span>
+          }
+        </button>
+
+        <!-- Avatar (topbar — visível apenas no mobile) -->
+        <button class="avatar-btn" data-user-btn (click)="toggleUserMenu('topbar')" aria-label="Menu do usuário">
+          <div class="avatar avatar--sm">{{ userInitials() }}</div>
+        </button>
+
+        <!-- Painel de notificações (topbar) -->
+        @if (notificationSource() === 'topbar') {
+          <div class="notif-panel notif-panel--topbar" data-notif-panel>
+            <ng-container *ngTemplateOutlet="notifPanelContent" />
+          </div>
+        }
+
+        <!-- Menu do usuário (topbar) -->
+        @if (userMenuSource() === 'topbar') {
+          <div class="user-menu user-menu--topbar" data-user-menu>
+            <div class="user-menu-header">
+              <span class="user-menu-name">{{ currentUser()?.firstName }} {{ currentUser()?.lastName }}</span>
+              <span class="user-menu-email">{{ currentUser()?.email }}</span>
+            </div>
+            <hr class="menu-divider" />
+            <button class="menu-item menu-item--danger" (click)="logout()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Sair
+            </button>
+          </div>
+        }
+
+      </div>
+    </header>
+
+    <!-- CONTEÚDO -->
+    <main class="content">
+      <router-outlet />
+    </main>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════ BOTTOM NAVBAR (mobile) -->
+  <nav class="bottom-nav">
+    @for (item of navItems; track item.path) {
+      <a
+        [routerLink]="item.path"
+        routerLinkActive="bottom-nav-item--active"
+        class="bottom-nav-item"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path [attr.d]="item.icon" />
+        </svg>
+        <span>{{ item.label }}</span>
+      </a>
+    }
+
+    <!-- Notificações na bottom nav -->
+    <button
+      class="bottom-nav-item"
+      data-notif-btn
+      (click)="toggleNotifications('mobile')"
+      [class.bottom-nav-item--active]="notificationSource() === 'mobile'"
+    >
+      <div class="bottom-notif-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        @if (pendingCount() > 0) {
+          <span class="badge badge--bottom">{{ pendingCount() > 9 ? '9+' : pendingCount() }}</span>
+        }
+      </div>
+      <span>Avisos</span>
+    </button>
+
+    <!-- Painel de notificações (mobile) -->
+    @if (notificationSource() === 'mobile') {
+      <div class="notif-panel notif-panel--mobile" data-notif-panel>
+        <ng-container *ngTemplateOutlet="notifPanelContent" />
+      </div>
+    }
+  </nav>
+
+</div>
+
+<!-- ═══════════════════════════════════════════ TEMPLATE: PAINEL DE NOTIFICAÇÕES -->
+<ng-template #notifPanelContent>
+  <div class="notif-panel-header">
+    <span class="notif-panel-title">Notificações</span>
+    @if (pendingCount() > 0) {
+      <span class="notif-count-chip">{{ pendingCount() }}</span>
+    }
+  </div>
+
+  @if (notificationsLoading()) {
+    <div class="notif-loading">
+      <span class="spinner-sm"></span>
+    </div>
+  } @else if (invitations().length === 0) {
+    <div class="notif-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <p>Nenhuma notificação</p>
+    </div>
+  } @else {
+    <ul class="notif-list">
+      @for (invitation of invitations(); track invitation.id) {
+        <li class="notif-item">
+          <div class="notif-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="notif-item-body">
+            <p class="notif-item-text">
+              Convite para entrar no grupo
+              <strong>{{ invitation.group.name }}</strong>
+            </p>
+            <p class="notif-item-sub">
+              de {{ invitation.group.responsibleUser.firstName }} {{ invitation.group.responsibleUser.lastName }}
+            </p>
+            <div class="notif-item-actions">
+              <button
+                class="notif-action notif-action--accept"
+                (click)="respondToInvitation(invitation.id, true)"
+              >
+                Aceitar
+              </button>
+              <button
+                class="notif-action notif-action--reject"
+                (click)="respondToInvitation(invitation.id, false)"
+              >
+                Recusar
+              </button>
+            </div>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</ng-template>

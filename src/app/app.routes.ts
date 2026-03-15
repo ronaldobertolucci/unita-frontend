@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  // ── Rotas públicas (AuthLayout) ──────────────────────────────────
   {
     path: '',
     loadComponent: () =>
@@ -39,5 +41,28 @@ export const routes: Routes = [
       },
     ],
   },
-  // TODO: MainLayoutComponent com guard (próxima sessão)
+
+  // ── Rotas privadas (MainLayout + authGuard) ───────────────────────
+  {
+    path: '',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./layouts/main-layout/main-layout.component').then(
+        m => m.MainLayoutComponent
+      ),
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then(
+            m => m.DashboardComponent
+          ),
+        data: { title: 'Dashboard' },
+      },
+      // Novas rotas serão adicionadas aqui conforme o desenvolvimento
+    ],
+  },
+
+  // Fallback
+  { path: '**', redirectTo: 'login' },
 ];

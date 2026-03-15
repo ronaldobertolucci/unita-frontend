@@ -1,0 +1,122 @@
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  OnInit,
+  HostListener,
+  ElementRef,
+} from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
+import { filter, map } from 'rxjs/operators';
+import { NgTemplateOutlet } from '@angular/common';
+import { AuthService } from '../../core/services/auth.service';
+import { NotificationService } from '../../core/services/notification.service';
+
+interface NavItem {
+  label: string;
+  path: string;
+  icon: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Dashboard',
+    path: '/dashboard',
+    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+  },
+];
+
+type NotificationSource = 'sidebar' | 'topbar' | 'mobile' | null;
+type UserMenuSource = 'sidebar' | 'topbar' | null;
+
+@Component({
+  selector: 'app-main-layout',
+  standalone: true,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet],
+  templateUrl: './main-layout.component.html',
+  styleUrl: './main-layout.component.css',
+})
+export class MainLayoutComponent implements OnInit {
+  private readonly authService = inject(AuthService);
+  private readonly notificationService = inject(NotificationService);
+  private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef);
+
+  readonly navItems = NAV_ITEMS;
+
+  readonly currentUser = this.authService.currentUser;
+  readonly userInitials = computed(() => {
+    const user = this.currentUser();
+    if (!user) return '?';
+    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+  });
+
+  readonly invitations = this.notificationService.invitations;
+  readonly pendingCount = this.notificationService.pendingCount;
+  readonly notificationsLoading = this.notificationService.loading;
+
+  readonly notificationSource = signal<NotificationSource>(null);
+  readonly userMenuSource = signal<UserMenuSource>(null);
+
+  readonly pageTitle = signal('Dashboard');
+
+  ngOnInit(): void {
+    this.notificationService.loadInvitations();
+    this.syncPageTitle();
+  }
+
+  private syncPageTitle(): void {
+    this.updateTitleFromUrl(this.router.url);
+    this.router.events
+      .pipe(
+        filter(e => e instanceof NavigationEnd),
+        map(e => (e as NavigationEnd).urlAfterRedirects)
+      )
+      .subscribe(url => this.updateTitleFromUrl(url));
+  }
+
+  private updateTitleFromUrl(url: string): void {
+    const route = this.router.routerState.root;
+    let current = route;
+    while (current.firstChild) current = current.firstChild;
+    const title = current.snapshot.data?.['title'];
+    if (title) this.pageTitle.set(title);
+  }
+
+  toggleNotifications(source: 'sidebar' | 'topbar' | 'mobile'): void {
+    this.notificationSource.update(v => (v === source ? null : source));
+    this.userMenuSource.set(null);
+  }
+
+  toggleUserMenu(source: 'sidebar' | 'topbar'): void {
+    this.userMenuSource.update(v => (v === source ? null : source));
+    this.notificationSource.set(null);
+  }
+
+  respondToInvitation(id: number, accept: boolean): void {
+    this.notificationService.respondToInvitation(id, accept);
+  }
+
+  logout(): void {
+    this.authService.logout();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!this.elementRef.nativeElement.contains(target)) return;
+
+    const clickedNotifBtn = target.closest('[data-notif-btn]');
+    const clickedNotifPanel = target.closest('[data-notif-panel]');
+    const clickedUserBtn = target.closest('[data-user-btn]');
+    const clickedUserMenu = target.closest('[data-user-menu]');
+
+    if (!clickedNotifBtn && !clickedNotifPanel) {
+      this.notificationSource.set(null);
+    }
+    if (!clickedUserBtn && !clickedUserMenu) {
+      this.userMenuSource.set(null);
+    }
+  }
+}
