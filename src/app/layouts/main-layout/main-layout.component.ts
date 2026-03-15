@@ -13,17 +13,29 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 
-interface NavItem {
+export interface NavItem {
   label: string;
   path: string;
-  icon: string;
+  icons: string[]; // array de paths SVG
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
     label: 'Dashboard',
     path: '/dashboard',
-    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    icons: [
+      'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    ],
+  },
+  {
+    label: 'Grupos',
+    path: '/groups',
+    icons: [
+      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2',
+      'M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+      'M23 21v-2a4 4 0 0 0-3-3.87',
+      'M16 3.13a4 4 0 0 1 0 7.75',
+    ],
   },
 ];
 
@@ -55,6 +67,7 @@ export class MainLayoutComponent implements OnInit {
   readonly invitations = this.notificationService.invitations;
   readonly pendingCount = this.notificationService.pendingCount;
   readonly notificationsLoading = this.notificationService.loading;
+  readonly respondError = this.notificationService.respondError;
 
   readonly notificationSource = signal<NotificationSource>(null);
   readonly userMenuSource = signal<UserMenuSource>(null);

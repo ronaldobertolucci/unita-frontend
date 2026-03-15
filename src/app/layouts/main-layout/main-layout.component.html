@@ -18,7 +18,9 @@
           class="nav-item"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path [attr.d]="item.icon" />
+            @for (d of item.icons; track d) {
+              <path [attr.d]="d" />
+            }
           </svg>
           <span>{{ item.label }}</span>
         </a>
@@ -163,7 +165,9 @@
         class="bottom-nav-item"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path [attr.d]="item.icon" />
+          @for (d of item.icons; track d) {
+            <path [attr.d]="d" />
+          }
         </svg>
         <span>{{ item.label }}</span>
       </a>

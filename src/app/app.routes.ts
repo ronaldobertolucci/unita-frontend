@@ -59,7 +59,22 @@ export const routes: Routes = [
           ),
         data: { title: 'Dashboard' },
       },
-      // Novas rotas serão adicionadas aqui conforme o desenvolvimento
+      {
+        path: 'groups',
+        loadComponent: () =>
+          import('./features/groups/groups.component').then(
+            m => m.GroupsComponent
+          ),
+        data: { title: 'Grupos' },
+      },
+      {
+        path: 'groups/:id',
+        loadComponent: () =>
+          import('./features/groups/group-detail/group-detail.component').then(
+            m => m.GroupDetailComponent
+          ),
+        data: { title: 'Grupo' },
+      },
     ],
   },
 

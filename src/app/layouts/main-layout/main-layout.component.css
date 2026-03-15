@@ -740,3 +740,25 @@
     padding: 0 1rem;
   }
 }
+
+/* ─── Erro no painel de notificações ─── */
+.notif-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0.75rem 0.9rem 0;
+  padding: 0.65rem 0.85rem;
+  background: var(--error-dim);
+  border: 1px solid var(--error-border);
+  color: var(--error);
+  border-radius: 10px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.notif-error svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
