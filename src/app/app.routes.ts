@@ -105,6 +105,12 @@ export const routes: Routes = [
               import('./features/registries/legal-entity-employers/legal-entity-employers.component').then(m => m.LegalEntityEmployersComponent),
             data: { title: 'Cadastros' },
           },
+          {
+            path: 'categorias',
+            loadComponent: () =>
+              import('./features/registries/categories/categories.component').then(m => m.CategoriesComponent),
+            data: { title: 'Cadastros' },
+          },
         ],
       },
     ],

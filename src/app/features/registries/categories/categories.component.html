@@ -1,0 +1,239 @@
+<!-- ─── Cabeçalho ─── -->
+<div class="section-header">
+  <span class="section-count">{{ userCategoriesCount() }} categoria{{ userCategoriesCount() !== 1 ? 's' : '' }} suas</span>
+  <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Nova categoria
+  </button>
+</div>
+
+<!-- ─── Loading ─── -->
+@if (isLoading()) {
+  <div class="loading-state">
+    <span class="spinner-lg"></span>
+  </div>
+}
+
+<!-- ─── Conteúdo ─── -->
+@else {
+
+  <!-- Seção: Despesas -->
+  @if (expenseCategories().length > 0) {
+    <div class="category-section">
+      <div class="category-section-header">
+        <span class="category-section-dot category-section-dot--expense"></span>
+        <span class="category-section-title">Despesas</span>
+        <span class="category-section-count">{{ expenseCategories().length }}</span>
+      </div>
+      <ul class="category-list">
+        @for (category of expenseCategories(); track category.id) {
+          <ng-container *ngTemplateOutlet="categoryItem; context: { $implicit: category }" />
+        }
+      </ul>
+    </div>
+  }
+
+  <!-- Seção: Receitas -->
+  @if (incomeCategories().length > 0) {
+    <div class="category-section">
+      <div class="category-section-header">
+        <span class="category-section-dot category-section-dot--income"></span>
+        <span class="category-section-title">Receitas</span>
+        <span class="category-section-count">{{ incomeCategories().length }}</span>
+      </div>
+      <ul class="category-list">
+        @for (category of incomeCategories(); track category.id) {
+          <ng-container *ngTemplateOutlet="categoryItem; context: { $implicit: category }" />
+        }
+      </ul>
+    </div>
+  }
+
+  <!-- Seção: Neutras -->
+  @if (neutralCategories().length > 0) {
+    <div class="category-section">
+      <div class="category-section-header">
+        <span class="category-section-dot category-section-dot--neutral"></span>
+        <span class="category-section-title">Neutras</span>
+        <span class="category-section-count">{{ neutralCategories().length }}</span>
+      </div>
+      <ul class="category-list">
+        @for (category of neutralCategories(); track category.id) {
+          <ng-container *ngTemplateOutlet="categoryItem; context: { $implicit: category }" />
+        }
+      </ul>
+    </div>
+  }
+
+  <!-- Empty state -->
+  @if (categories().length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+      </div>
+      <h3>Nenhuma categoria encontrada</h3>
+      <p>Crie categorias personalizadas para organizar suas movimentações financeiras.</p>
+      <button class="btn-primary" (click)="openCreateModal()">Criar categoria</button>
+    </div>
+  }
+
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar / Editar
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create' || activeModal() === 'edit') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>{{ activeModal() === 'edit' ? 'Editar categoria' : 'Nova categoria' }}</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+
+        <div class="field" [class.field--invalid]="nameControl.invalid && nameControl.touched">
+          <label for="catName">Nome</label>
+          <input
+            id="catName"
+            type="text"
+            formControlName="name"
+            placeholder="Ex: Farmácia"
+            autocomplete="off"
+          />
+          @if (nameControl.invalid && nameControl.touched) {
+            <span class="field-error">
+              @if (nameControl.hasError('required')) { Nome é obrigatório }
+              @else if (nameControl.hasError('maxlength')) { Máximo de 100 caracteres }
+            </span>
+          }
+        </div>
+
+        <div class="field">
+          <label>Tipo</label>
+          <div class="type-toggle">
+            <button
+              type="button"
+              class="type-toggle-btn"
+              [class.type-toggle-btn--expense]="typeControl.value === 'EXPENSE'"
+              [class.type-toggle-btn--active]="typeControl.value === 'EXPENSE'"
+              (click)="typeControl.setValue('EXPENSE')"
+            >
+              <span class="type-toggle-dot type-toggle-dot--expense"></span>
+              Despesa
+            </button>
+            <button
+              type="button"
+              class="type-toggle-btn"
+              [class.type-toggle-btn--income]="typeControl.value === 'INCOME'"
+              [class.type-toggle-btn--active]="typeControl.value === 'INCOME'"
+              (click)="typeControl.setValue('INCOME')"
+            >
+              <span class="type-toggle-dot type-toggle-dot--income"></span>
+              Receita
+            </button>
+            <button
+              type="button"
+              class="type-toggle-btn"
+              [class.type-toggle-btn--neutral]="typeControl.value === 'NEUTRAL'"
+              [class.type-toggle-btn--active]="typeControl.value === 'NEUTRAL'"
+              (click)="typeControl.setValue('NEUTRAL')"
+            >
+              <span class="type-toggle-dot type-toggle-dot--neutral"></span>
+              Neutro
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <h3>Excluir categoria?</h3>
+      <p>A categoria <strong>{{ selectedCategory()?.name }}</strong> será removida permanentemente.</p>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="delete()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ─── Template: item de categoria ─── -->
+<ng-template #categoryItem let-category>
+  <li class="category-item">
+    <span class="category-dot category-dot--{{ category.type | lowercase }}"></span>
+    <span class="category-name">{{ category.name }}</span>
+    @if (category.global) {
+      <span class="category-badge category-badge--global">Global</span>
+    }
+    @if (!category.global) {
+      <div class="category-actions">
+        <button class="btn-icon btn-icon--edit" (click)="openEditModal(category)" aria-label="Editar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="btn-icon btn-icon--danger" (click)="openDeleteModal(category)" aria-label="Excluir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+      </div>
+    }
+  </li>
+</ng-template>
+
+<!-- ─── Template: banner de erro ─── -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>

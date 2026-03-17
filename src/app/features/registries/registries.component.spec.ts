@@ -28,7 +28,7 @@ describe('RegistriesComponent', () => {
   it('should render the three sub-nav links', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const links = compiled.querySelectorAll('a.sub-nav-item');
-    expect(links.length).toBe(3);
+    expect(links.length).toBe(4);
   });
 
   it('should have correct routerLink for empresas', () => {
