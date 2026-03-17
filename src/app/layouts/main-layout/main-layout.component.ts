@@ -37,6 +37,23 @@ const NAV_ITEMS: NavItem[] = [
       'M16 3.13a4 4 0 0 1 0 7.75',
     ],
   },
+  {
+    label: 'Pockets',
+    path: '/pockets',
+    icons: [
+      'M21 12V7H5a2 2 0 0 1 0-4h14v4',
+      'M3 5v14a2 2 0 0 0 2 2h16v-5',
+      'M18 12a2 2 0 0 0 0 4h4v-4z',
+    ],
+  },
+  {
+    label: 'Cadastros',
+    path: '/cadastros',
+    icons: [
+      'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+      'M9 22V12h6v10',
+    ],
+  },
 ];
 
 type NotificationSource = 'sidebar' | 'topbar' | 'mobile' | null;

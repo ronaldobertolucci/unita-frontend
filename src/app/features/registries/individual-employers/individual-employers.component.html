@@ -1,0 +1,162 @@
+<!-- ─── Cabeçalho ─── -->
+<div class="section-header">
+  <span class="section-count">{{ employers().length }} empregador{{ employers().length !== 1 ? 'es' : '' }}</span>
+  <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Novo empregador
+  </button>
+</div>
+
+<!-- ─── Loading ─── -->
+@if (isLoading()) {
+  <div class="loading-state">
+    <span class="spinner-lg"></span>
+  </div>
+}
+
+<!-- ─── Empty state ─── -->
+@else if (employers().length === 0) {
+  <div class="empty-state">
+    <div class="empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <h3>Nenhum empregador PF cadastrado</h3>
+    <p>Cadastre empregadores pessoa física para criar vínculos FGTS.</p>
+    <button class="btn-primary" (click)="openCreateModal()">Cadastrar empregador</button>
+  </div>
+}
+
+<!-- ─── Lista ─── -->
+@else {
+  <ul class="employer-list">
+    @for (employer of employers(); track employer.id) {
+      <li class="employer-item">
+        <div class="employer-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="employer-body">
+          <span class="employer-name">{{ employer.name }}</span>
+          <span class="employer-doc">CPF: {{ formatCpf(employer.cpf) }}</span>
+        </div>
+        <div class="employer-actions">
+          <button class="btn-icon btn-icon--edit" (click)="openEditModal(employer)" aria-label="Editar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button class="btn-icon btn-icon--danger" (click)="openDeleteModal(employer)" aria-label="Excluir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar / Editar
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create' || activeModal() === 'edit') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>{{ activeModal() === 'edit' ? 'Editar empregador' : 'Novo empregador PF' }}</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+
+        <div class="field" [class.field--invalid]="nameControl.invalid && nameControl.touched">
+          <label for="empName">Nome completo</label>
+          <input id="empName" type="text" formControlName="name" placeholder="Ex: João da Silva" autocomplete="off" />
+          @if (nameControl.invalid && nameControl.touched) {
+            <span class="field-error">
+              @if (nameControl.hasError('required')) { Nome é obrigatório }
+              @else if (nameControl.hasError('maxlength')) { Máximo de 255 caracteres }
+            </span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="cpfControl.invalid && cpfControl.touched">
+          <label for="empCpf">CPF <span class="field-hint">11 dígitos, sem máscara</span></label>
+          <input id="empCpf" type="text" formControlName="cpf" placeholder="00000000000" inputmode="numeric" autocomplete="off" maxlength="11" />
+          @if (cpfControl.invalid && cpfControl.touched) {
+            <span class="field-error">
+              @if (cpfControl.hasError('required')) { CPF é obrigatório }
+              @else { CPF deve ter exatamente 11 dígitos numéricos }
+            </span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <h3>Excluir empregador?</h3>
+      <p>O empregador <strong>{{ selectedEmployer()?.name }}</strong> será removido permanentemente.</p>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="delete()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ─── Template: banner de erro ─── -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>

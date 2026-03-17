@@ -1,0 +1,726 @@
+<div class="page">
+
+  <!-- ─── Cabeçalho ─── -->
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>Meus Pockets</h2>
+      <p>Gerencie suas contas, carteiras e vínculos financeiros</p>
+    </div>
+    <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Novo pocket
+    </button>
+  </div>
+
+  <!-- ─── Loading ─── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  <!-- ─── Empty state ─── -->
+  @else if (pockets().length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="3"/>
+          <path d="M2 10h20"/>
+        </svg>
+      </div>
+      <h3>Nenhum pocket ainda</h3>
+      <p>Adicione contas bancárias, carteiras de benefício, vínculos FGTS ou sua carteira em dinheiro.</p>
+      <button class="btn-primary" (click)="openCreateModal()">Criar primeiro pocket</button>
+    </div>
+  }
+
+  <!-- ─── Conteúdo ─── -->
+  @else {
+
+    <!-- Saldo total -->
+    <div class="balance-card">
+      <span class="balance-label">Saldo total consolidado</span>
+      <span class="balance-value">{{ formatCurrency(totalBalance()) }}</span>
+    </div>
+
+    <!-- Grid de pockets -->
+    <div class="pockets-grid">
+      @for (pocket of pockets(); track pocket.id) {
+        <button class="pocket-card" (click)="openDetailModal(pocket)">
+          <div class="pocket-card-icon pocket-card-icon--{{ pocket.type | lowercase }}">
+            @if (pocket.type === 'BANK_ACCOUNT') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="3"/>
+                <path d="M2 10h20"/>
+              </svg>
+            } @else if (pocket.type === 'BENEFIT_ACCOUNT') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="2"/>
+                <path d="M6 12h.01M18 12h.01"/>
+              </svg>
+            } @else if (pocket.type === 'FGTS_EMPLOYER_ACCOUNT') {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+              </svg>
+            }
+          </div>
+          <div class="pocket-card-body">
+            <span class="pocket-card-label">{{ pocket.label }}</span>
+            <span class="pocket-card-type">{{ getPocketTypeLabel(pocket.type) }}</span>
+          </div>
+          <div class="pocket-card-right">
+            <span class="pocket-card-balance">{{ formatCurrency(pocket.balance) }}</span>
+            <svg class="pocket-card-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 4l4 4-4 4"/>
+            </svg>
+          </div>
+        </button>
+      }
+    </div>
+  }
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Seleção de tipo
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-type-select') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Novo pocket</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <p class="modal-description">Selecione o tipo de pocket que deseja adicionar.</p>
+      <div class="type-grid">
+
+        <button class="type-card" (click)="selectPocketType('BANK_ACCOUNT')">
+          <div class="type-card-icon type-card-icon--bank">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="3"/>
+              <path d="M2 10h20"/>
+            </svg>
+          </div>
+          <span class="type-card-label">Conta Bancária</span>
+          <span class="type-card-desc">Corrente, poupança, salário ou investimento</span>
+        </button>
+
+        <button class="type-card" (click)="selectPocketType('BENEFIT_ACCOUNT')">
+          <div class="type-card-icon type-card-icon--benefit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="2"/>
+              <path d="M6 12h.01M18 12h.01"/>
+            </svg>
+          </div>
+          <span class="type-card-label">Conta de Benefício</span>
+          <span class="type-card-desc">Vale-alimentação ou vale-refeição</span>
+        </button>
+
+        <button class="type-card" (click)="selectPocketType('FGTS_EMPLOYER_ACCOUNT')">
+          <div class="type-card-icon type-card-icon--fgts">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <span class="type-card-label">FGTS</span>
+          <span class="type-card-desc">Vínculo empregatício e saldo do FGTS</span>
+        </button>
+
+        <button
+          class="type-card"
+          [class.type-card--disabled]="hasCash()"
+          [disabled]="hasCash()"
+          (click)="selectPocketType('CASH')"
+        >
+          <div class="type-card-icon type-card-icon--cash">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+            </svg>
+          </div>
+          <span class="type-card-label">Carteira</span>
+          <span class="type-card-desc">
+            @if (hasCash()) { Você já possui uma carteira }
+            @else { Dinheiro em espécie }
+          </span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar conta bancária
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-bank-account') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Nova conta bancária</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="bankAccountForm" (ngSubmit)="createBankAccount()" novalidate>
+
+        <div class="field" [class.field--invalid]="baLegalEntityId.invalid && baLegalEntityId.touched">
+          <label for="baLegalEntity">Instituição</label>
+          @if (isLoadingRef()) {
+            <div class="field-loading"><span class="spinner-sm"></span></div>
+          } @else {
+            <select id="baLegalEntity" formControlName="legalEntityId">
+              <option [value]="null" disabled selected>Selecione a instituição</option>
+              @for (entity of legalEntities(); track entity.id) {
+                <option [value]="entity.id">{{ entity.corporateName }}</option>
+              }
+            </select>
+          }
+          @if (baLegalEntityId.invalid && baLegalEntityId.touched) {
+            <span class="field-error">Instituição é obrigatória</span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="baAgency.invalid && baAgency.touched">
+            <label for="baAgency">Agência</label>
+            <input id="baAgency" type="text" formControlName="agency" placeholder="0001" autocomplete="off" />
+            @if (baAgency.invalid && baAgency.touched) {
+              <span class="field-error">
+                @if (baAgency.hasError('required')) { Obrigatório }
+                @else if (baAgency.hasError('maxlength')) { Máx. 10 caracteres }
+              </span>
+            }
+          </div>
+          <div class="field" [class.field--invalid]="baNumber.invalid && baNumber.touched">
+            <label for="baNumber">Número</label>
+            <input id="baNumber" type="text" formControlName="number" placeholder="12345-6" autocomplete="off" />
+            @if (baNumber.invalid && baNumber.touched) {
+              <span class="field-error">
+                @if (baNumber.hasError('required')) { Obrigatório }
+                @else if (baNumber.hasError('maxlength')) { Máx. 20 caracteres }
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="baBankAccountTypeId.invalid && baBankAccountTypeId.touched">
+          <label for="baBankAccountType">Tipo de conta</label>
+          <select id="baBankAccountType" formControlName="bankAccountTypeId">
+            <option [value]="null" disabled selected>Selecione o tipo</option>
+            @for (type of bankAccountTypes; track type.id) {
+              <option [value]="type.id">{{ type.name }}</option>
+            }
+          </select>
+          @if (baBankAccountTypeId.invalid && baBankAccountTypeId.touched) {
+            <span class="field-error">Tipo é obrigatório</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="baStatus">Status</label>
+          <select id="baStatus" formControlName="status">
+            <option value="ACTIVE">Ativa</option>
+            <option value="INACTIVE">Inativa</option>
+            <option value="BLOCKED">Bloqueada</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar conta de benefício
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-benefit-account') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Nova conta de benefício</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="benefitAccountForm" (ngSubmit)="createBenefitAccount()" novalidate>
+
+        <div class="field" [class.field--invalid]="bfLegalEntityId.invalid && bfLegalEntityId.touched">
+          <label for="bfLegalEntity">Empresa fornecedora</label>
+          @if (isLoadingRef()) {
+            <div class="field-loading"><span class="spinner-sm"></span></div>
+          } @else {
+            <select id="bfLegalEntity" formControlName="legalEntityId">
+              <option [value]="null" disabled selected>Selecione a empresa</option>
+              @for (entity of legalEntities(); track entity.id) {
+                <option [value]="entity.id">{{ entity.corporateName }}</option>
+              }
+            </select>
+          }
+          @if (bfLegalEntityId.invalid && bfLegalEntityId.touched) {
+            <span class="field-error">Empresa é obrigatória</span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="bfBenefitTypeId.invalid && bfBenefitTypeId.touched">
+          <label for="bfBenefitType">Tipo de benefício</label>
+          <select id="bfBenefitType" formControlName="benefitTypeId">
+            <option [value]="null" disabled selected>Selecione o tipo</option>
+            @for (type of benefitTypes; track type.id) {
+              <option [value]="type.id">{{ type.name }}</option>
+            }
+          </select>
+          @if (bfBenefitTypeId.invalid && bfBenefitTypeId.touched) {
+            <span class="field-error">Tipo é obrigatório</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="bfStatus">Status</label>
+          <select id="bfStatus" formControlName="status">
+            <option value="ACTIVE">Ativa</option>
+            <option value="INACTIVE">Inativa</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar FGTS
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-fgts') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Novo vínculo FGTS</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="fgtsForm" (ngSubmit)="createFgts()" novalidate>
+
+        <div class="field">
+          <label>Tipo de empregador</label>
+          <div class="toggle-group">
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.toggle-btn--active]="fgtsEmployerType.value === 'individual'"
+              (click)="fgtsForm.patchValue({ employerType: 'individual' }); onEmployerTypeChange()"
+            >Pessoa Física</button>
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.toggle-btn--active]="fgtsEmployerType.value === 'legal-entity'"
+              (click)="fgtsForm.patchValue({ employerType: 'legal-entity' }); onEmployerTypeChange()"
+            >Pessoa Jurídica</button>
+          </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="fgtsEmployerId.invalid && fgtsEmployerId.touched">
+          <label for="fgtsEmployer">Empregador</label>
+          @if (isLoadingRef()) {
+            <div class="field-loading"><span class="spinner-sm"></span></div>
+          } @else if (currentEmployerList.length === 0) {
+            <div class="field-empty-hint">Nenhum empregador cadastrado deste tipo.</div>
+          } @else {
+            <select id="fgtsEmployer" formControlName="employerId">
+              <option [value]="null" disabled selected>Selecione o empregador</option>
+              @for (emp of currentEmployerList; track emp.id) {
+                <option [value]="emp.id">{{ emp.label }}</option>
+              }
+            </select>
+          }
+          @if (fgtsEmployerId.invalid && fgtsEmployerId.touched) {
+            <span class="field-error">Empregador é obrigatório</span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="fgtsAdmissionDate.invalid && fgtsAdmissionDate.touched">
+            <label for="fgtsAdmission">Data de admissão</label>
+            <input id="fgtsAdmission" type="date" formControlName="admissionDate" />
+            @if (fgtsAdmissionDate.invalid && fgtsAdmissionDate.touched) {
+              <span class="field-error">Data de admissão é obrigatória</span>
+            }
+          </div>
+          <div class="field">
+            <label for="fgtsDismissal">Data de demissão</label>
+            <input id="fgtsDismissal" type="date" formControlName="dismissalDate" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fgtsStatus">Status</label>
+          <select id="fgtsStatus" formControlName="status">
+            <option value="ACTIVE">Ativo</option>
+            <option value="INACTIVE">Inativo</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar criação da carteira
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-cash-confirm') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+      <div class="confirm-icon confirm-icon--accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+          <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+        </svg>
+      </div>
+      <h3>Criar carteira?</h3>
+      <p>Sua carteira será criada para registrar movimentações em dinheiro. Você só pode ter uma carteira.</p>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-primary" [disabled]="isSaving()" (click)="createCash()">
+          @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar carteira }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Detalhe — Conta bancária
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'detail-bank-account') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Conta bancária</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (isLoadingDetail()) {
+        <div class="modal-loading"><span class="spinner-sm"></span></div>
+      } @else if (bankAccountDetail()) {
+        <ng-container *ngTemplateOutlet="errorBanner" />
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Instituição</span>
+            <span class="detail-value">{{ bankAccountDetail()!.legalEntityCorporateName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Tipo</span>
+            <span class="detail-value">{{ bankAccountDetail()!.bankAccountType }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Agência</span>
+            <span class="detail-value">{{ bankAccountDetail()!.agency }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Número</span>
+            <span class="detail-value">{{ bankAccountDetail()!.number }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Saldo</span>
+            <span class="detail-value detail-value--balance">{{ formatCurrency(bankAccountDetail()!.balance) }}</span>
+          </div>
+        </div>
+
+        <form [formGroup]="editBankAccountForm" (ngSubmit)="saveBankAccount()" novalidate>
+          <div class="field">
+            <label for="editBaStatus">Status</label>
+            <select id="editBaStatus" formControlName="status">
+              <option value="ACTIVE">Ativa</option>
+              <option value="INACTIVE">Inativa</option>
+              <option value="BLOCKED">Bloqueada</option>
+            </select>
+          </div>
+          <div class="modal-actions modal-actions--between">
+            <button type="button" class="btn-action btn-action--danger" (click)="openDeleteConfirm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+              </svg>
+              Excluir
+            </button>
+            <div class="modal-actions-right">
+              <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+              <button type="submit" class="btn-primary" [disabled]="isSaving()">
+                @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+              </button>
+            </div>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Detalhe — Conta de benefício
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'detail-benefit-account') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Conta de benefício</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (isLoadingDetail()) {
+        <div class="modal-loading"><span class="spinner-sm"></span></div>
+      } @else if (benefitAccountDetail()) {
+        <ng-container *ngTemplateOutlet="errorBanner" />
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Empresa</span>
+            <span class="detail-value">{{ benefitAccountDetail()!.legalEntityCorporateName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Tipo</span>
+            <span class="detail-value">{{ benefitAccountDetail()!.benefitType }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Saldo</span>
+            <span class="detail-value detail-value--balance">{{ formatCurrency(benefitAccountDetail()!.balance) }}</span>
+          </div>
+        </div>
+
+        <form [formGroup]="editBenefitAccountForm" (ngSubmit)="saveBenefitAccount()" novalidate>
+          <div class="field">
+            <label for="editBfStatus">Status</label>
+            <select id="editBfStatus" formControlName="status">
+              <option value="ACTIVE">Ativa</option>
+              <option value="INACTIVE">Inativa</option>
+            </select>
+          </div>
+          <div class="modal-actions modal-actions--between">
+            <button type="button" class="btn-action btn-action--danger" (click)="openDeleteConfirm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+              </svg>
+              Excluir
+            </button>
+            <div class="modal-actions-right">
+              <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+              <button type="submit" class="btn-primary" [disabled]="isSaving()">
+                @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+              </button>
+            </div>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Detalhe — FGTS
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'detail-fgts') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Vínculo FGTS</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (isLoadingDetail()) {
+        <div class="modal-loading"><span class="spinner-sm"></span></div>
+      } @else if (fgtsDetail()) {
+        <ng-container *ngTemplateOutlet="errorBanner" />
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Empregador</span>
+            <span class="detail-value">{{ fgtsDetail()!.employerName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Admissão</span>
+            <span class="detail-value">{{ formatDate(fgtsDetail()!.admissionDate) }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Saldo</span>
+            <span class="detail-value detail-value--balance">{{ formatCurrency(fgtsDetail()!.balance) }}</span>
+          </div>
+        </div>
+
+        <form [formGroup]="editFgtsForm" (ngSubmit)="saveFgts()" novalidate>
+          <div class="field">
+            <label for="editFgtsDismissal">Data de demissão</label>
+            <input id="editFgtsDismissal" type="date" formControlName="dismissalDate" />
+          </div>
+          <div class="field">
+            <label for="editFgtsStatus">Status</label>
+            <select id="editFgtsStatus" formControlName="status">
+              <option value="ACTIVE">Ativo</option>
+              <option value="INACTIVE">Inativo</option>
+            </select>
+          </div>
+          <div class="modal-actions modal-actions--between">
+            <button type="button" class="btn-action btn-action--danger" (click)="openDeleteConfirm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+              </svg>
+              Excluir
+            </button>
+            <div class="modal-actions-right">
+              <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+              <button type="submit" class="btn-primary" [disabled]="isSaving()">
+                @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+              </button>
+            </div>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Detalhe — Carteira
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'detail-cash') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Carteira</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Saldo em espécie</span>
+          <span class="detail-value detail-value--balance">{{ formatCurrency(selectedPocket()!.balance) }}</span>
+        </div>
+      </div>
+
+      <p class="modal-description">A carteira registra suas movimentações em dinheiro. Não é possível editar suas configurações.</p>
+
+      <div class="modal-actions modal-actions-right">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <h3>Excluir pocket?</h3>
+      <p>O pocket <strong>{{ selectedPocket()?.label }}</strong> e todas as suas transações serão removidos permanentemente.</p>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deletePocket()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TEMPLATE: Banner de erro
+══════════════════════════════════════════════════════════════════ -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>

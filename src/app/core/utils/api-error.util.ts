@@ -5,6 +5,11 @@ const ERROR_MAP: Record<string, string> = {
   'Invitation not found': 'Convite não encontrado.',
   'Group not found': 'Grupo não encontrado.',
   'Only members can invite': 'Apenas membros podem convidar.',
+  'Legal entity is in use and cannot be deleted': 'Esta empresa está em uso e não pode ser excluída.',
+  'Employer is in use and cannot be deleted': 'Este empregador está em uso e não pode ser excluído.',
+  'An employer for this legal entity already exists': 'Já existe um empregador cadastrado para esta empresa.',
+  'A legal entity with this CNPJ already exists': 'Já existe uma empresa cadastrada com este CNPJ.',
+  'An employer with this CPF already exists': 'Já existe um empregador cadastrado com este CPF.',
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {

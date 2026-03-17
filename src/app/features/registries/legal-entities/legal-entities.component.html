@@ -1,0 +1,178 @@
+<!-- ─── Cabeçalho ─── -->
+<div class="section-header">
+  <span class="section-count">{{ legalEntities().length }} empresa{{ legalEntities().length !== 1 ? 's' : '' }}</span>
+  <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Nova empresa
+  </button>
+</div>
+
+<!-- ─── Loading ─── -->
+@if (isLoading()) {
+  <div class="loading-state">
+    <span class="spinner-lg"></span>
+  </div>
+}
+
+<!-- ─── Empty state ─── -->
+@else if (legalEntities().length === 0) {
+  <div class="empty-state">
+    <div class="empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </div>
+    <h3>Nenhuma empresa cadastrada</h3>
+    <p>Cadastre empresas para usá-las em contas bancárias, de benefício, cartões de crédito e investimentos.</p>
+    <button class="btn-primary" (click)="openCreateModal()">Cadastrar empresa</button>
+  </div>
+}
+
+<!-- ─── Lista ─── -->
+@else {
+  <ul class="entity-list">
+    @for (entity of legalEntities(); track entity.id) {
+      <li class="entity-item">
+        <div class="entity-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div class="entity-body">
+          <span class="entity-name">{{ entity.corporateName }}</span>
+          @if (entity.tradeName) {
+            <span class="entity-trade">{{ entity.tradeName }}</span>
+          }
+          <span class="entity-cnpj">{{ formatCnpj(entity.cnpj) }}</span>
+        </div>
+        <div class="entity-actions">
+          <button class="btn-icon btn-icon--edit" (click)="openEditModal(entity)" aria-label="Editar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button class="btn-icon btn-icon--danger" (click)="openDeleteModal(entity)" aria-label="Excluir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar / Editar
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create' || activeModal() === 'edit') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>{{ activeModal() === 'edit' ? 'Editar empresa' : 'Nova empresa' }}</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+
+        <div class="field" [class.field--invalid]="cnpjControl.invalid && cnpjControl.touched">
+          <label for="cnpj">CNPJ <span class="field-hint">14 dígitos, sem máscara</span></label>
+          <input id="cnpj" type="text" formControlName="cnpj" placeholder="00000000000000" inputmode="numeric" autocomplete="off" maxlength="14" />
+          @if (cnpjControl.invalid && cnpjControl.touched) {
+            <span class="field-error">
+              @if (cnpjControl.hasError('required')) { CNPJ é obrigatório }
+              @else if (cnpjControl.hasError('pattern') || cnpjControl.hasError('minlength') || cnpjControl.hasError('maxlength')) { CNPJ deve ter exatamente 14 dígitos numéricos }
+            </span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="corporateNameControl.invalid && corporateNameControl.touched">
+          <label for="corporateName">Razão social</label>
+          <input id="corporateName" type="text" formControlName="corporateName" placeholder="Ex: Empresa Exemplo Ltda" autocomplete="off" />
+          @if (corporateNameControl.invalid && corporateNameControl.touched) {
+            <span class="field-error">
+              @if (corporateNameControl.hasError('required')) { Razão social é obrigatória }
+              @else if (corporateNameControl.hasError('maxlength')) { Máximo de 255 caracteres }
+            </span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="tradeNameControl.invalid && tradeNameControl.touched">
+          <label for="tradeName">Nome fantasia <span class="field-hint">opcional</span></label>
+          <input id="tradeName" type="text" formControlName="tradeName" placeholder="Ex: Empresa Exemplo" autocomplete="off" />
+          @if (tradeNameControl.invalid && tradeNameControl.touched) {
+            <span class="field-error">Máximo de 255 caracteres</span>
+          }
+        </div>
+
+        <div class="field">
+          <label for="stateRegistration">Inscrição estadual <span class="field-hint">opcional</span></label>
+          <input id="stateRegistration" type="text" formControlName="stateRegistration" placeholder="Ex: 123456789" autocomplete="off" />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <h3>Excluir empresa?</h3>
+      <p>A empresa <strong>{{ selectedEntity()?.corporateName }}</strong> será removida permanentemente. Esta ação não poderá ser desfeita.</p>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="delete()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ─── Template: banner de erro ─── -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>

@@ -75,6 +75,38 @@ export const routes: Routes = [
           ),
         data: { title: 'Grupo' },
       },
+      {
+        path: 'pockets',
+        loadComponent: () =>
+          import('./features/pockets/pockets.component').then(m => m.PocketsComponent),
+        data: { title: 'Pockets' },
+      },
+      {
+        path: 'cadastros',
+        loadComponent: () =>
+          import('./features/registries/registries.component').then(m => m.RegistriesComponent),
+        children: [
+          { path: '', redirectTo: 'empresas', pathMatch: 'full' },
+          {
+            path: 'empresas',
+            loadComponent: () =>
+              import('./features/registries/legal-entities/legal-entities.component').then(m => m.LegalEntitiesComponent),
+            data: { title: 'Cadastros' },
+          },
+          {
+            path: 'empregadores-pf',
+            loadComponent: () =>
+              import('./features/registries/individual-employers/individual-employers.component').then(m => m.IndividualEmployersComponent),
+            data: { title: 'Cadastros' },
+          },
+          {
+            path: 'empregadores-pj',
+            loadComponent: () =>
+              import('./features/registries/legal-entity-employers/legal-entity-employers.component').then(m => m.LegalEntityEmployersComponent),
+            data: { title: 'Cadastros' },
+          },
+        ],
+      },
     ],
   },
 

@@ -1,0 +1,94 @@
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.page-header-text {
+  margin-bottom: 1.75rem;
+}
+
+.page-header-text h2 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.2px;
+}
+
+.page-header-text p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* ─── Sub-navegação ─── */
+.sub-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 1.75rem;
+}
+
+.sub-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.6rem 0.9rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.sub-nav-item svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.sub-nav-item:hover {
+  color: var(--text-primary);
+}
+
+.sub-nav-item--active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+}
+
+/* ─── Conteúdo da sub-rota ─── */
+.sub-content {
+  animation: fadeIn 0.18s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Responsividade ─── */
+@media (max-width: 480px) {
+  .sub-nav {
+    gap: 0;
+  }
+
+  .sub-nav-item {
+    flex: 1;
+    justify-content: center;
+    padding: 0.6rem 0.5rem;
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+
+  .sub-nav-item svg {
+    width: 14px;
+    height: 14px;
+  }
+}
