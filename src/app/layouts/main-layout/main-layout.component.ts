@@ -47,6 +47,14 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    label: 'Transferências',
+    path: '/transferencias',
+    icons: [
+      'M7 16V4m0 0L3 8m4-4l4 4',
+      'M17 8v12m0 0l4-4m-4 4l-4-4',
+    ],
+  },
+  {
     label: 'Cadastros',
     path: '/cadastros',
     icons: [

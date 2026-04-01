@@ -2,6 +2,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { normalizeType } from '../utils/pocket.utils';
 import {
   PocketSummaryDto,
   BankAccountDto,
@@ -19,7 +20,6 @@ import {
   UpdateBankAccountPayload,
   UpdateBenefitAccountPayload,
   UpdateFgtsPayload,
-  PocketType,
 } from '../models/pocket.model';
 
 // ─── Dados de referência hardcoded ──────────────────────────────────────────
@@ -52,20 +52,10 @@ export class PocketService {
     return this.http.get<any[]>(`${this.base}/pockets/my`).pipe(
       map(list => list.map(p => ({
         ...p,
-        type: this.normalizeType(p.type),
+        type: normalizeType(p.type),
       }))),
       tap(list => this._pockets.set(list))
     );
-  }
-
-  private normalizeType(type: string): PocketType {
-    const map: Record<string, PocketType> = {
-      'BankAccount': 'BANK_ACCOUNT',
-      'BenefitAccount': 'BENEFIT_ACCOUNT',
-      'FgtsEmployerAccount': 'FGTS_EMPLOYER_ACCOUNT',
-      'Cash': 'CASH',
-    };
-    return map[type] ?? type as PocketType;
   }
 
   // ─── Dados de referência (carregados sob demanda) ─────────────────────────

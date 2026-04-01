@@ -33,6 +33,16 @@ export class GroupService {
       });
   }
 
+  loadMyGroups$(): Observable<GroupDto[]> {
+    return this.http.get<GroupDto[]>(`${environment.apiUrl}/groups/my`).pipe(
+      tap(data => {
+        this._myGroups.set(data);
+        this._loading.set(false);
+      }),
+      tap({ subscribe: () => this._loading.set(true) })
+    );
+  }
+
   getGroup(id: number): Observable<GroupDto> {
     return this.http.get<GroupDto>(`${environment.apiUrl}/groups/${id}`);
   }
