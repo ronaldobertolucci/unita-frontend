@@ -1,0 +1,307 @@
+<div class="page">
+
+  <!-- ─── Loading inicial ─── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  @else if (pocket()) {
+
+    <!-- ─── Cabeçalho do pocket ─── -->
+    <div class="pocket-header">
+      <a routerLink="/pockets" class="back-link">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 12L6 8l4-4"/>
+        </svg>
+        Pockets
+      </a>
+
+      <div class="pocket-info-card">
+        <div class="pocket-icon pocket-icon--{{ pocket()!.type | lowercase }}">
+          @if (pocket()!.type === 'BANK_ACCOUNT') {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/>
+            </svg>
+          } @else if (pocket()!.type === 'BENEFIT_ACCOUNT') {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>
+            </svg>
+          } @else if (pocket()!.type === 'FGTS_EMPLOYER_ACCOUNT') {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+            </svg>
+          }
+        </div>
+        <div class="pocket-info-body">
+          <span class="pocket-info-label">{{ pocket()!.label }}</span>
+          <span class="pocket-info-type">{{ getPocketTypeLabel(pocket()!.type) }}</span>
+        </div>
+        <div class="pocket-info-right">
+          <span class="pocket-info-balance">{{ formatCurrency(pocket()!.balance) }}</span>
+          <span class="pocket-info-balance-label">saldo atual</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Barra de filtro ─── -->
+    <div class="filter-bar">
+      <div class="filter-inputs" [formGroup]="filterForm">
+        <div class="filter-field">
+          <label for="startDate">De</label>
+          <input id="startDate" type="date" formControlName="startDate" />
+        </div>
+        <div class="filter-field">
+          <label for="endDate">Até</label>
+          <input id="endDate" type="date" formControlName="endDate" />
+        </div>
+        <div class="filter-btns">
+          <button class="btn-ghost" (click)="applyFilter()" [disabled]="isLoadingTx()">Filtrar</button>
+          <button class="btn-ghost btn-ghost--muted" (click)="clearFilter()" [disabled]="isLoadingTx()">Limpar</button>
+        </div>
+      </div>
+      <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nova transação
+      </button>
+    </div>
+
+    @if (filterError()) {
+      <p class="filter-error">{{ filterError() }}</p>
+    }
+
+    <!-- ─── Lista de transações ─── -->
+    @if (isLoadingTx()) {
+      <div class="loading-state loading-state--sm">
+        <span class="spinner-lg"></span>
+      </div>
+    } @else if (groupedTransactions().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/>
+            <path d="M6 14h.01M10 14h4"/>
+          </svg>
+        </div>
+        <h3>Nenhuma transação</h3>
+        <p>Registre entradas e saídas para acompanhar o saldo deste pocket.</p>
+        <button class="btn-primary" (click)="openCreateModal()">Registrar primeira transação</button>
+      </div>
+    } @else {
+      <div class="tx-list">
+        @for (group of groupedTransactions(); track group.date) {
+          <div class="tx-group">
+            <div class="tx-group-header">
+              <span class="tx-group-date">{{ formatGroupDate(group.date) }}</span>
+            </div>
+            @for (tx of group.items; track tx.id) {
+              <div class="tx-item">
+                <div class="tx-direction-icon tx-direction-icon--{{ tx.direction | lowercase }}">
+                  @if (tx.direction === 'INCOME') {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                    </svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                    </svg>
+                  }
+                </div>
+                <div class="tx-body">
+                  <span class="tx-description">{{ tx.description }}</span>
+                  <span class="tx-category">{{ tx.category.name }}</span>
+                </div>
+                <span class="tx-amount tx-amount--{{ tx.direction | lowercase }}">
+                  {{ tx.direction === 'INCOME' ? '+' : '−' }}&nbsp;{{ formatCurrency(tx.amount) }}
+                </span>
+                <button class="tx-delete-btn" (click)="openDeleteConfirm(tx)" aria-label="Excluir transação">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                  </svg>
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+  }
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL: Nova transação
+══════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Nova transação</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="modal-error">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <!-- Toggle: Saída / Entrada -->
+      <div class="direction-toggle">
+        <button
+          type="button"
+          class="direction-btn"
+          [class.direction-btn--active]="createDirection() === 'EXPENSE'"
+          [class.direction-btn--expense]="createDirection() === 'EXPENSE'"
+          (click)="setDirection('EXPENSE')"
+        >
+          <span class="direction-dot direction-dot--expense"></span>
+          Saída
+        </button>
+        <button
+          type="button"
+          class="direction-btn"
+          [class.direction-btn--active]="createDirection() === 'INCOME'"
+          [class.direction-btn--income]="createDirection() === 'INCOME'"
+          (click)="setDirection('INCOME')"
+        >
+          <span class="direction-dot direction-dot--income"></span>
+          Entrada
+        </button>
+      </div>
+
+      <form [formGroup]="createForm" (ngSubmit)="onCreateTransaction()" novalidate>
+
+        <!-- Valor -->
+        <div class="field" [class.field--invalid]="amountControl.invalid && amountControl.touched">
+          <label for="txAmount">Valor (R$)</label>
+          <input
+            id="txAmount"
+            type="number"
+            formControlName="amount"
+            placeholder="0,00"
+            step="0.01"
+            min="0.01"
+          />
+          @if (amountControl.invalid && amountControl.touched) {
+            <span class="field-error">
+              @if (amountControl.hasError('required')) { Valor é obrigatório }
+              @else if (amountControl.hasError('min')) { O valor deve ser maior que zero }
+            </span>
+          }
+        </div>
+
+        <!-- Data -->
+        <div class="field" [class.field--invalid]="dateControl.invalid && dateControl.touched">
+          <label for="txDate">Data</label>
+          <input id="txDate" type="date" formControlName="transactionDate" />
+          @if (dateControl.invalid && dateControl.touched) {
+            <span class="field-error">Data é obrigatória</span>
+          }
+        </div>
+
+        <!-- Descrição -->
+        <div class="field" [class.field--invalid]="descriptionControl.invalid && descriptionControl.touched">
+          <label for="txDescription">Descrição</label>
+          <input
+            id="txDescription"
+            type="text"
+            formControlName="description"
+            placeholder="Ex: Salário, Conta de luz..."
+            autocomplete="off"
+          />
+          @if (descriptionControl.invalid && descriptionControl.touched) {
+            <span class="field-error">
+              @if (descriptionControl.hasError('required')) { Descrição é obrigatória }
+              @else if (descriptionControl.hasError('maxlength')) { Máximo de 255 caracteres }
+            </span>
+          }
+        </div>
+
+        <!-- Categoria -->
+        <div class="field" [class.field--invalid]="categoryControl.invalid && categoryControl.touched">
+          <label for="txCategory">Categoria</label>
+          <select id="txCategory" formControlName="categoryId">
+            <option [ngValue]="null" disabled>Selecione uma categoria</option>
+            @for (cat of availableCategories(); track cat.id) {
+              <option [ngValue]="cat.id">{{ cat.name }} ({{ getCategoryTypeLabel(cat.type) }})</option>
+            }
+          </select>
+          @if (categoryControl.invalid && categoryControl.touched) {
+            <span class="field-error">Selecione uma categoria</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Registrando... }
+            @else { Registrar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+
+      <h3>Excluir transação?</h3>
+      <p>A transação <strong>{{ selectedTransaction()?.description }}</strong> será removida permanentemente.</p>
+
+      @if (errorMessage()) {
+        <div class="modal-error">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteTransaction()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... }
+          @else { Excluir }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}

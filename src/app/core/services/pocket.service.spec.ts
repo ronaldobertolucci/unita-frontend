@@ -23,7 +23,6 @@ const mockBankAccount: BankAccountDto = {
   agency: '0001',
   bankAccountType: 'Corrente',
   status: 'ACTIVE',
-  balance: 1500,
 };
 
 const mockBenefitAccount: BenefitAccountDto = {
@@ -31,7 +30,6 @@ const mockBenefitAccount: BenefitAccountDto = {
   legalEntityCorporateName: 'Empresa Y',
   benefitType: 'Vale-Alimentação',
   status: 'ACTIVE',
-  balance: 300,
 };
 
 const mockFgts: FgtsEmployerAccountDto = {
@@ -40,7 +38,6 @@ const mockFgts: FgtsEmployerAccountDto = {
   admissionDate: '2020-01-01',
   dismissalDate: null,
   status: 'ACTIVE',
-  balance: 5000,
 };
 
 const mockCash: CashDto = { id: 2, balance: 200 };

@@ -19,7 +19,6 @@ export interface BankAccountDto {
   agency: string;
   bankAccountType: string;
   status: AccountStatus;
-  balance: number;
 }
 
 export interface BenefitAccountDto {
@@ -27,7 +26,6 @@ export interface BenefitAccountDto {
   legalEntityCorporateName: string;
   benefitType: string;
   status: 'ACTIVE' | 'INACTIVE';
-  balance: number;
 }
 
 export interface FgtsEmployerAccountDto {
@@ -36,7 +34,6 @@ export interface FgtsEmployerAccountDto {
   admissionDate: string;
   dismissalDate: string | null;
   status: 'ACTIVE' | 'INACTIVE';
-  balance: number;
 }
 
 export interface CashDto {

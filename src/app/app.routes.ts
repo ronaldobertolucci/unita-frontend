@@ -82,6 +82,13 @@ export const routes: Routes = [
         data: { title: 'Pockets' },
       },
       {
+        path: 'pockets/:id',
+        loadComponent: () =>
+          import('./features/pockets/pocket-detail/pocket-detail.component')
+            .then(m => m.PocketDetailComponent),
+        data: { title: 'Transações' }
+      },
+      {
         path: 'cadastros',
         loadComponent: () =>
           import('./features/registries/registries.component').then(m => m.RegistriesComponent),

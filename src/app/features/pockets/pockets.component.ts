@@ -13,6 +13,7 @@ import {
   IndividualEmployerDto,
   LegalEntityEmployerDto,
 } from '../../core/models/pocket.model';
+import { RouterLink } from '@angular/router';
 
 type ModalType =
   | 'create-type-select'
@@ -30,7 +31,7 @@ type ModalType =
 @Component({
   selector: 'app-pockets',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './pockets.component.html',
   styleUrl: './pockets.component.css',
 })
