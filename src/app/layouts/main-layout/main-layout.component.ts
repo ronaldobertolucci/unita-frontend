@@ -55,6 +55,14 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    label: 'Cartões',
+    path: '/credit-cards',
+    icons: [
+      'M1 4h22v16a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V4z',
+      'M1 10h22',
+    ],
+  },
+  {
     label: 'Cadastros',
     path: '/cadastros',
     icons: [

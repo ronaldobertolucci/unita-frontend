@@ -95,6 +95,22 @@ export const routes: Routes = [
         data: { title: 'Transferências' },
       },
       {
+        path: 'credit-cards',
+        loadComponent: () =>
+          import('./features/credit-cards/credit-cards.component').then(m => m.CreditCardsComponent),
+        data: { title: 'Cartões de Crédito' },
+      },
+      { path: 'credit-cards/:id', 
+        loadComponent: () => 
+          import('./features/credit-cards/credit-card-detail/credit-card-detail.component').then(m => m.CreditCardDetailComponent), 
+        data: { title: 'Cartões de Crédito' } 
+      },
+      { path: 'credit-cards/:id/bills/:billId', 
+        loadComponent: () => 
+          import('./features/credit-cards/credit-card-bill-detail/credit-card-bill-detail.component').then(m => m.CreditCardBillDetailComponent), 
+        data: { title: 'Fatura' } 
+      },
+      {
         path: 'cadastros',
         loadComponent: () =>
           import('./features/registries/registries.component').then(m => m.RegistriesComponent),

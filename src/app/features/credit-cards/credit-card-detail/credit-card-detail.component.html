@@ -1,0 +1,430 @@
+<div class="page">
+
+  <!-- ─── Loading ─── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  @else if (card()) {
+
+    <!-- ─── Link de volta ─── -->
+    <a routerLink="/credit-cards" class="back-link">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 12L6 8l4-4"/>
+      </svg>
+      Cartões
+    </a>
+
+    <!-- ─── Card de informações ─── -->
+    <div class="card-info-card">
+      <div class="card-info-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="4" width="22" height="16" rx="3"/>
+          <path d="M1 10h22"/>
+        </svg>
+      </div>
+      <div class="card-info-body">
+        <div class="card-info-main-row">
+          <span class="card-info-name">{{ card()!.legalEntityCorporateName }}</span>
+          <span class="card-brand-badge">{{ card()!.cardBrand }}</span>
+        </div>
+        <span class="card-info-digits">•••• •••• •••• {{ card()!.lastFourDigits }}</span>
+      </div>
+      <div class="card-info-right">
+        <div class="card-info-stat">
+          <span class="card-info-limit">{{ formatCurrency(card()!.creditLimit) }}</span>
+          <span class="card-info-limit-label">limite</span>
+        </div>
+        @if (totalOpenBills() > 0) {
+          <div class="card-info-stat card-info-stat--open">
+            <span class="card-info-open-amount">{{ formatCurrency(totalOpenBills()) }}</span>
+            <span class="card-info-open-label">em aberto</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ─── Faturas ─── -->
+    <div class="section-header">
+      <h3 class="section-title">Faturas</h3>
+      <button class="btn-primary btn-primary--sm" (click)="openCreatePurchaseModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Nova compra
+      </button>
+    </div>
+
+    @if (activeBills().length === 0 && paidBills().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <h3>Nenhuma fatura ainda</h3>
+        <p>As faturas são geradas automaticamente pelo sistema conforme as compras são registradas.</p>
+      </div>
+    } @else {
+      <div class="bills-list">
+        @for (bill of activeBills(); track bill.id) {
+          <div class="bill-item">
+            <a class="bill-item-link" [routerLink]="['/credit-cards', card()!.id, 'bills', bill.id]">
+              <div class="bill-dates">
+                <span class="bill-period">{{ formatDate(bill.closingDate) }} → {{ formatDate(bill.dueDate) }}</span>
+                <span class="bill-label">Fechamento → Vencimento</span>
+              </div>
+              <div class="bill-right">
+                <div class="bill-amount-wrap">
+                  <span class="bill-amount">{{ formatCurrency(bill.totalAmount) }}</span>
+                  <span class="bill-status-badge bill-status-badge--{{ bill.status | lowercase }}">
+                    {{ getBillStatusLabel(bill.status) }}
+                  </span>
+                </div>
+              </div>
+            </a>
+
+            @if (inlineError()?.billId === bill.id) {
+              <div class="bill-inline-error">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                {{ inlineError()!.message }}
+              </div>
+            }
+
+            @if (bill.status !== 'PAID') {
+              <div class="bill-actions">
+                @if (bill.status === 'OPEN') {
+                  <button class="btn-bill-action" (click)="closeBill(bill)">Fechar fatura</button>
+                }
+                @if (bill.status === 'CLOSED') {
+                  <button class="btn-bill-action" (click)="reopenBill(bill)">Reabrir</button>
+                  <button class="btn-bill-action btn-bill-action--primary" (click)="openPayModal(bill)">Pagar fatura</button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- ─── Faturas pagas ─── -->
+      @if (paidBills().length > 0) {
+        <div class="paid-section">
+          <button class="paid-section-toggle" (click)="paidBillsVisible.set(!paidBillsVisible())">
+            <span class="paid-section-label">
+              Faturas pagas ({{ paidBills().length }})
+            </span>
+            <svg
+              viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"
+              [class.chevron--open]="paidBillsVisible()"
+            >
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+
+          @if (paidBillsVisible()) {
+            <div class="bills-list bills-list--paid">
+              @for (bill of paidBills(); track bill.id) {
+                <a class="bill-item bill-item--paid" [routerLink]="['/credit-cards', card()!.id, 'bills', bill.id]">
+                  <div class="bill-dates">
+                    <span class="bill-period">{{ formatDate(bill.closingDate) }} → {{ formatDate(bill.dueDate) }}</span>
+                    <span class="bill-label">Fechamento → Vencimento</span>
+                  </div>
+                  <div class="bill-right">
+                    <div class="bill-amount-wrap">
+                      <span class="bill-amount">{{ formatCurrency(bill.totalAmount) }}</span>
+                      <span class="bill-status-badge bill-status-badge--paid">Paga</span>
+                    </div>
+                  </div>
+                </a>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+
+  }
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Nova compra — Step 1
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-purchase-step1') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <span class="modal-step-label">Passo 1 de 2</span>
+          <h3>Nova compra</h3>
+        </div>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="purchaseStep1Form" (ngSubmit)="submitPurchaseStep1()" novalidate>
+
+        <div class="field" [class.field--invalid]="s1Description.invalid && s1Description.touched">
+          <label for="s1Desc">Descrição</label>
+          <input id="s1Desc" type="text" formControlName="description" placeholder="Ex: Geladeira, Notebook..." autocomplete="off" />
+          @if (s1Description.invalid && s1Description.touched) {
+            <span class="field-error">
+              @if (s1Description.hasError('required')) { Descrição é obrigatória }
+              @else { Máximo de 255 caracteres }
+            </span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="s1TotalValue.invalid && s1TotalValue.touched">
+            <label for="s1Value">Valor total (R$)</label>
+            <input id="s1Value" type="number" formControlName="totalValue" placeholder="0,00" step="0.01" min="0.01" />
+            @if (s1TotalValue.invalid && s1TotalValue.touched) {
+              <span class="field-error">
+                @if (s1TotalValue.hasError('required')) { Obrigatório }
+                @else { Maior que zero }
+              </span>
+            }
+          </div>
+          <div class="field" [class.field--invalid]="s1InstallmentsCount.invalid && s1InstallmentsCount.touched">
+            <label for="s1Count">Nº de parcelas</label>
+            <input id="s1Count" type="number" formControlName="installmentsCount" placeholder="1" min="1" max="99" />
+            @if (s1InstallmentsCount.invalid && s1InstallmentsCount.touched) {
+              <span class="field-error">
+                @if (s1InstallmentsCount.hasError('required')) { Obrigatório }
+                @else { Entre 1 e 99 }
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="s1PurchaseDate.invalid && s1PurchaseDate.touched">
+          <label for="s1Date">Data da compra</label>
+          <input id="s1Date" type="date" formControlName="purchaseDate" />
+          @if (s1PurchaseDate.invalid && s1PurchaseDate.touched) {
+            <span class="field-error">Data é obrigatória</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Próximo }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Nova compra — Step 2 (parcelas)
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-purchase-step2') {
+  <div class="modal-overlay">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <span class="modal-step-label">
+            Parcela {{ currentInstallmentIndex() }} de {{ currentPurchase()!.installmentsCount }}
+          </span>
+          <h3>{{ currentPurchase()!.description }}</h3>
+        </div>
+        <button class="modal-close" (click)="tryCloseStep2()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="progress-bar">
+        <div
+          class="progress-fill"
+          [style.width.%]="((currentInstallmentIndex() - 1) / currentPurchase()!.installmentsCount) * 100"
+        ></div>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="installmentForm" (ngSubmit)="submitInstallment()" novalidate>
+
+        <div class="field" [class.field--invalid]="instAmount.invalid && instAmount.touched">
+          <label for="instAmt">Valor da parcela (R$)</label>
+          <input id="instAmt" type="number" formControlName="amount" placeholder="0,00" step="0.01" min="0.01" />
+          @if (instAmount.invalid && instAmount.touched) {
+            <span class="field-error">
+              @if (instAmount.hasError('required')) { Obrigatório }
+              @else { Maior que zero }
+            </span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="instCategoryId.invalid && instCategoryId.touched">
+          <label for="instCat">Categoria</label>
+          <select id="instCat" formControlName="categoryId">
+            <option [value]="null" disabled selected>Selecione uma categoria</option>
+            @for (cat of expenseCategories(); track cat.id) {
+              <option [value]="cat.id">{{ cat.name }}</option>
+            }
+          </select>
+          @if (instCategoryId.invalid && instCategoryId.touched) {
+            <span class="field-error">Selecione uma categoria</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          @if (errorMessage()) {
+            <button type="button" class="btn-action btn-action--danger" [disabled]="isSaving()" (click)="deletePurchaseFromStep2()">
+              @if (isSaving()) { <span class="spinner spinner--light"></span> } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                </svg>
+              }
+              Excluir compra
+            </button>
+          }
+          <button type="submit" class="btn-primary btn-primary--full" [disabled]="isSaving()">
+            @if (isSaving()) {
+              <span class="spinner"></span> Salvando...
+            } @else if (currentInstallmentIndex() === currentPurchase()!.installmentsCount) {
+              Concluir
+            } @else {
+              Próxima parcela
+            }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Aviso de fechamento no meio do step 2
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'warn-close-mid-purchase') {
+  <div class="modal-overlay">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+
+      <h3>Compra criada sem todas as parcelas</h3>
+      <p>
+        A compra <strong>{{ currentPurchase()?.description }}</strong> foi criada, mas apenas
+        <strong>{{ currentInstallmentIndex() - 1 }}</strong> de
+        <strong>{{ currentPurchase()?.installmentsCount }}</strong> parcelas foram registradas.
+        As parcelas faltantes não aparecerão na fatura até serem adicionadas.
+      </p>
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="cancelCloseStep2()" [disabled]="isSaving()">Continuar cadastrando</button>
+        <button type="button" class="btn-ghost btn-ghost--warn" (click)="confirmCloseStep2()" [disabled]="isSaving()">Sair assim mesmo</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deletePurchaseFromStep2()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir compra }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TEMPLATE: Banner de erro
+══════════════════════════════════════════════════════════════════ -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Pagar fatura
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'pay-bill') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Pagar fatura</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Resumo da fatura -->
+      <div class="pay-summary">
+        <span class="pay-summary-label">Total da fatura</span>
+        <span class="pay-summary-amount">{{ formatCurrency(selectedBill()!.totalAmount) }}</span>
+        <span class="pay-summary-period">
+          Vencimento: {{ formatDate(selectedBill()!.dueDate) }}
+        </span>
+      </div>
+
+      @if (errorMessage()) {
+        <div class="modal-error">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <form [formGroup]="payForm" (ngSubmit)="payBill()" novalidate>
+
+        <div class="field" [class.field--invalid]="payPocketId.invalid && payPocketId.touched">
+          <label for="payPocket">Pagar com</label>
+          @if (eligiblePockets().length === 0) {
+            <div class="field-empty-hint">Nenhuma conta bancária ou carteira disponível.</div>
+          } @else {
+            <select id="payPocket" formControlName="pocketId">
+              <option [value]="null" disabled selected>Selecione a conta</option>
+              @for (pocket of eligiblePockets(); track pocket.id) {
+                <option [value]="pocket.id">{{ pocket.label }}</option>
+              }
+            </select>
+          }
+          @if (payPocketId.invalid && payPocketId.touched) {
+            <span class="field-error">Selecione uma conta para pagamento</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || eligiblePockets().length === 0">
+            @if (isSaving()) { <span class="spinner"></span> Pagando... } @else { Confirmar pagamento }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}

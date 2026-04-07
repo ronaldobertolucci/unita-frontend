@@ -17,6 +17,8 @@ const ERROR_MAP: Record<string, string> = {
   'Source and target pockets must be different': 'O pocket de origem e o de destino devem ser diferentes.',
   'Source and target pocket owners must share a group': 'Os donos dos pockets devem compartilhar um grupo.',
   'Insufficient balance in source pocket': 'Saldo insuficiente no pocket de origem.',
+  'Bill is closed. Reopen it before adding installments': 'Fatura fechada. Reabra antes de adicionar compras/parcelas.',
+  'Cannot add installment to a paid bill': 'Não é possível adicionar uma compra/parcela a uma fatura paga.'
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {

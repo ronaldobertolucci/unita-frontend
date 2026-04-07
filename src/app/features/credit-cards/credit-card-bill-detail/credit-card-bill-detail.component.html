@@ -1,0 +1,288 @@
+<div class="page">
+
+  <!-- ─── Loading ─── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  @else if (bill()) {
+
+    <!-- ─── Link de volta ─── -->
+    <a [routerLink]="['/credit-cards', cardId]" class="back-link">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 12L6 8l4-4"/>
+      </svg>
+      Faturas
+    </a>
+
+    <!-- ─── Card de informações da fatura ─── -->
+    <div class="bill-header-card">
+      <div class="bill-header-top">
+        <div class="bill-header-dates">
+          <span class="bill-header-period">
+            Fechamento: {{ formatDate(bill()!.closingDate) }} · Vencimento: {{ formatDate(bill()!.dueDate) }}
+          </span>
+          <span class="bill-status-badge bill-status-badge--{{ bill()!.status | lowercase }}">
+            {{ getBillStatusLabel(bill()!.status) }}
+          </span>
+        </div>
+        <span class="bill-header-amount">{{ formatCurrency(bill()!.totalAmount) }}</span>
+      </div>
+
+      @if (bill()!.totalRefunds > 0) {
+        <div class="bill-header-breakdown">
+          <span class="bill-breakdown-item">
+            Parcelas: {{ formatCurrency(bill()!.totalInstallments) }}
+          </span>
+          <span class="bill-breakdown-sep">−</span>
+          <span class="bill-breakdown-item bill-breakdown-item--refund">
+            Estornos: {{ formatCurrency(bill()!.totalRefunds) }}
+          </span>
+        </div>
+      }
+    </div>
+
+    <!-- ─── Barra de ações ─── -->
+    @if (!isPaid) {
+      <div class="action-bar">
+        <button class="btn-ghost btn-ghost--sm" (click)="openCreateRefundModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 .49-3.85"/>
+          </svg>
+          Novo estorno
+        </button>
+      </div>
+    }
+
+    <!-- ─── Lista unificada ─── -->
+    @if (displayItems().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+        </div>
+        <h3>Fatura vazia</h3>
+        <p>Adicione compras a partir da tela do cartão ou registre estornos aqui.</p>
+      </div>
+    } @else {
+      <div class="items-list">
+        @for (item of displayItems(); track item.type + '-' + (item.purchaseId ?? item.refundId)) {
+          <div class="item-row">
+
+            <div class="item-icon item-icon--{{ item.type === 'refund' ? 'income' : 'expense' }}">
+              @if (item.type === 'refund') {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/>
+                  <polyline points="5 12 12 5 19 12"/>
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <polyline points="19 12 12 19 5 12"/>
+                </svg>
+              }
+            </div>
+
+            <div class="item-body">
+              <span class="item-description">{{ item.description }}</span>
+              <span class="item-meta">
+                @if (item.type === 'installment') {
+                  Parcela {{ item.installmentNumber }}/{{ item.totalInstallments }} · {{ formatDate(item.date) }}
+                } @else {
+                  Estorno · {{ formatDate(item.date) }}
+                }
+              </span>
+            </div>
+
+            <span class="item-amount item-amount--{{ item.type === 'refund' ? 'income' : 'expense' }}">
+              {{ item.type === 'refund' ? '+' : '−' }}&nbsp;{{ formatCurrency(item.amount) }}
+            </span>
+
+            @if (!isPaid) {
+              <button
+                class="item-delete-btn"
+                (click)="item.type === 'installment'
+                  ? openDeletePurchaseConfirm(item.purchaseId!, item.description, item.totalInstallments!)
+                  : openDeleteRefundConfirm(item.refundId!, item.description)"
+                aria-label="Excluir"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                </svg>
+              </button>
+            }
+
+          </div>
+        }
+      </div>
+    }
+
+  }
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Novo estorno
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create-refund') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Novo estorno</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="refundForm" (ngSubmit)="submitRefund()" novalidate>
+
+        <div class="field" [class.field--invalid]="refDescription.invalid && refDescription.touched">
+          <label for="refDesc">Descrição</label>
+          <input id="refDesc" type="text" formControlName="description" placeholder="Ex: Estorno de compra..." autocomplete="off" />
+          @if (refDescription.invalid && refDescription.touched) {
+            <span class="field-error">
+              @if (refDescription.hasError('required')) { Descrição é obrigatória }
+              @else { Máximo de 255 caracteres }
+            </span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="refAmount.invalid && refAmount.touched">
+            <label for="refAmt">Valor (R$)</label>
+            <input id="refAmt" type="number" formControlName="amount" placeholder="0,00" step="0.01" min="0.01" />
+            @if (refAmount.invalid && refAmount.touched) {
+              <span class="field-error">
+                @if (refAmount.hasError('required')) { Obrigatório }
+                @else { Maior que zero }
+              </span>
+            }
+          </div>
+          <div class="field" [class.field--invalid]="refDate.invalid && refDate.touched">
+            <label for="refDateInp">Data</label>
+            <input id="refDateInp" type="date" formControlName="refundDate" />
+            @if (refDate.invalid && refDate.touched) {
+              <span class="field-error">Data é obrigatória</span>
+            }
+          </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="refCategoryId.invalid && refCategoryId.touched">
+          <label for="refCat">Categoria</label>
+          <select id="refCat" formControlName="categoryId">
+            <option [value]="null" disabled selected>Selecione uma categoria</option>
+            @for (cat of incomeCategories(); track cat.id) {
+              <option [value]="cat.id">{{ cat.name }}</option>
+            }
+          </select>
+          @if (refCategoryId.invalid && refCategoryId.touched) {
+            <span class="field-error">Selecione uma categoria</span>
+          }
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Registrando... } @else { Registrar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão de compra
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete-purchase') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+
+      <h3>Excluir compra?</h3>
+      <p>
+        A compra <strong>{{ selectedPurchaseDescription() }}</strong> e todas as suas
+        <strong>{{ selectedPurchaseTotalInstallments() }} parcela(s)</strong>
+        serão removidas permanentemente desta fatura.
+      </p>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deletePurchase()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão de estorno
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete-refund') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+
+      <h3>Excluir estorno?</h3>
+      <p>O estorno <strong>{{ selectedRefundDescription() }}</strong> será removido permanentemente.</p>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteRefund()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TEMPLATE: Banner de erro
+══════════════════════════════════════════════════════════════════ -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>

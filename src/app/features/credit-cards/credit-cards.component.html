@@ -1,0 +1,402 @@
+<div class="page">
+
+  <!-- ─── Cabeçalho ─── -->
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>Cartões de Crédito</h2>
+      <p>Gerencie seus cartões, faturas e compras</p>
+    </div>
+    <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Novo cartão
+    </button>
+  </div>
+
+  <!-- ─── Loading ─── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  <!-- ─── Empty state ─── -->
+  @else if (creditCards().length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="4" width="22" height="16" rx="3"/>
+          <path d="M1 10h22"/>
+        </svg>
+      </div>
+      <h3>Nenhum cartão ainda</h3>
+      <p>Adicione seus cartões de crédito para acompanhar faturas e compras parceladas.</p>
+      <button class="btn-primary" (click)="openCreateModal()">Adicionar primeiro cartão</button>
+    </div>
+  }
+
+  <!-- ─── Lista de cartões ─── -->
+  @else {
+    <div class="cards-list">
+      @for (card of creditCards(); track card.id) {
+        <a class="card-item" [routerLink]="['/credit-cards', card.id]">
+
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="3"/>
+              <path d="M1 10h22"/>
+            </svg>
+          </div>
+
+          <div class="card-body">
+            <div class="card-main-row">
+              <span class="card-name">{{ card.legalEntityCorporateName }}</span>
+              <span class="card-brand-badge">{{ card.cardBrand }}</span>
+            </div>
+            <span class="card-digits">•••• •••• •••• {{ card.lastFourDigits }}</span>
+          </div>
+
+          <div class="card-right">
+            <div class="card-limit-wrap">
+              <span class="card-limit-value">{{ formatCurrency(card.creditLimit) }}</span>
+              <span class="card-limit-label">limite</span>
+            </div>
+            <button
+              class="card-settings-btn"
+              (click)="$event.stopPropagation(); $event.preventDefault(); openDetailModal(card)"
+              aria-label="Configurações do cartão"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+
+        </a>
+      }
+    </div>
+  }
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Criar cartão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'create') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Novo cartão</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <form [formGroup]="createForm" (ngSubmit)="createCreditCard()" novalidate>
+
+        <!-- Instituição -->
+        <div class="field" [class.field--invalid]="createLegalEntityId.invalid && createLegalEntityId.touched">
+          <label for="createLegalEntity">Instituição</label>
+          @if (isLoadingRef()) {
+            <div class="field-loading"><span class="spinner-sm"></span></div>
+          } @else {
+            <select id="createLegalEntity" formControlName="legalEntityId">
+              <option [value]="null" disabled selected>Selecione a instituição</option>
+              @for (entity of legalEntities(); track entity.id) {
+                <option [value]="entity.id">{{ entity.corporateName }}</option>
+              }
+            </select>
+          }
+          @if (createLegalEntityId.invalid && createLegalEntityId.touched) {
+            <span class="field-error">Instituição é obrigatória</span>
+          }
+        </div>
+
+        <!-- Bandeira -->
+        <div class="field" [class.field--invalid]="createCardBrandId.invalid && createCardBrandId.touched">
+          <label for="createCardBrand">Bandeira</label>
+          <select id="createCardBrand" formControlName="cardBrandId">
+            <option [value]="null" disabled selected>Selecione a bandeira</option>
+            @for (brand of cardBrands; track brand.id) {
+              <option [value]="brand.id">{{ brand.name }}</option>
+            }
+          </select>
+          @if (createCardBrandId.invalid && createCardBrandId.touched) {
+            <span class="field-error">Bandeira é obrigatória</span>
+          }
+        </div>
+
+        <!-- Últimos 4 dígitos -->
+        <div class="field" [class.field--invalid]="createLastFourDigits.invalid && createLastFourDigits.touched">
+          <label for="createLastFour">Últimos 4 dígitos</label>
+          <input
+            id="createLastFour"
+            type="text"
+            formControlName="lastFourDigits"
+            placeholder="1234"
+            maxlength="4"
+            autocomplete="off"
+          />
+          @if (createLastFourDigits.invalid && createLastFourDigits.touched) {
+            <span class="field-error">
+              @if (createLastFourDigits.hasError('required')) { Campo obrigatório }
+              @else { Informe exatamente 4 dígitos numéricos }
+            </span>
+          }
+        </div>
+
+        <!-- Limite -->
+        <div class="field" [class.field--invalid]="createCreditLimit.invalid && createCreditLimit.touched">
+          <label for="createLimit">Limite (R$)</label>
+          <input
+            id="createLimit"
+            type="number"
+            formControlName="creditLimit"
+            placeholder="0,00"
+            step="0.01"
+            min="0.01"
+          />
+          @if (createCreditLimit.invalid && createCreditLimit.touched) {
+            <span class="field-error">
+              @if (createCreditLimit.hasError('required')) { Campo obrigatório }
+              @else { O limite deve ser maior que zero }
+            </span>
+          }
+        </div>
+
+        <!-- Dia de fechamento e vencimento -->
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="createClosingDay.invalid && createClosingDay.touched">
+            <label for="createClosingDay">Dia de fechamento</label>
+            <input
+              id="createClosingDay"
+              type="number"
+              formControlName="closingDay"
+              placeholder="15"
+              min="1"
+              max="31"
+            />
+            @if (createClosingDay.invalid && createClosingDay.touched) {
+              <span class="field-error">
+                @if (createClosingDay.hasError('required')) { Obrigatório }
+                @else { Entre 1 e 31 }
+              </span>
+            }
+          </div>
+          <div class="field" [class.field--invalid]="createDueDay.invalid && createDueDay.touched">
+            <label for="createDueDay">Dia de vencimento</label>
+            <input
+              id="createDueDay"
+              type="number"
+              formControlName="dueDay"
+              placeholder="22"
+              min="1"
+              max="31"
+            />
+            @if (createDueDay.invalid && createDueDay.touched) {
+              <span class="field-error">
+                @if (createDueDay.hasError('required')) { Obrigatório }
+                @else { Entre 1 e 31 }
+              </span>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar }
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Detalhe do cartão (editar + excluir)
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'detail') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Cartão de crédito</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Instituição</span>
+          <span class="detail-value">{{ selectedCard()!.legalEntityCorporateName }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Bandeira</span>
+          <span class="detail-value">{{ selectedCard()!.cardBrand }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Número</span>
+          <span class="detail-value">•••• {{ selectedCard()!.lastFourDigits }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Limite</span>
+          <span class="detail-value">{{ formatCurrency(selectedCard()!.creditLimit) }}</span>
+        </div>
+      </div>
+
+      <form [formGroup]="editForm" (ngSubmit)="saveCreditCard()" novalidate>
+
+        <div class="field" [class.field--invalid]="editCreditLimit.invalid && editCreditLimit.touched">
+          <label for="editLimit">Limite (R$)</label>
+          <input id="editLimit" type="number" formControlName="creditLimit" placeholder="0,00" step="0.01" min="0.01" />
+          @if (editCreditLimit.invalid && editCreditLimit.touched) {
+            <span class="field-error">
+              @if (editCreditLimit.hasError('required')) { Campo obrigatório }
+              @else { O limite deve ser maior que zero }
+            </span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="editClosingDay.invalid && editClosingDay.touched">
+            <label for="editClosingDay">Dia de fechamento</label>
+            <input id="editClosingDay" type="number" formControlName="closingDay" min="1" max="31" />
+            @if (editClosingDay.invalid && editClosingDay.touched) {
+              <span class="field-error">Entre 1 e 31</span>
+            }
+          </div>
+          <div class="field" [class.field--invalid]="editDueDay.invalid && editDueDay.touched">
+            <label for="editDueDay">Dia de vencimento</label>
+            <input id="editDueDay" type="number" formControlName="dueDay" min="1" max="31" />
+            @if (editDueDay.invalid && editDueDay.touched) {
+              <span class="field-error">Entre 1 e 31</span>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions modal-actions--between">
+          <button type="button" class="btn-action btn-action--danger" (click)="openDeleteConfirm()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+            </svg>
+            Excluir
+          </button>
+          <div class="modal-actions-right">
+            <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isSaving()">
+              @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar atualização de datas
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-update') {
+  <div class="modal-overlay">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+
+      <h3>Atualizar datas do cartão?</h3>
+      <p>
+        A alteração dos dias de fechamento ou vencimento será aplicada a
+        <strong>todas as faturas em aberto</strong> deste cartão.
+        Faturas já pagas não serão afetadas.
+      </p>
+
+      @if (errorMessage()) {
+        <div class="modal-error">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="backToDetail()" [disabled]="isSaving()">Cancelar</button>
+        <button type="button" class="btn-primary" [disabled]="isSaving()" (click)="confirmSaveCreditCard()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Confirmar }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MODAL: Confirmar exclusão
+══════════════════════════════════════════════════════════════════ -->
+@if (activeModal() === 'confirm-delete') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+
+      <div class="confirm-icon confirm-icon--danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+
+      <h3>Excluir cartão?</h3>
+      <p>
+        O cartão <strong>{{ selectedCard()?.cardBrand }} •••• {{ selectedCard()?.lastFourDigits }}</strong>
+        e todos os seus dados serão removidos permanentemente.
+      </p>
+
+      <ng-container *ngTemplateOutlet="errorBanner" />
+
+      <div class="modal-actions modal-actions--center">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteCreditCard()">
+          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+        </button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TEMPLATE: Banner de erro
+══════════════════════════════════════════════════════════════════ -->
+<ng-template #errorBanner>
+  @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      {{ errorMessage() }}
+    </div>
+  }
+</ng-template>
