@@ -1,0 +1,327 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal, LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localePt from '@angular/common/locales/pt';
+import { of, throwError } from 'rxjs';
+import { RouterTestingModule } from '@angular/router/testing';
+import { Router } from '@angular/router';
+
+registerLocaleData(localePt, 'pt-BR');
+
+import { InvestmentsComponent } from './investments.component';
+import { AssetService } from '../../core/services/asset.service';
+import { LegalEntityService } from '../../core/services/legal-entity.service';
+import { AssetSummaryDto } from '../../core/models/asset.model';
+import { LegalEntityDto } from '../../core/models/legal-entity.model';
+
+const mockAsset: AssetSummaryDto = {
+  id: 1,
+  name: 'CDB Banco X',
+  category: 'RENDA_FIXA',
+  status: 'ACTIVE',
+  legalEntityName: 'Banco X',
+  currentValue: 10500,
+  totalInvested: 10000,
+  redeemedValue: 0,
+};
+
+const mockAssetRedeemed: AssetSummaryDto = {
+  id: 2,
+  name: 'PGBL Banco Y',
+  category: 'PREVIDENCIA',
+  status: 'REDEEMED',
+  legalEntityName: 'Banco Y',
+  currentValue: 0,
+  totalInvested: 5000,
+  redeemedValue: 5300,
+};
+
+const mockLegalEntity: LegalEntityDto = {
+  id: 1,
+  cnpj: '12345678000190',
+  corporateName: 'Banco X',
+  tradeName: null,
+  stateRegistration: null,
+};
+
+function buildAssetService(assets: AssetSummaryDto[] = []) {
+  return {
+    assets: signal(assets),
+    isLoading: signal(false),
+    loadAssets: jest.fn(),
+    createFixedIncome: jest.fn(),
+    createPension: jest.fn(),
+  };
+}
+
+function buildLegalEntityService(entities: LegalEntityDto[] = []) {
+  return {
+    legalEntities: signal(entities),
+    loadLegalEntities: jest.fn().mockReturnValue(of(entities)),
+  };
+}
+
+describe('InvestmentsComponent', () => {
+  let fixture: ComponentFixture<InvestmentsComponent>;
+  let component: InvestmentsComponent;
+  let assetServiceSpy: ReturnType<typeof buildAssetService>;
+  let legalEntityServiceSpy: ReturnType<typeof buildLegalEntityService>;
+  let router: Router;
+
+  function setup(assets: AssetSummaryDto[] = [], entities: LegalEntityDto[] = []) {
+    assetServiceSpy = buildAssetService(assets);
+    legalEntityServiceSpy = buildLegalEntityService(entities);
+
+    TestBed.configureTestingModule({
+      imports: [InvestmentsComponent, RouterTestingModule],
+      providers: [
+        { provide: AssetService, useValue: assetServiceSpy },
+        { provide: LegalEntityService, useValue: legalEntityServiceSpy },
+        { provide: LOCALE_ID, useValue: 'pt-BR' },
+      ],
+    });
+
+    fixture = TestBed.createComponent(InvestmentsComponent);
+    component = fixture.componentInstance;
+    router = TestBed.inject(Router);
+    fixture.detectChanges();
+  }
+
+  // ─── Inicialização ────────────────────────────────────────────────────────
+
+  describe('initialization', () => {
+    beforeEach(() => setup());
+
+    it('should create the component', () => {
+      expect(component).toBeTruthy();
+    });
+
+    it('should call loadAssets on init', () => {
+      expect(assetServiceSpy.loadAssets).toHaveBeenCalled();
+    });
+
+    it('should call loadLegalEntities on init', () => {
+      expect(legalEntityServiceSpy.loadLegalEntities).toHaveBeenCalled();
+    });
+
+    it('should start with modal closed', () => {
+      expect(component.modalOpen()).toBe(false);
+    });
+
+    it('should start with fixed-income tab active', () => {
+      expect(component.activeTab()).toBe('fixed-income');
+    });
+  });
+
+  // ─── openModal() ──────────────────────────────────────────────────────────
+
+  describe('openModal()', () => {
+    beforeEach(() => setup());
+
+    it('should open modal', () => {
+      component.openModal();
+      expect(component.modalOpen()).toBe(true);
+    });
+
+    it('should reset to fixed-income tab', () => {
+      component.setTab('pension');
+      component.openModal();
+      expect(component.activeTab()).toBe('fixed-income');
+    });
+
+    it('should clear errorMessage', () => {
+      component.errorMessage.set('erro anterior');
+      component.openModal();
+      expect(component.errorMessage()).toBe('');
+    });
+
+    it('should rebuild forms', () => {
+      component.openModal();
+      expect(component.fixedIncomeForm).toBeTruthy();
+      expect(component.pensionForm).toBeTruthy();
+    });
+  });
+
+  // ─── closeModal() ─────────────────────────────────────────────────────────
+
+  describe('closeModal()', () => {
+    beforeEach(() => setup());
+
+    it('should close modal', () => {
+      component.openModal();
+      component.closeModal();
+      expect(component.modalOpen()).toBe(false);
+    });
+  });
+
+  // ─── setTab() ─────────────────────────────────────────────────────────────
+
+  describe('setTab()', () => {
+    beforeEach(() => setup());
+
+    it('should switch to pension tab', () => {
+      component.setTab('pension');
+      expect(component.activeTab()).toBe('pension');
+    });
+
+    it('should clear errorMessage on tab switch', () => {
+      component.errorMessage.set('erro');
+      component.setTab('pension');
+      expect(component.errorMessage()).toBe('');
+    });
+  });
+
+  // ─── openDetail() ─────────────────────────────────────────────────────────
+
+  describe('openDetail()', () => {
+    beforeEach(() => setup([mockAsset]));
+
+    it('should navigate to /investments/:id', () => {
+      const spy = jest.spyOn(router, 'navigate');
+      component.openDetail(1);
+      expect(spy).toHaveBeenCalledWith(['/investments', 1]);
+    });
+  });
+
+  // ─── displayValue() ───────────────────────────────────────────────────────
+
+  describe('displayValue()', () => {
+    beforeEach(() => setup());
+
+    it('should return currentValue for ACTIVE asset', () => {
+      expect(component.displayValue(mockAsset)).toBe(10500);
+    });
+
+    it('should return redeemedValue for REDEEMED asset', () => {
+      expect(component.displayValue(mockAssetRedeemed)).toBe(5300);
+    });
+  });
+
+  // ─── variation() ──────────────────────────────────────────────────────────
+
+  describe('variation()', () => {
+    beforeEach(() => setup());
+
+    it('should calculate variation based on currentValue for ACTIVE asset', () => {
+      expect(component.variation(mockAsset)).toBeCloseTo(5, 0);
+    });
+
+    it('should calculate variation based on redeemedValue for REDEEMED asset', () => {
+      expect(component.variation(mockAssetRedeemed)).toBeCloseTo(6, 0);
+    });
+
+    it('should return 0 when totalInvested is 0', () => {
+      const asset = { ...mockAsset, totalInvested: 0 };
+      expect(component.variation(asset)).toBe(0);
+    });
+  });
+
+  // ─── categoryLabel() / statusLabel() ──────────────────────────────────────
+
+  describe('helpers', () => {
+    beforeEach(() => setup());
+
+    it('categoryLabel should return "Renda Fixa" for RENDA_FIXA', () => {
+      expect(component.categoryLabel('RENDA_FIXA')).toBe('Renda Fixa');
+    });
+
+    it('categoryLabel should return "Previdência" for PREVIDENCIA', () => {
+      expect(component.categoryLabel('PREVIDENCIA')).toBe('Previdência');
+    });
+
+    it('statusLabel should map all statuses', () => {
+      expect(component.statusLabel('ACTIVE')).toBe('Ativo');
+      expect(component.statusLabel('MATURED')).toBe('Vencido');
+      expect(component.statusLabel('REDEEMED')).toBe('Resgatado');
+    });
+  });
+
+  // ─── onSubmit() — Renda Fixa ──────────────────────────────────────────────
+
+  describe('onSubmit() — fixed income', () => {
+    beforeEach(() => setup([], [mockLegalEntity]));
+
+    it('should not submit when form is invalid', () => {
+      component.openModal();
+      component.onSubmit();
+      expect(assetServiceSpy.createFixedIncome).not.toHaveBeenCalled();
+      expect(component.fixedIncomeForm.touched).toBe(true);
+    });
+
+    it('should call createFixedIncome and close modal on success', () => {
+      assetServiceSpy.createFixedIncome.mockReturnValue(of({}));
+      component.openModal();
+      component.fixedIncomeForm.setValue({
+        name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+      });
+      component.onSubmit();
+      expect(assetServiceSpy.createFixedIncome).toHaveBeenCalledWith({
+        name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+      });
+      expect(component.modalOpen()).toBe(false);
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('should set errorMessage and stop saving on error', () => {
+      assetServiceSpy.createFixedIncome.mockReturnValue(
+        throwError(() => ({ error: { message: 'Erro interno' } })),
+      );
+      component.openModal();
+      component.fixedIncomeForm.setValue({
+        name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+      });
+      component.onSubmit();
+      expect(component.errorMessage()).toBeTruthy();
+      expect(component.isSaving()).toBe(false);
+      expect(component.modalOpen()).toBe(true);
+    });
+  });
+
+  // ─── onSubmit() — Previdência ─────────────────────────────────────────────
+
+  describe('onSubmit() — pension', () => {
+    beforeEach(() => setup([], [mockLegalEntity]));
+
+    it('should not submit when pension form is invalid', () => {
+      component.openModal();
+      component.setTab('pension');
+      component.onSubmit();
+      expect(assetServiceSpy.createPension).not.toHaveBeenCalled();
+    });
+
+    it('should call createPension and close modal on success', () => {
+      assetServiceSpy.createPension.mockReturnValue(of({}));
+      component.openModal();
+      component.setTab('pension');
+      component.pensionForm.setValue({
+        name: 'PGBL Banco X', legalEntityId: 1,
+        pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+      });
+      component.onSubmit();
+      expect(assetServiceSpy.createPension).toHaveBeenCalledWith({
+        name: 'PGBL Banco X', legalEntityId: 1,
+        pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+      });
+      expect(component.modalOpen()).toBe(false);
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('should set errorMessage and stop saving on error', () => {
+      assetServiceSpy.createPension.mockReturnValue(
+        throwError(() => ({ error: { message: 'Erro interno' } })),
+      );
+      component.openModal();
+      component.setTab('pension');
+      component.pensionForm.setValue({
+        name: 'PGBL Banco X', legalEntityId: 1,
+        pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+      });
+      component.onSubmit();
+      expect(component.errorMessage()).toBeTruthy();
+      expect(component.isSaving()).toBe(false);
+    });
+  });
+});

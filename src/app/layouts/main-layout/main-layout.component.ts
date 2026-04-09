@@ -63,6 +63,14 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    label: 'Investimentos',
+    path: '/investments',
+    icons: [
+      'M3 17l6-6 4 4 8-8',
+      'M14 7h7v7',
+    ],
+  },
+  {
     label: 'Cadastros',
     path: '/cadastros',
     icons: [

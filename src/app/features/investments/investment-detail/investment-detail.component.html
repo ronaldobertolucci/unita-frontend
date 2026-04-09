@@ -1,0 +1,670 @@
+<!-- Loading -->
+@if (isLoading()) {
+<div class="loading-state">
+  <span class="spinner-lg"></span>
+</div>
+}
+
+@else {
+@if (asset(); as a) {
+<div class="page">
+
+  <!-- Voltar -->
+  <a routerLink="/investments" class="back-btn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+    Investimentos
+  </a>
+
+  <!-- Cabeçalho do ativo -->
+  <div class="asset-header">
+    <div class="asset-header-icon" [class.asset-header-icon--pension]="a.category === 'PREVIDENCIA'">
+      @if (a.category === 'RENDA_FIXA') {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round">
+        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+        <polyline points="16 7 22 7 22 13" />
+      </svg>
+      } @else {
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+      }
+    </div>
+
+    <div class="asset-header-info">
+      <div class="asset-header-name-row">
+        <h2 class="asset-title">{{ a.name }}</h2>
+        <span class="badge-status" [class]="'badge-status--' + a.status.toLowerCase()">
+          {{ statusLabel(a.status) }}
+        </span>
+      </div>
+      <div class="asset-header-meta">
+        <span class="badge-category">{{ categoryLabel(a.category) }}</span>
+        <span class="asset-institution">{{ a.legalEntity.tradeName ?? a.legalEntity.corporateName }}</span>
+      </div>
+    </div>
+
+    <div class="asset-header-actions">
+      <button class="btn-action" (click)="openModal('edit')" title="Editar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+      </button>
+      <button class="btn-action btn-action--danger" (click)="openModal('confirm-delete')" title="Excluir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Detalhes do tipo -->
+  @if (a.fixedIncomeDetails) {
+  <div class="detail-chips">
+    <span class="detail-chip">{{ a.fixedIncomeDetails.indexer }}</span>
+    <span class="detail-chip">{{ a.fixedIncomeDetails.annualRate | number:'1.2-2':'pt-BR' }}% a.a.</span>
+    <span class="detail-chip">Vence {{ a.fixedIncomeDetails.maturityDate | date:'dd/MM/yyyy' }}</span>
+    @if (a.fixedIncomeDetails.taxFree) {
+    <span class="detail-chip detail-chip--accent">Isento de IR</span>
+    }
+  </div>
+  }
+
+  @if (a.pensionDetails) {
+  <div class="detail-chips">
+    <span class="detail-chip">{{ pensionTypeLabel(a.pensionDetails.pensionType) }}</span>
+    <span class="detail-chip">Regime {{ taxRegimeLabel(a.pensionDetails.taxRegime) }}</span>
+  </div>
+  }
+
+  <!-- Card de posição -->
+  <div class="position-card">
+    <div class="position-card-header">
+      <span class="position-card-title">Posição atual</span>
+      <!-- FIX 5: botão só aparece se não for REDEEMED -->
+      @if (a.status !== 'REDEEMED') {
+      <button class="btn-action" (click)="openModal('update-position')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10" />
+          <path d="M20.49 15a9 9 0 1 1-.08-6.5" />
+        </svg>
+        Atualizar
+      </button>
+      }
+    </div>
+
+    <div class="position-grid">
+      <!-- FIX 2: exibe valor correto conforme status -->
+      <div class="position-item">
+        <span class="position-label">
+          {{ a.status === 'REDEEMED' ? 'Valor resgatado' : 'Valor atual' }}
+        </span>
+        <span class="position-value position-value--highlight">
+          {{ displayCurrentValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+        </span>
+        <span class="position-variation" [class.position-variation--positive]="variation() >= 0"
+          [class.position-variation--negative]="variation() < 0">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            @if (variation() >= 0) {
+            <polyline points="2 10 8 4 14 10" /> }
+            @else {
+            <polyline points="2 6 8 12 14 6" /> }
+          </svg>
+          {{ variation() | number:'1.2-2':'pt-BR' }}%
+        </span>
+      </div>
+
+      <div class="position-item">
+        <span class="position-label">Total investido</span>
+        <span class="position-value">{{ a.position.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      </div>
+
+      @if (a.status !== 'REDEEMED') {
+      <div class="position-item">
+        <span class="position-label">Resgatado</span>
+        <span class="position-value">{{ a.position.redeemedValue | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      </div>
+      }
+
+      <div class="position-item">
+        <span class="position-label">Última atualização</span>
+        <span class="position-value">
+          {{ a.position.lastValuationDate ? (a.position.lastValuationDate | date:'dd/MM/yyyy') : '—' }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ações de transação -->
+  @if (a.status === 'ACTIVE') {
+  <div class="action-row">
+    <button class="btn-tx btn-tx--buy" (click)="openModal('buy')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+      Aporte
+    </button>
+    <button class="btn-tx btn-tx--yield" (click)="openModal('yield')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+        <polyline points="17 6 23 6 23 12" />
+      </svg>
+      Resgate antecipado
+    </button>
+    <button class="btn-tx btn-tx--sell" (click)="openModal('sell')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="19" y1="12" x2="5" y2="12" />
+      </svg>
+      Resgate total
+    </button>
+  </div>
+  }
+
+  <!-- Histórico de transações -->
+  <div class="section-header">
+    <span class="section-title">Histórico</span>
+  </div>
+
+  @if (isLoadingTransactions()) {
+  <div class="loading-state loading-state--sm">
+    <span class="spinner-lg"></span>
+  </div>
+  } @else if (transactions().length === 0) {
+  <div class="empty-tx">
+    <p>Nenhuma movimentação registrada.</p>
+  </div>
+  } @else {
+  <ul class="tx-list">
+    @for (tx of transactions(); track tx.id) {
+    <li class="tx-item">
+      <div class="tx-icon" [class]="'tx-icon--' + tx.type.toLowerCase()">
+        @if (tx.type === 'BUY') {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        } @else if (tx.type === 'YIELD') {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+          <polyline points="16 7 22 7 22 13" />
+        </svg>
+        } @else if (tx.type === 'SELL') {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="19" y1="12" x2="5" y2="12" />
+        </svg>
+        } @else {
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        }
+      </div>
+
+      <div class="tx-info">
+        <span class="tx-label">{{ transactionLabel(tx.type) }}</span>
+        @if (tx.notes) {
+        <span class="tx-notes">{{ tx.notes }}</span>
+        }
+      </div>
+
+      <div class="tx-right">
+        <span class="tx-amount" [class.tx-amount--credit]="isCredit(tx.type)"
+          [class.tx-amount--debit]="isDebit(tx.type)">
+          {{ isDebit(tx.type) ? '-' : isCredit(tx.type) ? '+' : '' }}{{ tx.amount |
+          currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+        </span>
+        <span class="tx-date">{{ tx.transactionDate | date:'dd/MM/yyyy' }}</span>
+      </div>
+    </li>
+    }
+  </ul>
+  }
+
+</div>
+}
+}
+
+<!-- ═══════════════════════════ MODAL: Editar ativo -->
+@if (activeModal() === 'edit' && editForm) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Editar ativo</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <form [formGroup]="editForm" (ngSubmit)="onEdit()" novalidate>
+      <div class="field" [class.field--invalid]="ctrl(editForm,'name').invalid && ctrl(editForm,'name').touched">
+        <label>Nome</label>
+        <input type="text" formControlName="name" autocomplete="off" />
+        @if (ctrl(editForm,'name').invalid && ctrl(editForm,'name').touched) {
+        <span class="field-error">
+          @if (ctrl(editForm,'name').hasError('required')) { Nome é obrigatório }
+          @else if (ctrl(editForm,'name').hasError('maxlength')) { Máximo de 255 caracteres }
+        </span>
+        }
+      </div>
+
+      <div class="field"
+        [class.field--invalid]="ctrl(editForm,'legalEntityId').invalid && ctrl(editForm,'legalEntityId').touched">
+        <label>Instituição</label>
+        <select formControlName="legalEntityId">
+          <option value="">Selecione...</option>
+          @for (e of legalEntityService.legalEntities(); track e.id) {
+          <option [value]="e.id">{{ e.tradeName ?? e.corporateName }}</option>
+          }
+        </select>
+        @if (ctrl(editForm,'legalEntityId').invalid && ctrl(editForm,'legalEntityId').touched) {
+        <span class="field-error">Instituição é obrigatória</span>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- ═══════════════════════════ MODAL: Atualizar posição -->
+@if (activeModal() === 'update-position' && positionForm) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Atualizar posição</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    <p class="modal-description">Informe o valor de mercado atual conforme seu extrato da instituição.</p>
+
+    @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <form [formGroup]="positionForm" (ngSubmit)="onUpdatePosition()" novalidate>
+      <div class="form-row">
+        <div class="field"
+          [class.field--invalid]="ctrl(positionForm,'currentValue').invalid && ctrl(positionForm,'currentValue').touched">
+          <label>Valor atual (R$)</label>
+          <input type="number" formControlName="currentValue" min="0" step="0.01" placeholder="0,00" />
+          @if (ctrl(positionForm,'currentValue').invalid && ctrl(positionForm,'currentValue').touched) {
+          <span class="field-error">Valor inválido</span>
+          }
+        </div>
+
+        <div class="field"
+          [class.field--invalid]="ctrl(positionForm,'lastValuationDate').invalid && ctrl(positionForm,'lastValuationDate').touched">
+          <label>Data do extrato</label>
+          <input type="date" formControlName="lastValuationDate" />
+          @if (ctrl(positionForm,'lastValuationDate').invalid && ctrl(positionForm,'lastValuationDate').touched) {
+          <span class="field-error">Data é obrigatória</span>
+          }
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Atualizar }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- ═══════════════════════════ MODAL: Aporte (BUY) -->
+@if (activeModal() === 'buy' && buyForm) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Registrar aporte</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <form [formGroup]="buyForm" (ngSubmit)="onBuy()" novalidate>
+      <div class="form-row">
+        <div class="field" [class.field--invalid]="ctrl(buyForm,'amount').invalid && ctrl(buyForm,'amount').touched">
+          <label>Valor (R$)</label>
+          <input type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0,00" />
+          @if (ctrl(buyForm,'amount').invalid && ctrl(buyForm,'amount').touched) {
+          <span class="field-error">Valor inválido</span>
+          }
+        </div>
+        <div class="field"
+          [class.field--invalid]="ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched">
+          <label>Quantidade</label>
+          <input type="number" formControlName="quantity" min="0" step="0.0001" placeholder="1" />
+          @if (ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched) {
+          <span class="field-error">Quantidade inválida</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field"
+          [class.field--invalid]="ctrl(buyForm,'transactionDate').invalid && ctrl(buyForm,'transactionDate').touched">
+          <label>Data</label>
+          <input type="date" formControlName="transactionDate" />
+          @if (ctrl(buyForm,'transactionDate').invalid && ctrl(buyForm,'transactionDate').touched) {
+          <span class="field-error">Data é obrigatória</span>
+          }
+        </div>
+        <div class="field"
+          [class.field--invalid]="ctrl(buyForm,'pocketId').invalid && ctrl(buyForm,'pocketId').touched">
+          <label>Conta de débito</label>
+          <select formControlName="pocketId">
+            <option value="">Selecione...</option>
+            @for (p of eligiblePockets(); track p.id) {
+            <option [value]="p.id">{{ p.label }}</option>
+            }
+          </select>
+          @if (ctrl(buyForm,'pocketId').invalid && ctrl(buyForm,'pocketId').touched) {
+          <span class="field-error">Conta é obrigatória</span>
+          }
+        </div>
+      </div>
+
+      <!-- FIX 4: categoria desabilitada, exibida como campo de leitura -->
+      <div class="field">
+        <label>Categoria</label>
+        <input type="text" [value]="categoryNameFor('buy')" disabled class="field-input--disabled" />
+      </div>
+
+      <div class="field">
+        <label>Observações <span class="label-optional">(opcional)</span></label>
+        <input type="text" formControlName="notes" placeholder="Ex: 1ª aplicação" />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- ═══════════════════════════ MODAL: Rendimento (YIELD) -->
+@if (activeModal() === 'yield' && yieldForm) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Registrar resgate antecipado</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    <p class="modal-description">Use para rendimentos creditados diretamente em conta. Para atualizar o valor do ativo,
+      use "Atualizar posição".</p>
+
+    @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <form [formGroup]="yieldForm" (ngSubmit)="onYield()" novalidate>
+      <div class="form-row">
+        <div class="field"
+          [class.field--invalid]="ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched">
+          <label>Valor (R$)</label>
+          <input type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0,00" />
+          @if (ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched) {
+          <span class="field-error">Valor inválido</span>
+          }
+        </div>
+        <div class="field"
+          [class.field--invalid]="ctrl(yieldForm,'transactionDate').invalid && ctrl(yieldForm,'transactionDate').touched">
+          <label>Data</label>
+          <input type="date" formControlName="transactionDate" />
+          @if (ctrl(yieldForm,'transactionDate').invalid && ctrl(yieldForm,'transactionDate').touched) {
+          <span class="field-error">Data é obrigatória</span>
+          }
+        </div>
+      </div>
+
+      <div class="field"
+        [class.field--invalid]="ctrl(yieldForm,'pocketId').invalid && ctrl(yieldForm,'pocketId').touched">
+        <label>Conta de crédito</label>
+        <select formControlName="pocketId">
+          <option value="">Selecione...</option>
+          @for (p of eligiblePockets(); track p.id) {
+          <option [value]="p.id">{{ p.label }}</option>
+          }
+        </select>
+        @if (ctrl(yieldForm,'pocketId').invalid && ctrl(yieldForm,'pocketId').touched) {
+        <span class="field-error">Conta é obrigatória</span>
+        }
+      </div>
+
+      <!-- FIX 4: categoria desabilitada -->
+      <div class="field">
+        <label>Categoria</label>
+        <input type="text" [value]="categoryNameFor('yield')" disabled class="field-input--disabled" />
+      </div>
+
+      <div class="field">
+        <label>Observações <span class="label-optional">(opcional)</span></label>
+        <input type="text" formControlName="notes" placeholder="Ex: Rendimento mensal" />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- ═══════════════════════════ MODAL: Resgate (SELL) -->
+@if (activeModal() === 'sell' && sellForm) {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--wide" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Registrar resgate</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+
+    <p class="modal-description">O valor líquido creditado em conta será: valor bruto − imposto.</p>
+
+    @if (errorMessage()) {
+    <div class="modal-error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <form [formGroup]="sellForm" (ngSubmit)="onSell()" novalidate>
+      <div class="form-row">
+        <div class="field"
+          [class.field--invalid]="ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched">
+          <label>Valor bruto (R$)</label>
+          <input type="number" formControlName="grossAmount" min="0.01" step="0.01" class="field-input--disabled" />
+          @if (ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched) {
+          <span class="field-error">Valor inválido</span>
+          }
+        </div>
+        <div class="field"
+          [class.field--invalid]="ctrl(sellForm,'taxAmount').invalid && ctrl(sellForm,'taxAmount').touched">
+          <label>Imposto IR (R$)</label>
+          <input type="number" formControlName="taxAmount" min="0" step="0.01" placeholder="0,00" />
+          @if (ctrl(sellForm,'taxAmount').invalid && ctrl(sellForm,'taxAmount').touched) {
+          <span class="field-error">Valor inválido</span>
+          }
+        </div>
+      </div>
+
+      <div class="field"
+        [class.field--invalid]="ctrl(sellForm,'transactionDate').invalid && ctrl(sellForm,'transactionDate').touched">
+        <label>Data</label>
+        <input type="date" formControlName="transactionDate" />
+        @if (ctrl(sellForm,'transactionDate').invalid && ctrl(sellForm,'transactionDate').touched) {
+        <span class="field-error">Data é obrigatória</span>
+        }
+      </div>
+
+      <div class="field"
+        [class.field--invalid]="ctrl(sellForm,'pocketId').invalid && ctrl(sellForm,'pocketId').touched">
+        <label>Conta de crédito</label>
+        <select formControlName="pocketId">
+          <option value="">Selecione...</option>
+          @for (p of eligiblePockets(); track p.id) {
+          <option [value]="p.id">{{ p.label }}</option>
+          }
+        </select>
+        @if (ctrl(sellForm,'pocketId').invalid && ctrl(sellForm,'pocketId').touched) {
+        <span class="field-error">Conta é obrigatória</span>
+        }
+      </div>
+
+      <!-- FIX 4: categoria desabilitada -->
+      <div class="field">
+        <label>Categoria</label>
+        <input type="text" [value]="categoryNameFor('sell')" disabled class="field-input--disabled" />
+      </div>
+
+      <div class="field">
+        <label>Observações <span class="label-optional">(opcional)</span></label>
+        <input type="text" formControlName="notes" placeholder="Ex: Resgate parcial" />
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+}
+
+<!-- ═══════════════════════════ MODAL: Confirmar exclusão -->
+@if (activeModal() === 'confirm-delete') {
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+    <div class="confirm-icon confirm-icon--danger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
+    </div>
+    <h3>Excluir ativo</h3>
+    <p>Tem certeza que deseja excluir <strong>{{ asset()?.name }}</strong>? Esta ação não pode ser desfeita.</p>
+
+    @if (errorMessage()) {
+    <div class="modal-error modal-error--center">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <div class="modal-actions modal-actions--center">
+      <button class="btn-secondary" (click)="closeModal()">Cancelar</button>
+      <button class="btn-danger" (click)="onDelete()" [disabled]="isSaving()">
+        @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
+      </button>
+    </div>
+  </div>
+</div>
+}

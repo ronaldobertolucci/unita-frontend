@@ -110,6 +110,17 @@ export const routes: Routes = [
           import('./features/credit-cards/credit-card-bill-detail/credit-card-bill-detail.component').then(m => m.CreditCardBillDetailComponent), 
         data: { title: 'Fatura' } 
       },
+            {
+        path: 'investments',
+        loadComponent: () =>
+          import('./features/investments/investments.component').then(m => m.InvestmentsComponent),
+        data: { title: 'Investimentos' },
+      },
+      { path: 'investments/:id', 
+        loadComponent: () => 
+          import('./features/investments/investment-detail/investment-detail.component').then(m => m.InvestmentDetailComponent), 
+        data: { title: 'Investimento' } 
+      },
       {
         path: 'cadastros',
         loadComponent: () =>

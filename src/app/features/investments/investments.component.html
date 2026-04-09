@@ -1,0 +1,303 @@
+<div class="page">
+
+  <!-- Cabeçalho -->
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>Investimentos</h2>
+      <p>Acompanhe seus ativos de renda fixa e previdência</p>
+    </div>
+    <button class="btn-primary btn-primary--sm" (click)="openModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Novo ativo
+    </button>
+  </div>
+
+  <!-- Loading -->
+  @if (assetService.isLoading()) {
+    <div class="loading-state">
+      <span class="spinner-lg"></span>
+    </div>
+  }
+
+  <!-- Lista vazia -->
+  @else if (assetService.assets().length === 0) {
+    <div class="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+          <polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
+      <h3>Nenhum investimento ainda</h3>
+      <p>Cadastre seus ativos de renda fixa ou previdência para acompanhar sua carteira.</p>
+      <button class="btn-primary" (click)="openModal()">Cadastrar primeiro ativo</button>
+    </div>
+  }
+
+  <!-- Lista de ativos -->
+  @else {
+    <div class="assets-list">
+      @for (asset of assetService.assets(); track asset.id) {
+        <div class="asset-card" (click)="openDetail(asset.id)">
+
+          <!-- Ícone + info principal -->
+          <div class="asset-card-left">
+            <div class="asset-icon" [class.asset-icon--pension]="asset.category === 'PREVIDENCIA'">
+              @if (asset.category === 'RENDA_FIXA') {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                  <polyline points="16 7 22 7 22 13"/>
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              }
+            </div>
+
+            <div class="asset-info">
+              <div class="asset-name-row">
+                <span class="asset-name">{{ asset.name }}</span>
+                <span class="badge-status" [class]="'badge-status--' + asset.status.toLowerCase()">
+                  {{ statusLabel(asset.status) }}
+                </span>
+              </div>
+              <div class="asset-meta">
+                <span class="badge-category">{{ categoryLabel(asset.category) }}</span>
+                <span class="asset-institution">{{ asset.legalEntityName }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Valores -->
+          <div class="asset-card-right">
+            <span class="asset-current-value">
+              {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+            </span>
+            <div class="asset-variation" [class.asset-variation--positive]="variation(asset) >= 0" [class.asset-variation--negative]="variation(asset) < 0">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                @if (variation(asset) >= 0) {
+                  <polyline points="2 10 8 4 14 10"/>
+                } @else {
+                  <polyline points="2 6 8 12 14 6"/>
+                }
+              </svg>
+              {{ variation(asset) | number:'1.2-2':'pt-BR' }}%
+            </div>
+            <span class="asset-invested">
+              Investido: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+            </span>
+          </div>
+
+          <!-- Seta -->
+          <svg class="asset-card-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 4l4 4-4 4"/>
+          </svg>
+
+        </div>
+      }
+    </div>
+  }
+
+</div>
+
+<!-- ═══════════════════════════════════════════ MODAL: Novo ativo -->
+@if (modalOpen()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--wide" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h3>Novo ativo</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Toggle de tipo -->
+      <div class="toggle-group">
+        <button
+          class="toggle-btn"
+          [class.toggle-btn--active]="activeTab() === 'fixed-income'"
+          (click)="setTab('fixed-income')"
+          type="button"
+        >
+          Renda Fixa
+        </button>
+        <button
+          class="toggle-btn"
+          [class.toggle-btn--active]="activeTab() === 'pension'"
+          (click)="setTab('pension')"
+          type="button"
+        >
+          Previdência
+        </button>
+      </div>
+
+      <!-- Erro -->
+      @if (errorMessage()) {
+        <div class="modal-error">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <!-- ── Formulário: Renda Fixa ── -->
+      @if (activeTab() === 'fixed-income') {
+        <form [formGroup]="fixedIncomeForm" (ngSubmit)="onSubmit()" novalidate>
+
+          <div class="field" [class.field--invalid]="fi['name'].invalid && fi['name'].touched">
+            <label for="fi-name">Nome</label>
+            <input id="fi-name" type="text" formControlName="name" placeholder="Ex: CDB Banco X 120% CDI" autocomplete="off"/>
+            @if (fi['name'].invalid && fi['name'].touched) {
+              <span class="field-error">
+                @if (fi['name'].hasError('required')) { Nome é obrigatório }
+                @else if (fi['name'].hasError('maxlength')) { Máximo de 255 caracteres }
+              </span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="fi['legalEntityId'].invalid && fi['legalEntityId'].touched">
+            <label for="fi-entity">Instituição</label>
+            <select id="fi-entity" formControlName="legalEntityId">
+              <option value="">Selecione...</option>
+              @for (entity of legalEntityService.legalEntities(); track entity.id) {
+                <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+              }
+            </select>
+            @if (fi['legalEntityId'].invalid && fi['legalEntityId'].touched) {
+              <span class="field-error">Instituição é obrigatória</span>
+            }
+          </div>
+
+          <div class="form-row">
+            <div class="field" [class.field--invalid]="fi['indexer'].invalid && fi['indexer'].touched">
+              <label for="fi-indexer">Indexador</label>
+              <select id="fi-indexer" formControlName="indexer">
+                <option value="">Selecione...</option>
+                @for (idx of indexers; track idx) {
+                  <option [value]="idx">{{ idx }}</option>
+                }
+              </select>
+              @if (fi['indexer'].invalid && fi['indexer'].touched) {
+                <span class="field-error">Indexador é obrigatório</span>
+              }
+            </div>
+
+            <div class="field" [class.field--invalid]="fi['annualRate'].invalid && fi['annualRate'].touched">
+              <label for="fi-rate">Taxa anual (%)</label>
+              <input id="fi-rate" type="number" formControlName="annualRate" placeholder="Ex: 12.5" min="0" step="0.01"/>
+              @if (fi['annualRate'].invalid && fi['annualRate'].touched) {
+                <span class="field-error">
+                  @if (fi['annualRate'].hasError('required')) { Taxa é obrigatória }
+                  @else if (fi['annualRate'].hasError('min')) { Valor inválido }
+                </span>
+              }
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field" [class.field--invalid]="fi['maturityDate'].invalid && fi['maturityDate'].touched">
+              <label for="fi-maturity">Vencimento</label>
+              <input id="fi-maturity" type="date" formControlName="maturityDate"/>
+              @if (fi['maturityDate'].invalid && fi['maturityDate'].touched) {
+                <span class="field-error">Vencimento é obrigatório</span>
+              }
+            </div>
+
+            <div class="field field--checkbox">
+              <label class="checkbox-label">
+                <input type="checkbox" formControlName="taxFree"/>
+                <span class="checkbox-text">Isento de IR <span class="checkbox-hint">(LCI, LCA, Debêntures)</span></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isSaving()">
+              @if (isSaving()) { <span class="spinner"></span> Salvando... }
+              @else { Cadastrar }
+            </button>
+          </div>
+
+        </form>
+      }
+
+      <!-- ── Formulário: Previdência ── -->
+      @if (activeTab() === 'pension') {
+        <form [formGroup]="pensionForm" (ngSubmit)="onSubmit()" novalidate>
+
+          <div class="field" [class.field--invalid]="pe['name'].invalid && pe['name'].touched">
+            <label for="pe-name">Nome</label>
+            <input id="pe-name" type="text" formControlName="name" placeholder="Ex: PGBL Banco X" autocomplete="off"/>
+            @if (pe['name'].invalid && pe['name'].touched) {
+              <span class="field-error">
+                @if (pe['name'].hasError('required')) { Nome é obrigatório }
+                @else if (pe['name'].hasError('maxlength')) { Máximo de 255 caracteres }
+              </span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="pe['legalEntityId'].invalid && pe['legalEntityId'].touched">
+            <label for="pe-entity">Instituição</label>
+            <select id="pe-entity" formControlName="legalEntityId">
+              <option value="">Selecione...</option>
+              @for (entity of legalEntityService.legalEntities(); track entity.id) {
+                <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+              }
+            </select>
+            @if (pe['legalEntityId'].invalid && pe['legalEntityId'].touched) {
+              <span class="field-error">Instituição é obrigatória</span>
+            }
+          </div>
+
+          <div class="form-row">
+            <div class="field" [class.field--invalid]="pe['pensionType'].invalid && pe['pensionType'].touched">
+              <label for="pe-type">Tipo</label>
+              <select id="pe-type" formControlName="pensionType">
+                <option value="">Selecione...</option>
+                @for (type of pensionTypes; track type) {
+                  <option [value]="type">{{ pensionTypeLabels[type] }}</option>
+                }
+              </select>
+              @if (pe['pensionType'].invalid && pe['pensionType'].touched) {
+                <span class="field-error">Tipo é obrigatório</span>
+              }
+            </div>
+
+            <div class="field" [class.field--invalid]="pe['taxRegime'].invalid && pe['taxRegime'].touched">
+              <label for="pe-regime">Regime tributário</label>
+              <select id="pe-regime" formControlName="taxRegime">
+                <option value="">Selecione...</option>
+                @for (regime of taxRegimes; track regime) {
+                  <option [value]="regime">{{ taxRegimeLabels[regime] }}</option>
+                }
+              </select>
+              @if (pe['taxRegime'].invalid && pe['taxRegime'].touched) {
+                <span class="field-error">Regime é obrigatório</span>
+              }
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isSaving()">
+              @if (isSaving()) { <span class="spinner"></span> Salvando... }
+              @else { Cadastrar }
+            </button>
+          </div>
+
+        </form>
+      }
+
+    </div>
+  </div>
+}

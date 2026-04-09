@@ -18,7 +18,8 @@ const ERROR_MAP: Record<string, string> = {
   'Source and target pocket owners must share a group': 'Os donos dos pockets devem compartilhar um grupo.',
   'Insufficient balance in source pocket': 'Saldo insuficiente no pocket de origem.',
   'Bill is closed. Reopen it before adding installments': 'Fatura fechada. Reabra antes de adicionar compras/parcelas.',
-  'Cannot add installment to a paid bill': 'Não é possível adicionar uma compra/parcela a uma fatura paga.'
+  'Cannot add installment to a paid bill': 'Não é possível adicionar uma compra/parcela a uma fatura paga.',
+  'Asset has transactions and cannot be deleted': 'Investimento com transações não pode ser excluída.',
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {
