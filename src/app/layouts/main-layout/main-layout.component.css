@@ -741,6 +741,74 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────
+   PAINEL "MAIS" (mobile overflow menu)
+───────────────────────────────────────────────────────── */
+.more-panel {
+  position: fixed;
+  bottom: 72px;
+  left: 1rem;
+  right: 1rem;
+  background: rgba(10, 18, 42, 0.98);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  overflow: hidden;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: panelIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.more-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.15s ease, color 0.15s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.more-panel-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.more-panel-item--active {
+  color: var(--accent) !important;
+  background: var(--accent-dim);
+}
+
+.more-panel-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.more-panel-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 0.25rem 0;
+}
+
+.more-panel-notif-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 /* ─── Erro no painel de notificações ─── */
 .notif-error {
   display: flex;

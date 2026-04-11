@@ -158,7 +158,7 @@
 
   <!-- ═══════════════════════════════════════════ BOTTOM NAVBAR (mobile) -->
   <nav class="bottom-nav">
-    @for (item of navItems; track item.path) {
+    @for (item of primaryNavItems; track item.path) {
       <a
         [routerLink]="item.path"
         routerLinkActive="bottom-nav-item--active"
@@ -173,24 +173,57 @@
       </a>
     }
 
-    <!-- Notificações na bottom nav -->
+    <!-- Botão Mais -->
     <button
       class="bottom-nav-item"
-      data-notif-btn
-      (click)="toggleNotifications('mobile')"
-      [class.bottom-nav-item--active]="notificationSource() === 'mobile'"
+      data-more-btn
+      (click)="toggleMoreMenu()"
+      [class.bottom-nav-item--active]="moreMenuOpen()"
     >
-      <div class="bottom-notif-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
-        @if (pendingCount() > 0) {
-          <span class="badge badge--bottom">{{ pendingCount() > 9 ? '9+' : pendingCount() }}</span>
-        }
-      </div>
-      <span>Avisos</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="5"  cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
+      </svg>
+      <span>Mais</span>
     </button>
+
+    <!-- Painel Mais -->
+    @if (moreMenuOpen()) {
+      <div class="more-panel" data-more-panel>
+        @for (item of overflowNavItems; track item.path) {
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="more-panel-item--active"
+            class="more-panel-item"
+            (click)="moreMenuOpen.set(false)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              @for (d of item.icons; track d) {
+                <path [attr.d]="d" />
+              }
+            </svg>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+        <hr class="more-panel-divider" />
+        <button
+          class="more-panel-item"
+          data-notif-btn
+          (click)="toggleNotifications('mobile')"
+          [class.more-panel-item--active]="notificationSource() === 'mobile'"
+        >
+          <div class="more-panel-notif-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            @if (pendingCount() > 0) {
+              <span class="badge badge--bottom">{{ pendingCount() > 9 ? '9+' : pendingCount() }}</span>
+            }
+          </div>
+          <span>Avisos</span>
+        </button>
+      </div>
+    }
 
     <!-- Painel de notificações (mobile) -->
     @if (notificationSource() === 'mobile') {

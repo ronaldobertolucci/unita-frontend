@@ -80,6 +80,8 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const PRIMARY_NAV_PATHS = new Set(['/dashboard', '/pockets', '/transferencias', '/credit-cards']);
+
 type NotificationSource = 'sidebar' | 'topbar' | 'mobile' | null;
 type UserMenuSource = 'sidebar' | 'topbar' | null;
 
@@ -97,6 +99,8 @@ export class MainLayoutComponent implements OnInit {
   private readonly elementRef = inject(ElementRef);
 
   readonly navItems = NAV_ITEMS;
+  readonly primaryNavItems = NAV_ITEMS.filter(i => PRIMARY_NAV_PATHS.has(i.path));
+  readonly overflowNavItems = NAV_ITEMS.filter(i => !PRIMARY_NAV_PATHS.has(i.path));
 
   readonly currentUser = this.authService.currentUser;
   readonly userInitials = computed(() => {
@@ -112,6 +116,7 @@ export class MainLayoutComponent implements OnInit {
 
   readonly notificationSource = signal<NotificationSource>(null);
   readonly userMenuSource = signal<UserMenuSource>(null);
+  readonly moreMenuOpen = signal(false);
 
   readonly pageTitle = signal('Dashboard');
 
@@ -141,11 +146,19 @@ export class MainLayoutComponent implements OnInit {
   toggleNotifications(source: 'sidebar' | 'topbar' | 'mobile'): void {
     this.notificationSource.update(v => (v === source ? null : source));
     this.userMenuSource.set(null);
+    this.moreMenuOpen.set(false);
   }
 
   toggleUserMenu(source: 'sidebar' | 'topbar'): void {
     this.userMenuSource.update(v => (v === source ? null : source));
     this.notificationSource.set(null);
+    this.moreMenuOpen.set(false);
+  }
+
+  toggleMoreMenu(): void {
+    this.moreMenuOpen.update(v => !v);
+    this.notificationSource.set(null);
+    this.userMenuSource.set(null);
   }
 
   respondToInvitation(id: number, accept: boolean): void {
@@ -165,12 +178,17 @@ export class MainLayoutComponent implements OnInit {
     const clickedNotifPanel = target.closest('[data-notif-panel]');
     const clickedUserBtn = target.closest('[data-user-btn]');
     const clickedUserMenu = target.closest('[data-user-menu]');
+    const clickedMoreBtn = target.closest('[data-more-btn]');
+    const clickedMorePanel = target.closest('[data-more-panel]');
 
     if (!clickedNotifBtn && !clickedNotifPanel) {
       this.notificationSource.set(null);
     }
     if (!clickedUserBtn && !clickedUserMenu) {
       this.userMenuSource.set(null);
+    }
+    if (!clickedMoreBtn && !clickedMorePanel) {
+      this.moreMenuOpen.set(false);
     }
   }
 }
