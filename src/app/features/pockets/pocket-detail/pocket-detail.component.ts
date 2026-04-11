@@ -52,6 +52,18 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
     categoryId: [null as number | null, Validators.required]
   });
 
+  private readonly EXPENSE_EXCLUDED = new Set([
+    'Resgate de Investimento',
+    'Rendimento de Investimento',
+    'Transferência Recebida'
+  ]);
+
+  private readonly INCOME_EXCLUDED = new Set([
+    'Aporte em Investimento',
+    'Pagamento de Cartão',
+    'Transferência Enviada'
+  ]);
+
   // ─── Computed ────────────────────────────────────────────────────
   readonly transactions = this.transactionService.transactions;
 
@@ -66,11 +78,18 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       .map(([date, items]) => ({ date, items }));
   });
 
-  readonly availableCategories = computed(() =>
-    this.categoryService.categories()
-      .filter(c => c.type === this.createDirection() || c.type === 'NEUTRAL')
-      .sort((a, b) => a.name.localeCompare('pt-BR'))
-  );
+readonly availableCategories = computed(() => {
+  const excluded = this.createDirection() === 'EXPENSE'
+    ? this.EXPENSE_EXCLUDED
+    : this.INCOME_EXCLUDED;
+
+  return this.categoryService.categories()
+    .filter(c =>
+      (c.type === this.createDirection() || c.type === 'NEUTRAL') &&
+      !excluded.has(c.name)
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+});
 
   // ─── Lifecycle ───────────────────────────────────────────────────
   ngOnInit(): void {
