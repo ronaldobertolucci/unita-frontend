@@ -92,8 +92,8 @@ export class CreditCardBillDetailComponent implements OnInit {
 
   // ─── Categorias filtradas ─────────────────────────────────────────────────
 
-  readonly incomeCategories = computed(() =>
-    this.categoryService.categories().filter(c => c.type === 'INCOME' || c.type === 'NEUTRAL')
+  readonly reimbursementCategoryId = computed(() =>
+    this.categoryService.categories().find(c => c.name === 'Reembolsos')?.id ?? null
   );
 
   // ─── Lista unificada de exibição ──────────────────────────────────────────
@@ -185,6 +185,8 @@ export class CreditCardBillDetailComponent implements OnInit {
 
   openCreateRefundModal(): void {
     this.refundForm.reset({ refundDate: this.todayString() });
+    this.refundForm.get('categoryId')!.setValue(this.reimbursementCategoryId());
+    this.refundForm.get('categoryId')!.disable();
     this.errorMessage.set(null);
     this.activeModal.set('create-refund');
   }
@@ -196,7 +198,7 @@ export class CreditCardBillDetailComponent implements OnInit {
     }
     this.isSaving.set(true);
     this.errorMessage.set(null);
-    const v = this.refundForm.value;
+    const v = this.refundForm.getRawValue();
 
     this.creditCardService.createRefund(this.cardId, this.billId, {
       description: v.description!,

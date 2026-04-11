@@ -94,9 +94,11 @@ export class CreditCardDetailComponent implements OnInit {
 
   // ─── Categorias para parcelas ─────────────────────────────────────────────
 
-  readonly expenseCategories = computed(() =>
-    this.categoryService.categories().filter(c => c.type === 'EXPENSE' || c.type === 'NEUTRAL')
-  );
+readonly expenseCategories = computed(() =>
+  this.categoryService.categories()
+    .filter(c => c.type === 'EXPENSE')
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+);
 
   // ─── Totais ───────────────────────────────────────────────────────────────
 

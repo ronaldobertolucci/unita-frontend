@@ -180,17 +180,9 @@
           </div>
         </div>
 
-        <div class="field" [class.field--invalid]="refCategoryId.invalid && refCategoryId.touched">
-          <label for="refCat">Categoria</label>
-          <select id="refCat" formControlName="categoryId">
-            <option [value]="null" disabled selected>Selecione uma categoria</option>
-            @for (cat of incomeCategories(); track cat.id) {
-              <option [value]="cat.id">{{ cat.name }}</option>
-            }
-          </select>
-          @if (refCategoryId.invalid && refCategoryId.touched) {
-            <span class="field-error">Selecione uma categoria</span>
-          }
+        <div class="field">
+          <label>Categoria</label>
+          <input type="text" value="Reembolsos" disabled />
         </div>
 
         <div class="modal-actions">

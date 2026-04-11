@@ -170,17 +170,6 @@ describe('CreditCardBillDetailComponent', () => {
     });
   });
 
-  // ─── expenseCategories / incomeCategories ─────────────────────────────────
-
-  describe('incomeCategories()', () => {
-    beforeEach(() => setup());
-
-    it('should include INCOME and NEUTRAL categories', () => {
-      const types = component.incomeCategories().map(c => c.type);
-      expect(types.every(t => t === 'INCOME' || t === 'NEUTRAL')).toBe(true);
-    });
-  });
-
   // ─── isPaid ───────────────────────────────────────────────────────────────
 
   describe('isPaid', () => {
