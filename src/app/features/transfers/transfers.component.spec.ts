@@ -9,10 +9,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
 
 const mockPockets = [
-  { id: 1, type: 'BANK_ACCOUNT', label: 'Nubank', balance: 1000 },
-  { id: 2, type: 'CASH', label: 'Carteira', balance: 200 },
-  { id: 3, type: 'BENEFIT_ACCOUNT', label: 'VR', balance: 300 },
+  { id: 1, type: 'BANK_ACCOUNT',          label: 'Nubank',   balance: 1000 },
+  { id: 2, type: 'CASH',                  label: 'Carteira', balance: 200  },
+  { id: 3, type: 'BENEFIT_ACCOUNT',       label: 'VR',       balance: 300  },
+  { id: 4, type: 'FGTS_EMPLOYER_ACCOUNT', label: 'FGTS Empresa X', balance: 5000 },
 ];
+
+const mockPocketsWithoutFgts = mockPockets.filter(p => p.type !== 'FGTS_EMPLOYER_ACCOUNT');
 
 const mockGroups = [{ id: 10, name: 'Família' }];
 
@@ -24,6 +27,7 @@ const mockGroupPockets = [
 function buildTransferService() {
   return {
     transfer: jest.fn(),
+    fgtsWithdrawal: jest.fn(),
     getGroupPockets: jest.fn(),
   };
 }
@@ -37,7 +41,7 @@ function buildPocketService(pockets = mockPockets) {
 
 function buildGroupService(groupsData = mockGroups) {
   return {
-    myGroups: signal(groupsData), // ✅ Corrigido para myGroups
+    myGroups: signal(groupsData),
     loadMyGroups$: jest.fn().mockReturnValue(of(void 0)),
   };
 }
@@ -126,6 +130,37 @@ describe('TransfersComponent', () => {
     });
   });
 
+  // ─── fgtsPockets ─────────────────────────────────────────────────────────
+
+  describe('fgtsPockets', () => {
+    it('should return only FGTS_EMPLOYER_ACCOUNT pockets', () => {
+      setup(mockPockets);
+      const result = component.fgtsPockets();
+      expect(result.length).toBe(1);
+      expect(result[0].type).toBe('FGTS_EMPLOYER_ACCOUNT');
+      expect(result[0].id).toBe(4);
+    });
+
+    it('should return empty array when there are no FGTS pockets', () => {
+      setup(mockPocketsWithoutFgts);
+      expect(component.fgtsPockets()).toEqual([]);
+    });
+  });
+
+  // ─── hasFgtsPockets ──────────────────────────────────────────────────────
+
+  describe('hasFgtsPockets', () => {
+    it('should return true when FGTS pockets exist', () => {
+      setup(mockPockets);
+      expect(component.hasFgtsPockets()).toBe(true);
+    });
+
+    it('should return false when no FGTS pockets exist', () => {
+      setup(mockPocketsWithoutFgts);
+      expect(component.hasFgtsPockets()).toBe(false);
+    });
+  });
+
   // ─── hasGroups ────────────────────────────────────────────────────────────
 
   describe('hasGroups', () => {
@@ -148,6 +183,11 @@ describe('TransfersComponent', () => {
     it('should switch active tab', () => {
       component.setTab('group');
       expect(component.activeTab()).toBe('group');
+    });
+
+    it('should switch to fgts tab', () => {
+      component.setTab('fgts');
+      expect(component.activeTab()).toBe('fgts');
     });
 
     it('should clear error and success messages', () => {
@@ -328,6 +368,76 @@ describe('TransfersComponent', () => {
       component.submitGroupTransfer();
       expect(component.errorMessage()).toBeTruthy();
       expect(component.isSaving()).toBe(false);
+    });
+  });
+
+  // ─── submitFgtsWithdrawal() ───────────────────────────────────────────────
+
+  describe('submitFgtsWithdrawal()', () => {
+    beforeEach(() => setup());
+
+    it('should mark form as touched when invalid', () => {
+      component.submitFgtsWithdrawal();
+      expect(component.fgtsForm.touched).toBe(true);
+      expect(transferServiceSpy.fgtsWithdrawal).not.toHaveBeenCalled();
+    });
+
+    it('should call fgtsWithdrawal with correct payload on success', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(transferServiceSpy.fgtsWithdrawal).toHaveBeenCalledWith({
+        sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário',
+      });
+    });
+
+    it('should not call transfer() — only fgtsWithdrawal()', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(transferServiceSpy.transfer).not.toHaveBeenCalled();
+    });
+
+    it('should reload pockets and show success message on success', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(pocketServiceSpy.loadPockets).toHaveBeenCalledTimes(2);
+      expect(component.successMessage()).toBe('Saque de FGTS realizado com sucesso!');
+    });
+
+    it('should reset form on success', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(component.fgtsForm.get('sourcePocketId')?.value).toBeNull();
+      expect(component.fgtsForm.get('targetPocketId')?.value).toBeNull();
+      expect(component.fgtsForm.get('amount')?.value).toBeNull();
+      expect(component.fgtsForm.get('description')?.value).toBeNull();
+    });
+
+    it('should stop saving after success', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('should set errorMessage and stop saving on failure', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(throwError(() => ({ error: { message: 'Saldo insuficiente' } })));
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(component.errorMessage()).toBeTruthy();
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('should clear previous messages before submitting', () => {
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      component['errorMessage'].set('erro anterior');
+      component['successMessage'].set('sucesso anterior');
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
+      component.submitFgtsWithdrawal();
+      expect(component.errorMessage()).toBeNull();
     });
   });
 });

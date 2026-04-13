@@ -47,6 +47,39 @@ describe('TransferService', () => {
     });
   });
 
+  describe('fgtsWithdrawal()', () => {
+    it('should POST to /transfers/fgts/withdrawal with the given payload', () => {
+      const payload: TransferPayload = {
+        sourcePocketId: 10,
+        targetPocketId: 2,
+        amount: 1500,
+        description: 'Saque aniversário',
+      };
+
+      service.fgtsWithdrawal(payload).subscribe();
+
+      const req = httpMock.expectOne(`${baseUrl}/transfers/fgts/withdrawal`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(payload);
+      req.flush(null);
+    });
+
+    it('should complete without error on success', () => {
+      const payload: TransferPayload = {
+        sourcePocketId: 10,
+        targetPocketId: 1,
+        amount: 200,
+        description: 'Saque FGTS',
+      };
+
+      let completed = false;
+      service.fgtsWithdrawal(payload).subscribe({ complete: () => (completed = true) });
+
+      httpMock.expectOne(`${baseUrl}/transfers/fgts/withdrawal`).flush(null);
+      expect(completed).toBe(true);
+    });
+  });
+
   describe('getGroupPockets()', () => {
     it('should GET /groups/{id}/share/pockets', () => {
       service.getGroupPockets(10).subscribe();

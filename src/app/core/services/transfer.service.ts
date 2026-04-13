@@ -32,6 +32,10 @@ export class TransferService {
     return this.http.post<void>(`${this.baseUrl}/transfers`, payload);
   }
 
+  fgtsWithdrawal(payload: TransferPayload): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/transfers/fgts/withdrawal`, payload);
+  }
+
   getGroupPockets(groupId: number): Observable<GroupPocketDto[]> {
     return this.http.get<GroupPocketDto[]>(`${this.baseUrl}/groups/${groupId}/share/pockets`).pipe(
       map(pockets =>

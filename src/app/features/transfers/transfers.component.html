@@ -29,6 +29,16 @@
       >
         Entre membros do grupo
       </button>
+      <button
+        type="button"
+        class="toggle-btn"
+        [class.toggle-btn--active]="activeTab() === 'fgts'"
+        [disabled]="!hasFgtsPockets()"
+        [title]="!hasFgtsPockets() ? 'Você não possui nenhuma conta FGTS' : ''"
+        (click)="hasFgtsPockets() && setTab('fgts')"
+      >
+        Saque FGTS
+      </button>
     </div>
   </div>
 
@@ -222,6 +232,77 @@
         <div class="modal-actions">
           <button type="submit" class="btn-primary" [disabled]="isSaving()">
             @if (isSaving()) { <span class="spinner"></span> Transferindo... } @else { Transferir }
+          </button>
+        </div>
+
+      </form>
+    }
+
+    <!-- ══ FLUXO: Saque FGTS ══ -->
+    @if (activeTab() === 'fgts') {
+      <form [formGroup]="fgtsForm" (ngSubmit)="submitFgtsWithdrawal()" novalidate>
+
+        <div class="field" [class.field--invalid]="fgtsSource.invalid && fgtsSource.touched">
+          <label for="fgtsSource">Conta FGTS (origem)</label>
+          <select id="fgtsSource" formControlName="sourcePocketId">
+            <option [value]="null" disabled selected>Selecione a conta FGTS</option>
+            @for (p of fgtsPockets(); track p.id) {
+              <option [value]="p.id">{{ p.label }}</option>
+            }
+          </select>
+          @if (fgtsSource.invalid && fgtsSource.touched) {
+            <span class="field-error">Conta FGTS é obrigatória</span>
+          }
+        </div>
+
+        <div class="transfer-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <polyline points="19 12 12 19 5 12"/>
+          </svg>
+        </div>
+
+        <div class="field" [class.field--invalid]="fgtsTarget.invalid && fgtsTarget.touched">
+          <label for="fgtsTarget">Destino</label>
+          @if (eligibleSourcePockets().length === 0) {
+            <div class="field-empty-hint">Nenhum pocket elegível (Conta Bancária ou Carteira).</div>
+          } @else {
+            <select id="fgtsTarget" formControlName="targetPocketId">
+              <option [value]="null" disabled selected>Selecione o pocket de destino</option>
+              @for (p of eligibleSourcePockets(); track p.id) {
+                <option [value]="p.id">{{ p.label }}</option>
+              }
+            </select>
+          }
+          @if (fgtsTarget.invalid && fgtsTarget.touched) {
+            <span class="field-error">Pocket de destino é obrigatório</span>
+          }
+        </div>
+
+        <div class="field-row">
+          <div class="field" [class.field--invalid]="fgtsAmount.invalid && fgtsAmount.touched">
+            <label for="fgtsAmount">Valor (R$)</label>
+            <input id="fgtsAmount" type="number" min="0.01" step="0.01" formControlName="amount" placeholder="0,00" />
+            @if (fgtsAmount.invalid && fgtsAmount.touched) {
+              <span class="field-error">
+                @if (fgtsAmount.hasError('required')) { Valor é obrigatório }
+                @else if (fgtsAmount.hasError('min')) { Valor deve ser maior que zero }
+              </span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="fgtsDescription.invalid && fgtsDescription.touched">
+            <label for="fgtsDescription">Descrição</label>
+            <input id="fgtsDescription" type="text" formControlName="description" placeholder="Ex: Saque aniversário" autocomplete="off" />
+            @if (fgtsDescription.invalid && fgtsDescription.touched) {
+              <span class="field-error">Descrição é obrigatória</span>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+            @if (isSaving()) { <span class="spinner"></span> Sacando... } @else { Sacar }
           </button>
         </div>
 

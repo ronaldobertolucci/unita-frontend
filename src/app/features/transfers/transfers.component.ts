@@ -8,7 +8,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { translateApiError } from '../../core/utils/api-error.util';
 import { GroupPocketDto } from '../../core/services/transfer.service';
 
-type TransferTab = 'own' | 'group';
+type TransferTab = 'own' | 'group' | 'fgts';
 
 @Component({
   selector: 'app-transfers',
@@ -47,6 +47,10 @@ export class TransfersComponent implements OnInit {
     this.eligibleSourcePockets().filter(p => p.id !== this.selectedSourceId())
   );
 
+  readonly fgtsPockets = computed(() =>
+    this.pockets().filter(p => p.type === 'FGTS_EMPLOYER_ACCOUNT')
+  );
+
   // Membros do grupo selecionado (exclui o próprio usuário)
   readonly groupMembers = computed(() => {
     const currentUserId = this.authService.currentUser()?.id;
@@ -69,6 +73,7 @@ export class TransfersComponent implements OnInit {
   });
 
   readonly hasGroups = computed(() => this.groups().length > 0);
+  readonly hasFgtsPockets = computed(() => this.fgtsPockets().length > 0);
 
   // ── Formulários ──────────────────────────────────────────────────
   readonly ownForm = this.fb.group({
@@ -87,6 +92,13 @@ export class TransfersComponent implements OnInit {
     description: ['', Validators.required],
   });
 
+  readonly fgtsForm = this.fb.group({
+    sourcePocketId: [null as number | null, Validators.required],
+    targetPocketId: [null as number | null, Validators.required],
+    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    description: ['', Validators.required],
+  });
+
   // ── Atalhos de controle ──────────────────────────────────────────
   get ownSource() { return this.ownForm.get('sourcePocketId')!; }
   get ownTarget() { return this.ownForm.get('targetPocketId')!; }
@@ -99,6 +111,11 @@ export class TransfersComponent implements OnInit {
   get grpTarget() { return this.groupForm.get('targetPocketId')!; }
   get grpAmount() { return this.groupForm.get('amount')!; }
   get grpDescription() { return this.groupForm.get('description')!; }
+
+  get fgtsSource() { return this.fgtsForm.get('sourcePocketId')!; }
+  get fgtsTarget() { return this.fgtsForm.get('targetPocketId')!; }
+  get fgtsAmount() { return this.fgtsForm.get('amount')!; }
+  get fgtsDescription() { return this.fgtsForm.get('description')!; }
 
   // ── Lifecycle ────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -192,6 +209,34 @@ export class TransfersComponent implements OnInit {
         this.groupForm.reset();
         this.groupPockets.set([]);
         this.successMessage.set('Transferência realizada com sucesso!');
+        this.isSaving.set(false);
+      },
+      error: err => {
+        this.errorMessage.set(translateApiError(err?.error?.message));
+        this.isSaving.set(false);
+      },
+    });
+  }
+
+  submitFgtsWithdrawal(): void {
+    if (this.fgtsForm.invalid) {
+      this.fgtsForm.markAllAsTouched();
+      return;
+    }
+    this.clearMessages();
+    this.isSaving.set(true);
+
+    const { sourcePocketId, targetPocketId, amount, description } = this.fgtsForm.value;
+    this.transferService.fgtsWithdrawal({
+      sourcePocketId: sourcePocketId!,
+      targetPocketId: targetPocketId!,
+      amount: amount!,
+      description: description!,
+    }).subscribe({
+      next: () => {
+        this.pocketService.loadPockets().subscribe();
+        this.fgtsForm.reset();
+        this.successMessage.set('Saque de FGTS realizado com sucesso!');
         this.isSaving.set(false);
       },
       error: err => {
