@@ -30,9 +30,9 @@ type ModalType =
   | null;
 
 // Nomes das categorias de sistema usadas em investimentos
-const CATEGORY_BUY   = 'Aporte em Investimento';
+const CATEGORY_BUY = 'Aporte em Investimento';
 const CATEGORY_YIELD = 'Rendimento de Investimento';
-const CATEGORY_SELL  = 'Resgate de Investimento';
+const CATEGORY_SELL = 'Resgate de Investimento';
 
 @Component({
   selector: 'app-investment-detail',
@@ -393,7 +393,7 @@ export class InvestmentDetailComponent implements OnInit {
     this.positionForm = this.fb.group({
       currentValue: [pos?.currentValue ?? '', [Validators.required, Validators.min(0)]],
       lastValuationDate: [
-        pos?.lastValuationDate ?? new Date().toISOString().slice(0, 10),
+        pos?.lastValuationDate ?? this.toLocalDateString(new Date()),
         Validators.required,
       ],
     });
@@ -406,7 +406,7 @@ export class InvestmentDetailComponent implements OnInit {
       amount: ['', [Validators.required, Validators.min(0.01)]],
       quantity: ['', [Validators.required, Validators.min(0)]],
       pocketId: ['', Validators.required],
-      transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
+      transactionDate: [this.toLocalDateString(new Date()), Validators.required],
       categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],
       notes: [''],
     });
@@ -417,7 +417,7 @@ export class InvestmentDetailComponent implements OnInit {
     this.yieldForm = this.fb.group({
       amount: ['', [Validators.required, Validators.min(0.01)]],
       pocketId: ['', Validators.required],
-      transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
+      transactionDate: [this.toLocalDateString(new Date()), Validators.required],
       categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],
       notes: [''],
     });
@@ -431,10 +431,17 @@ export class InvestmentDetailComponent implements OnInit {
       taxAmount: ['', [Validators.required, Validators.min(0)]],
       quantity: [{ value: 1, disabled: true }],
       pocketId: ['', Validators.required],
-      transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
+      transactionDate: [this.toLocalDateString(new Date()), Validators.required],
       categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],
       notes: [''],
     });
+  }
+
+  private toLocalDateString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   // ── Getters de controle ───────────────────────────────────────────────────
@@ -444,7 +451,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   // FIX 4: label da categoria pré-definida para exibição no campo desabilitado
   categoryNameFor(type: 'buy' | 'yield' | 'sell'): string {
-    if (type === 'buy')   return this.categoryBuy()?.name   ?? CATEGORY_BUY;
+    if (type === 'buy') return this.categoryBuy()?.name ?? CATEGORY_BUY;
     if (type === 'yield') return this.categoryYield()?.name ?? CATEGORY_YIELD;
     return this.categorySell()?.name ?? CATEGORY_SELL;
   }

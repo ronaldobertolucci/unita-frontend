@@ -110,6 +110,13 @@ function buildLegalEntityService(entities: LegalEntityDto[] = []) {
   };
 }
 
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('InvestmentDetailComponent', () => {
@@ -314,7 +321,7 @@ describe('InvestmentDetailComponent', () => {
 
     it('should build buyForm with today as default date', () => {
       component.openModal('buy');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = toLocalDateString(new Date());
       expect(component.buyForm.value.transactionDate).toBe(today);
     });
 
