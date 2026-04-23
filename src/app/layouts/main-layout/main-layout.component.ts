@@ -28,16 +28,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'Grupos',
-    path: '/groups',
-    icons: [
-      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2',
-      'M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
-      'M23 21v-2a4 4 0 0 0-3-3.87',
-      'M16 3.13a4 4 0 0 1 0 7.75',
-    ],
-  },
-  {
     label: 'Pockets',
     path: '/pockets',
     icons: [
@@ -47,11 +37,11 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'Transferências',
-    path: '/transferencias',
+    label: 'Investimentos',
+    path: '/investments',
     icons: [
-      'M7 16V4m0 0L3 8m4-4l4 4',
-      'M17 8v12m0 0l4-4m-4 4l-4-4',
+      'M3 17l6-6 4 4 8-8',
+      'M14 7h7v7',
     ],
   },
   {
@@ -63,11 +53,21 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'Investimentos',
-    path: '/investments',
+    label: 'Transferências',
+    path: '/transferencias',
     icons: [
-      'M3 17l6-6 4 4 8-8',
-      'M14 7h7v7',
+      'M7 16V4m0 0L3 8m4-4l4 4',
+      'M17 8v12m0 0l4-4m-4 4l-4-4',
+    ],
+  },
+  {
+    label: 'Grupos',
+    path: '/groups',
+    icons: [
+      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2',
+      'M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+      'M23 21v-2a4 4 0 0 0-3-3.87',
+      'M16 3.13a4 4 0 0 1 0 7.75',
     ],
   },
   {
@@ -80,7 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-const PRIMARY_NAV_PATHS = new Set(['/dashboard', '/pockets', '/transferencias', '/credit-cards']);
+const PRIMARY_NAV_PATHS = new Set(['/dashboard', '/pockets', '/investments', '/credit-cards']);
 
 type NotificationSource = 'sidebar' | 'topbar' | 'mobile' | null;
 type UserMenuSource = 'sidebar' | 'topbar' | null;
