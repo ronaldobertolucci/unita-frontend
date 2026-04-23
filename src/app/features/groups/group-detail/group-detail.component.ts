@@ -8,6 +8,7 @@ import { InvitationService } from '../../../core/services/invitation.service';
 import { translateApiError } from '../../../core/utils/api-error.util';
 import { GroupDto, GroupMembership } from '../../../core/models/group.model';
 import { GroupInvitation } from '../../../core/models/invitation.model';
+import { GroupSharePermissionsComponent } from '../group-share-permissions/group-share-permissions.component';
 
 type Tab = 'members' | 'invitations';
 type ModalType =
@@ -16,12 +17,13 @@ type ModalType =
   | 'transfer'
   | 'confirm-leave'
   | 'confirm-delete'
+  | 'share-permissions'
   | null;
 
 @Component({
   selector: 'app-group-detail',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, NgTemplateOutlet],
+  imports: [RouterLink, ReactiveFormsModule, NgTemplateOutlet, GroupSharePermissionsComponent],
   templateUrl: './group-detail.component.html',
   styleUrl: './group-detail.component.css',
 })
@@ -68,7 +70,7 @@ export class GroupDetailComponent implements OnInit {
   get editNameControl() { return this.editNameForm.get('name')!; }
   get emailControl() { return this.inviteForm.get('email')!; }
 
-  private groupId!: number;
+  groupId!: number;
 
   ngOnInit(): void {
     this.groupId = Number(this.route.snapshot.paramMap.get('id'));

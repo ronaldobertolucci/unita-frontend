@@ -1,0 +1,478 @@
+<div class="page">
+
+  <!-- ─── Cabeçalho ─── -->
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>Dashboard</h2>
+      <p>Visão geral das suas finanças</p>
+    </div>
+  </div>
+
+  <!-- ─── Abas ─── -->
+  <div class="tabs">
+    <div class="toggle-group tabs__toggle">
+      <button type="button" class="toggle-btn" [class.toggle-btn--active]="activeTab() === 'individual'"
+        (click)="setTab('individual')">
+        Individual
+      </button>
+      <button type="button" class="toggle-btn" [class.toggle-btn--active]="activeTab() === 'groups'"
+        (click)="setTab('groups')">
+        Grupos
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       ABA INDIVIDUAL
+  ══════════════════════════════════════════════════════════════════ -->
+  <div [class.section--hidden]="activeTab() !== 'individual'">
+
+    @if (errorMessage()) {
+    <div class="error-banner">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ errorMessage() }}
+    </div>
+    }
+
+    <!-- Cards de resumo -->
+    @if (isLoadingDashboard()) {
+    <div class="loading-state"><span class="spinner-lg"></span></div>
+    } @else {
+    <div class="cards-grid">
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+          <span class="summary-card-title">Saldo por conta</span>
+        </div>
+        @if (pocketRows().length === 0) {
+        <p class="summary-card-empty">Nenhuma conta cadastrada.</p>
+        } @else {
+        <div class="summary-rows">
+          @for (row of pocketRows(); track row.label) {
+          <div class="summary-row">
+            <span class="summary-row-label">{{ row.label }}</span>
+            <span class="summary-row-value">{{ formatCurrency(row.total) }}</span>
+          </div>
+          }
+        </div>
+        <div class="summary-card-total">
+          <span>Total</span><span>{{ formatCurrency(pocketTotal()) }}</span>
+        </div>
+        }
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+            <polyline points="16 7 22 7 22 13" />
+          </svg>
+          <span class="summary-card-title">Investimentos</span>
+        </div>
+        @if (investmentRows().length === 0) {
+        <p class="summary-card-empty">Nenhum investimento cadastrado.</p>
+        } @else {
+        <div class="summary-rows">
+          @for (row of investmentRows(); track row.label) {
+          <div class="summary-row">
+            <span class="summary-row-label">{{ row.label }}</span>
+            <span class="summary-row-value">{{ formatCurrency(row.total) }}</span>
+          </div>
+          }
+        </div>
+        <div class="summary-card-total">
+          <span>Total</span><span>{{ formatCurrency(investmentTotal()) }}</span>
+        </div>
+        }
+      </div>
+
+      <div class="summary-card summary-card--bills">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+          <span class="summary-card-title">Faturas em aberto</span>
+        </div>
+        <p class="bills-amount" [class.bills-amount--zero]="(dashboardData()?.totalOpenBills ?? 0) === 0">
+          {{ formatCurrency(dashboardData()?.totalOpenBills ?? 0) }}
+        </p>
+        <p class="bills-hint">Total de faturas com status Aberta e Fechada</p>
+      </div>
+
+    </div>
+    }
+
+    <!-- Filtro do gráfico de linha -->
+    <div class="chart-filter chart-filter--dates">
+      <span class="chart-filter-label">Receitas, Despesas e Saldo</span>
+      <div class="date-fields">
+        <div class="date-field">
+          <label class="date-label">De</label>
+          <input type="date" class="date-input" [value]="lineStartDate()" (change)="onLineStartDateChange($event)" />
+        </div>
+        <div class="date-field">
+          <label class="date-label">Até</label>
+          <input type="date" class="date-input" [value]="lineEndDate()" (change)="onLineEndDateChange($event)" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico de linha -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <p class="chart-card-title">Receitas, Despesas e Saldo</p>
+          <p class="chart-card-subtitle">Por mês no período selecionado</p>
+        </div>
+      </div>
+      @if (isLoadingMonthly()) {
+      <div class="chart-loading"><span class="spinner-lg"></span></div>
+      } @else if (!hasMonthlyData()) {
+      <div class="chart-empty">
+        <p>Nenhum dado financeiro no período selecionado.</p>
+      </div>
+      }
+      <div class="chart-container chart-container--line"
+        [class.chart-container--hidden]="isLoadingMonthly() || !hasMonthlyData()">
+        <canvas #lineChartCanvas></canvas>
+      </div>
+    </div>
+
+    <!-- Filtro dos gráficos de categoria -->
+    <div class="chart-filter chart-filter--month">
+      <span class="chart-filter-label">Despesas e Receitas por Categoria</span>
+      <div class="chart-filter-selects">
+        <select class="filter-select" [value]="selectedMonth()" (change)="onMonthChange($event)">
+          @for (name of monthNames; track $index) {
+          <option [value]="$index + 1" [selected]="selectedMonth() === $index + 1">{{ name }}</option>
+          }
+        </select>
+        <select class="filter-select" [value]="selectedYear()" (change)="onYearChange($event)">
+          @for (year of availableYears(); track year) {
+          <option [value]="year" [selected]="selectedYear() === year">{{ year }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <!-- Gráficos de categoria lado a lado -->
+    <div class="charts-row">
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <p class="chart-card-title">Despesas</p>
+            <p class="chart-card-subtitle">Top 10 — maior para o menor</p>
+          </div>
+          <span class="chart-badge chart-badge--expense">Despesas</span>
+        </div>
+        @if (isLoadingCategory()) {
+        <div class="chart-loading"><span class="spinner-lg"></span></div>
+        } @else if (!hasExpenseData()) {
+        <div class="chart-empty">
+          <p>Nenhuma despesa no período.</p>
+        </div>
+        }
+        <div class="chart-container chart-container--bar"
+          [class.chart-container--hidden]="isLoadingCategory() || !hasExpenseData()">
+          <canvas #expenseChartCanvas></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <p class="chart-card-title">Receitas</p>
+            <p class="chart-card-subtitle">Top 10 — maior para o menor</p>
+          </div>
+          <span class="chart-badge chart-badge--income">Receitas</span>
+        </div>
+        @if (isLoadingCategory()) {
+        <div class="chart-loading"><span class="spinner-lg"></span></div>
+        } @else if (!hasIncomeData()) {
+        <div class="chart-empty">
+          <p>Nenhuma receita no período.</p>
+        </div>
+        }
+        <div class="chart-container chart-container--bar"
+          [class.chart-container--hidden]="isLoadingCategory() || !hasIncomeData()">
+          <canvas #incomeChartCanvas></canvas>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       ABA GRUPOS
+  ══════════════════════════════════════════════════════════════════ -->
+  <div [class.section--hidden]="activeTab() !== 'groups'">
+
+    <!-- Seletor de grupo -->
+    <div class="group-selector">
+      <select class="filter-select filter-select--group" (change)="onGroupSelect($event)">
+        <option [value]="null" disabled [selected]="!selectedGroupId()">Selecione um grupo</option>
+        @for (g of groups(); track g.id) {
+        <option [value]="g.id" [selected]="selectedGroupId() === g.id">{{ g.name }}</option>
+        }
+      </select>
+    </div>
+
+    @if (!selectedGroupId()) {
+    <div class="group-empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+      <p>Selecione um grupo para visualizar o dashboard consolidado</p>
+    </div>
+    } @else {
+
+    @if (groupErrorMessage()) {
+    <div class="error-banner">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      {{ groupErrorMessage() }}
+    </div>
+    }
+
+    <!-- Filtro de membros -->
+    @if (groupMembers().length > 0) {
+    <div class="member-filter">
+      <span class="member-filter-label">Membros</span>
+      <div class="member-chips">
+        @if (!isAllMembersSelected()) {
+        <button type="button" class="member-chip member-chip--all" (click)="selectAllMembers()">Todos</button>
+        }
+        @for (member of groupMembers(); track member.id) {
+        <button type="button" class="member-chip" [class.member-chip--active]="isMemberSelected(member.id)"
+          (click)="toggleMember(member.id)">
+          <span class="member-chip-avatar">{{ getMemberInitials(member) }}</span>
+          {{ member.firstName }}
+        </button>
+        }
+      </div>
+    </div>
+    }
+
+    <!-- Cards de resumo do grupo -->
+    @if (isLoadingGroupDashboard()) {
+    <div class="loading-state"><span class="spinner-lg"></span></div>
+    } @else {
+    <div class="cards-grid">
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+          <span class="summary-card-title">Saldo por conta</span>
+        </div>
+        @if (groupPocketRows().length === 0) {
+        <p class="summary-card-empty">Nenhum dado disponível.</p>
+        } @else {
+        <div class="summary-rows">
+          @for (row of groupPocketRows(); track row.label) {
+          <div class="summary-row">
+            <span class="summary-row-label">{{ row.label }}</span>
+            <span class="summary-row-value">{{ formatCurrency(row.total) }}</span>
+          </div>
+          }
+        </div>
+        <div class="summary-card-total">
+          <span>Total</span><span>{{ formatCurrency(groupPocketTotal()) }}</span>
+        </div>
+        }
+        @if (groupMembersNotSharingPockets() > 0) {
+        <p class="sharing-notice">{{ groupMembersNotSharingPockets() }} membro(s) sem compartilhamento de saldo</p>
+        }
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+            <polyline points="16 7 22 7 22 13" />
+          </svg>
+          <span class="summary-card-title">Investimentos</span>
+        </div>
+        @if (groupInvestmentRows().length === 0) {
+        <p class="summary-card-empty">Nenhum dado disponível.</p>
+        } @else {
+        <div class="summary-rows">
+          @for (row of groupInvestmentRows(); track row.label) {
+          <div class="summary-row">
+            <span class="summary-row-label">{{ row.label }}</span>
+            <span class="summary-row-value">{{ formatCurrency(row.total) }}</span>
+          </div>
+          }
+        </div>
+        <div class="summary-card-total">
+          <span>Total</span><span>{{ formatCurrency(groupInvestmentTotal()) }}</span>
+        </div>
+        }
+        @if (groupMembersNotSharingInvestments() > 0) {
+        <p class="sharing-notice">{{ groupMembersNotSharingInvestments() }} membro(s) sem compartilhamento de
+          investimentos</p>
+        }
+      </div>
+
+      <div class="summary-card summary-card--bills">
+        <div class="summary-card-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+          <span class="summary-card-title">Faturas em aberto</span>
+        </div>
+        <p class="bills-amount" [class.bills-amount--zero]="groupTotalOpenBills() === 0">
+          {{ formatCurrency(groupTotalOpenBills()) }}
+        </p>
+        <p class="bills-hint">Total de faturas com status Aberta e Fechada</p>
+        @if (groupMembersNotSharingBills() > 0) {
+        <p class="sharing-notice">{{ groupMembersNotSharingBills() }} membro(s) sem compartilhamento de faturas</p>
+        }
+      </div>
+
+    </div>
+    }
+
+    <!-- Filtro do gráfico de linha do grupo -->
+    <div class="chart-filter chart-filter--dates">
+      <span class="chart-filter-label">Receitas, Despesas e Saldo</span>
+      <div class="date-fields">
+        <div class="date-field">
+          <label class="date-label">De</label>
+          <input type="date" class="date-input" [value]="groupLineStartDate()"
+            (change)="onGroupLineStartDateChange($event)" />
+        </div>
+        <div class="date-field">
+          <label class="date-label">Até</label>
+          <input type="date" class="date-input" [value]="groupLineEndDate()"
+            (change)="onGroupLineEndDateChange($event)" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico de linha do grupo -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <p class="chart-card-title">Receitas, Despesas e Saldo</p>
+          <p class="chart-card-subtitle">Por mês no período selecionado</p>
+        </div>
+        @if (groupMembersNotSharingMonthly() > 0) {
+        <span class="sharing-badge">{{ groupMembersNotSharingMonthly() }} sem dados</span>
+        }
+      </div>
+      @if (isLoadingGroupMonthly()) {
+      <div class="chart-loading"><span class="spinner-lg"></span></div>
+      } @else if (!groupHasMonthlyData()) {
+      <div class="chart-empty">
+        <p>Nenhum dado financeiro no período selecionado.</p>
+      </div>
+      }
+      <div class="chart-container chart-container--line"
+        [class.chart-container--hidden]="isLoadingGroupMonthly() || !groupHasMonthlyData()">
+        <canvas #groupLineChartCanvas></canvas>
+      </div>
+    </div>
+
+    <!-- Filtro dos gráficos de categoria do grupo -->
+    <div class="chart-filter chart-filter--month">
+      <span class="chart-filter-label">Despesas e Receitas por Categoria</span>
+      <div class="chart-filter-selects">
+        <select class="filter-select" [value]="groupSelectedMonth()" (change)="onGroupMonthChange($event)">
+          @for (name of monthNames; track $index) {
+          <option [value]="$index + 1" [selected]="groupSelectedMonth() === $index + 1">{{ name }}</option>
+          }
+        </select>
+        <select class="filter-select" [value]="groupSelectedYear()" (change)="onGroupYearChange($event)">
+          @for (year of availableYears(); track year) {
+          <option [value]="year" [selected]="groupSelectedYear() === year">{{ year }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <!-- Gráficos de categoria do grupo lado a lado -->
+    <div class="charts-row">
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <p class="chart-card-title">Despesas</p>
+            <p class="chart-card-subtitle">Top 10 — maior para o menor</p>
+          </div>
+          <span class="chart-badge chart-badge--expense">Despesas</span>
+        </div>
+        @if (isLoadingGroupCategory()) {
+        <div class="chart-loading"><span class="spinner-lg"></span></div>
+        } @else if (!groupHasExpenseData()) {
+        <div class="chart-empty">
+          <p>Nenhuma despesa no período.</p>
+        </div>
+        }
+        <div class="chart-container chart-container--bar"
+          [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasExpenseData()">
+          <canvas #groupExpenseChartCanvas></canvas>
+        </div>
+        @if (!isLoadingGroupCategory() && groupMembersNotSharingCategory() > 0) {
+        <p class="sharing-notice sharing-notice--bottom">{{ groupMembersNotSharingCategory() }} membro(s) sem
+          compartilhamento de categorias</p>
+        }
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <p class="chart-card-title">Receitas</p>
+            <p class="chart-card-subtitle">Top 10 — maior para o menor</p>
+          </div>
+          <span class="chart-badge chart-badge--income">Receitas</span>
+        </div>
+        @if (isLoadingGroupCategory()) {
+        <div class="chart-loading"><span class="spinner-lg"></span></div>
+        } @else if (!groupHasIncomeData()) {
+        <div class="chart-empty">
+          <p>Nenhuma receita no período.</p>
+        </div>
+        }
+        <div class="chart-container chart-container--bar"
+          [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasIncomeData()">
+          <canvas #groupIncomeChartCanvas></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    }
+
+  </div>
+
+</div>

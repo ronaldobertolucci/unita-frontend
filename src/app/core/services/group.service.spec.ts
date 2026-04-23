@@ -3,7 +3,7 @@ import {
   HttpClientTestingModule,
   HttpTestingController,
 } from '@angular/common/http/testing';
-import { GroupService } from './group.service';
+import { GroupService, SharePermissionDto } from './group.service';
 import { GroupDto } from '../models/group.model';
 import { environment } from '../../../environments/environment';
 
@@ -27,6 +27,14 @@ const mockGroup2: GroupDto = {
   responsibleUser: mockUser,
 };
 
+const mockPermissions: SharePermissionDto[] = [
+  { shareType: 'BALANCE',              enabled: true  },
+  { shareType: 'CREDIT_CARD_BILLS',    enabled: false },
+  { shareType: 'INVESTMENTS',          enabled: true  },
+  { shareType: 'EXPENSES_BY_CATEGORY', enabled: false },
+  { shareType: 'INCOME_BY_CATEGORY',   enabled: true  },
+];
+
 describe('GroupService', () => {
   let service: GroupService;
   let httpMock: HttpTestingController;
@@ -36,7 +44,7 @@ describe('GroupService', () => {
       imports: [HttpClientTestingModule],
       providers: [GroupService],
     });
-    service = TestBed.inject(GroupService);
+    service  = TestBed.inject(GroupService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -163,6 +171,97 @@ describe('GroupService', () => {
       const req = httpMock.expectOne(`${environment.apiUrl}/groups/10/members`);
       expect(req.request.method).toBe('GET');
       req.flush([]);
+    });
+  });
+
+  // ─── getSharePermissions() ────────────────────────────────────────────────
+
+  describe('getSharePermissions()', () => {
+    it('should call GET /groups/:id/share/permissions', () => {
+      service.getSharePermissions(10).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockPermissions);
+    });
+
+    it('should return the list of SharePermissionDto', () => {
+      service.getSharePermissions(10).subscribe(result => {
+        expect(result).toEqual(mockPermissions);
+        expect(result.length).toBe(5);
+      });
+
+      httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`).flush(mockPermissions);
+    });
+
+    it('should return permissions for the correct group id', () => {
+      service.getSharePermissions(99).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/99/share/permissions`);
+      expect(req.request.url).toContain('/groups/99/');
+      req.flush([]);
+    });
+
+    it('should preserve enabled values from API response', () => {
+      service.getSharePermissions(10).subscribe(result => {
+        const balance = result.find(p => p.shareType === 'BALANCE');
+        expect(balance?.enabled).toBe(true);
+
+        const bills = result.find(p => p.shareType === 'CREDIT_CARD_BILLS');
+        expect(bills?.enabled).toBe(false);
+      });
+
+      httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`).flush(mockPermissions);
+    });
+  });
+
+  // ─── updateSharePermissions() ─────────────────────────────────────────────
+
+  describe('updateSharePermissions()', () => {
+    it('should call PUT /groups/:id/share/permissions', () => {
+      const payload = { permissions: mockPermissions };
+      service.updateSharePermissions(10, payload).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`);
+      expect(req.request.method).toBe('PUT');
+      req.flush(mockPermissions);
+    });
+
+    it('should send the correct payload body', () => {
+      const payload = { permissions: mockPermissions };
+      service.updateSharePermissions(10, payload).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`);
+      expect(req.request.body).toEqual(payload);
+      req.flush(mockPermissions);
+    });
+
+    it('should return updated SharePermissionDto list', () => {
+      const updated: SharePermissionDto[] = mockPermissions.map(p => ({ ...p, enabled: true }));
+      const payload = { permissions: updated };
+
+      service.updateSharePermissions(10, payload).subscribe(result => {
+        expect(result.every(p => p.enabled)).toBe(true);
+      });
+
+      httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`).flush(updated);
+    });
+
+    it('should call the endpoint for the correct group id', () => {
+      service.updateSharePermissions(42, { permissions: [] }).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/42/share/permissions`);
+      expect(req.request.url).toContain('/groups/42/');
+      req.flush([]);
+    });
+
+    it('should send all five permissions in a full update', () => {
+      const allEnabled = mockPermissions.map(p => ({ ...p, enabled: true }));
+      service.updateSharePermissions(10, { permissions: allEnabled }).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/groups/10/share/permissions`);
+      expect(req.request.body.permissions.length).toBe(5);
+      req.flush(allEnabled);
     });
   });
 });

@@ -2,167 +2,186 @@
 
   <!-- Loading -->
   @if (isLoading()) {
-    <div class="loading-state">
-      <span class="spinner-lg"></span>
-    </div>
+  <div class="loading-state">
+    <span class="spinner-lg"></span>
+  </div>
   }
 
   @else if (group()) {
 
-    <!-- Cabeçalho -->
-    <div class="page-header">
-      <a routerLink="/groups" class="back-btn">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 12L6 8l4-4"/>
-        </svg>
-        Grupos
-      </a>
+  <!-- Cabeçalho -->
+  <div class="page-header">
+    <a routerLink="/groups" class="back-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M10 12L6 8l4-4" />
+      </svg>
+      Grupos
+    </a>
 
-      <div class="group-info">
-        <div class="group-avatar">{{ getInitials(group()!.name) }}</div>
-        <div>
-          <h2 class="group-name">{{ group()!.name }}</h2>
-          <span class="group-responsible">
-            @if (isResponsible()) {
-              <span class="badge-responsible">Você é o responsável</span>
-            } @else {
-              Responsável: {{ group()!.responsibleUser.firstName }} {{ group()!.responsibleUser.lastName }}
+    <div class="group-info">
+      <div class="group-avatar">{{ getInitials(group()!.name) }}</div>
+      <div>
+        <h2 class="group-name">{{ group()!.name }}</h2>
+        <span class="group-responsible">
+          @if (isResponsible()) {
+          <span class="badge-responsible">Você é o responsável</span>
+          } @else {
+          Responsável: {{ group()!.responsibleUser.firstName }} {{ group()!.responsibleUser.lastName }}
+          }
+        </span>
+      </div>
+    </div>
+
+    <!-- Ações -->
+    <div class="action-row">
+      @if (isResponsible()) {
+      <button class="btn-action" (click)="openModal('edit-name')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+        Editar nome
+      </button>
+      <button class="btn-action" (click)="openModal('share-permissions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        </svg>
+        Compartilhamento
+      </button>
+      <button class="btn-action" (click)="openModal('transfer')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <polyline points="17 1 21 5 17 9" />
+          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+          <polyline points="7 23 3 19 7 15" />
+          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </svg>
+        Transferir
+      </button>
+      <button class="btn-action btn-action--danger" (click)="openModal('confirm-delete')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+        </svg>
+        Deletar
+      </button>
+      } @else {
+      <button class="btn-action" (click)="openModal('share-permissions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        </svg>
+        Compartilhamento
+      </button>
+      <button class="btn-action btn-action--danger" (click)="openModal('confirm-leave')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        Sair do grupo
+      </button>
+      }
+    </div>
+  </div>
+
+  <!-- Abas -->
+  <div class="tabs">
+    <button class="tab" [class.tab--active]="activeTab() === 'members'" (click)="setTab('members')">
+      Membros
+      <span class="tab-count">{{ members().length }}</span>
+    </button>
+    <button class="tab" [class.tab--active]="activeTab() === 'invitations'" (click)="setTab('invitations')">
+      Convites
+      @if (invitations().length > 0) {
+      <span class="tab-count tab-count--accent">{{ invitations().length }}</span>
+      }
+    </button>
+  </div>
+
+  <!-- Aba: Membros -->
+  @if (activeTab() === 'members') {
+  <div class="tab-content">
+    <ul class="member-list">
+      @for (membership of members(); track membership.id) {
+      <li class="member-item">
+        <div class="member-avatar">{{ getInitials(membership.user.firstName + ' ' + membership.user.lastName) }}</div>
+        <div class="member-info">
+          <span class="member-name">
+            {{ membership.user.firstName }} {{ membership.user.lastName }}
+            @if (membership.user.id === group()!.responsibleUser.id) {
+            <span class="badge-pill">responsável</span>
+            }
+            @if (membership.user.id === currentUser()?.id) {
+            <span class="badge-pill badge-pill--muted">você</span>
             }
           </span>
+          <span class="member-joined">Entrou em {{ formatDate(membership.joinedAt) }}</span>
         </div>
-      </div>
+      </li>
+      }
+    </ul>
+  </div>
+  }
 
-      <!-- Ações -->
-      <div class="action-row">
-        @if (isResponsible()) {
-          <button class="btn-action" (click)="openModal('edit-name')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Editar nome
-          </button>
-          <button class="btn-action" (click)="openModal('transfer')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="17 1 21 5 17 9"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-              <polyline points="7 23 3 19 7 15"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            </svg>
-            Transferir
-          </button>
-          <button class="btn-action btn-action--danger" (click)="openModal('confirm-delete')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-            </svg>
-            Deletar
-          </button>
-        } @else {
-          <button class="btn-action btn-action--danger" (click)="openModal('confirm-leave')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            Sair do grupo
-          </button>
-        }
-      </div>
-    </div>
-
-    <!-- Abas -->
-    <div class="tabs">
-      <button
-        class="tab"
-        [class.tab--active]="activeTab() === 'members'"
-        (click)="setTab('members')"
-      >
-        Membros
-        <span class="tab-count">{{ members().length }}</span>
-      </button>
-      <button
-        class="tab"
-        [class.tab--active]="activeTab() === 'invitations'"
-        (click)="setTab('invitations')"
-      >
-        Convites
-        @if (invitations().length > 0) {
-          <span class="tab-count tab-count--accent">{{ invitations().length }}</span>
-        }
+  <!-- Aba: Convites -->
+  @if (activeTab() === 'invitations') {
+  <div class="tab-content">
+    <div class="invitations-header">
+      <span class="invitations-title">Convites pendentes</span>
+      <button class="btn-primary btn-primary--sm" (click)="openModal('invite')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Convidar
       </button>
     </div>
 
-    <!-- Aba: Membros -->
-    @if (activeTab() === 'members') {
-      <div class="tab-content">
-        <ul class="member-list">
-          @for (membership of members(); track membership.id) {
-            <li class="member-item">
-              <div class="member-avatar">{{ getInitials(membership.user.firstName + ' ' + membership.user.lastName) }}</div>
-              <div class="member-info">
-                <span class="member-name">
-                  {{ membership.user.firstName }} {{ membership.user.lastName }}
-                  @if (membership.user.id === group()!.responsibleUser.id) {
-                    <span class="badge-pill">responsável</span>
-                  }
-                  @if (membership.user.id === currentUser()?.id) {
-                    <span class="badge-pill badge-pill--muted">você</span>
-                  }
-                </span>
-                <span class="member-joined">Entrou em {{ formatDate(membership.joinedAt) }}</span>
-              </div>
-            </li>
-          }
-        </ul>
-      </div>
-    }
-
-    <!-- Aba: Convites -->
-    @if (activeTab() === 'invitations') {
-      <div class="tab-content">
-        <div class="invitations-header">
-          <span class="invitations-title">Convites pendentes</span>
-          <button class="btn-primary btn-primary--sm" (click)="openModal('invite')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Convidar
-          </button>
+    @if (invitations().length === 0) {
+    <div class="empty-tab">
+      <p>Nenhum convite pendente</p>
+    </div>
+    } @else {
+    <ul class="invitation-list">
+      @for (invitation of invitations(); track invitation.id) {
+      <li class="invitation-item">
+        <div class="invitation-info">
+          <span class="invitation-email">{{ invitation.invitedUser.email }}</span>
+          <span class="invitation-name">{{ invitation.invitedUser.firstName }} {{ invitation.invitedUser.lastName
+            }}</span>
         </div>
-
-        @if (invitations().length === 0) {
-          <div class="empty-tab">
-            <p>Nenhum convite pendente</p>
-          </div>
-        } @else {
-          <ul class="invitation-list">
-            @for (invitation of invitations(); track invitation.id) {
-              <li class="invitation-item">
-                <div class="invitation-info">
-                  <span class="invitation-email">{{ invitation.invitedUser.email }}</span>
-                  <span class="invitation-name">{{ invitation.invitedUser.firstName }} {{ invitation.invitedUser.lastName }}</span>
-                </div>
-                <span class="invitation-status">Pendente</span>
-                <button
-                  class="btn-icon btn-icon--danger"
-                  (click)="cancelInvitation(invitation.id)"
-                  aria-label="Cancelar convite"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </li>
-            }
-          </ul>
-        }
-      </div>
+        <span class="invitation-status">Pendente</span>
+        <button class="btn-icon btn-icon--danger" (click)="cancelInvitation(invitation.id)"
+          aria-label="Cancelar convite">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </li>
+      }
+    </ul>
     }
+  </div>
+  }
 
   }
 
@@ -172,192 +191,194 @@
 
 <!-- Modal: editar nome -->
 @if (activeModal() === 'edit-name') {
-  <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3>Editar nome</h3>
-        <button class="modal-close" (click)="closeModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Editar nome</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <form [formGroup]="editNameForm" (ngSubmit)="saveGroupName()" novalidate>
+      <div class="field" [class.field--invalid]="editNameControl.invalid && editNameControl.touched">
+        <label for="editName">Nome do grupo</label>
+        <input id="editName" type="text" formControlName="name" autocomplete="off" />
+        @if (editNameControl.invalid && editNameControl.touched) {
+        <span class="field-error">
+          @if (editNameControl.hasError('required')) { Nome é obrigatório }
+          @else if (editNameControl.hasError('maxlength')) { Máximo de 100 caracteres }
+        </span>
+        }
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
         </button>
       </div>
-      <ng-container *ngTemplateOutlet="errorBanner" />
-      <form [formGroup]="editNameForm" (ngSubmit)="saveGroupName()" novalidate>
-        <div class="field" [class.field--invalid]="editNameControl.invalid && editNameControl.touched">
-          <label for="editName">Nome do grupo</label>
-          <input id="editName" type="text" formControlName="name" autocomplete="off" />
-          @if (editNameControl.invalid && editNameControl.touched) {
-            <span class="field-error">
-              @if (editNameControl.hasError('required')) { Nome é obrigatório }
-              @else if (editNameControl.hasError('maxlength')) { Máximo de 100 caracteres }
-            </span>
-          }
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
-            @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Salvar }
-          </button>
-        </div>
-      </form>
-    </div>
+    </form>
   </div>
+</div>
 }
 
 <!-- Modal: convidar membro -->
 @if (activeModal() === 'invite') {
-  <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3>Convidar membro</h3>
-        <button class="modal-close" (click)="closeModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Convidar membro</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <form [formGroup]="inviteForm" (ngSubmit)="inviteMember()" novalidate>
+      <div class="field" [class.field--invalid]="emailControl.invalid && emailControl.touched">
+        <label for="inviteEmail">E-mail do convidado</label>
+        <input id="inviteEmail" type="email" formControlName="email" placeholder="nome@email.com" inputmode="email"
+          autocomplete="off" />
+        @if (emailControl.invalid && emailControl.touched) {
+        <span class="field-error">
+          @if (emailControl.hasError('required')) { E-mail é obrigatório }
+          @else if (emailControl.hasError('email')) { E-mail inválido }
+        </span>
+        }
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          @if (isSaving()) { <span class="spinner"></span> Enviando... } @else { Enviar convite }
         </button>
       </div>
-      <ng-container *ngTemplateOutlet="errorBanner" />
-      <form [formGroup]="inviteForm" (ngSubmit)="inviteMember()" novalidate>
-        <div class="field" [class.field--invalid]="emailControl.invalid && emailControl.touched">
-          <label for="inviteEmail">E-mail do convidado</label>
-          <input
-            id="inviteEmail"
-            type="email"
-            formControlName="email"
-            placeholder="nome@email.com"
-            inputmode="email"
-            autocomplete="off"
-          />
-          @if (emailControl.invalid && emailControl.touched) {
-            <span class="field-error">
-              @if (emailControl.hasError('required')) { E-mail é obrigatório }
-              @else if (emailControl.hasError('email')) { E-mail inválido }
-            </span>
-          }
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
-            @if (isSaving()) { <span class="spinner"></span> Enviando... } @else { Enviar convite }
-          </button>
-        </div>
-      </form>
-    </div>
+    </form>
   </div>
+</div>
 }
 
 <!-- Modal: transferir responsabilidade -->
 @if (activeModal() === 'transfer') {
-  <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3>Transferir responsabilidade</h3>
-        <button class="modal-close" (click)="closeModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <ng-container *ngTemplateOutlet="errorBanner" />
-      <p class="modal-description">Selecione o novo responsável pelo grupo. Esta ação não pode ser desfeita.</p>
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Transferir responsabilidade</h3>
+      <button class="modal-close" (click)="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <p class="modal-description">Selecione o novo responsável pelo grupo. Esta ação não pode ser desfeita.</p>
 
-      @if (otherMembers().length === 0) {
-        <p class="empty-tab">Não há outros membros para transferir.</p>
-      } @else {
-        <ul class="member-select-list">
-          @for (membership of otherMembers(); track membership.id) {
-            <li
-              class="member-select-item"
-              [class.member-select-item--selected]="selectedMemberId() === membership.user.id"
-              (click)="selectedMemberId.set(membership.user.id)"
-            >
-              <div class="member-avatar member-avatar--sm">
-                {{ getInitials(membership.user.firstName + ' ' + membership.user.lastName) }}
-              </div>
-              <span>{{ membership.user.firstName }} {{ membership.user.lastName }}</span>
-              @if (selectedMemberId() === membership.user.id) {
-                <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              }
-            </li>
-          }
-        </ul>
+    @if (otherMembers().length === 0) {
+    <p class="empty-tab">Não há outros membros para transferir.</p>
+    } @else {
+    <ul class="member-select-list">
+      @for (membership of otherMembers(); track membership.id) {
+      <li class="member-select-item" [class.member-select-item--selected]="selectedMemberId() === membership.user.id"
+        (click)="selectedMemberId.set(membership.user.id)">
+        <div class="member-avatar member-avatar--sm">
+          {{ getInitials(membership.user.firstName + ' ' + membership.user.lastName) }}
+        </div>
+        <span>{{ membership.user.firstName }} {{ membership.user.lastName }}</span>
+        @if (selectedMemberId() === membership.user.id) {
+        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        }
+      </li>
       }
+    </ul>
+    }
 
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button
-          type="button"
-          class="btn-primary"
-          [disabled]="isSaving() || !selectedMemberId()"
-          (click)="transferResponsibility()"
-        >
-          @if (isSaving()) { <span class="spinner"></span> Transferindo... } @else { Transferir }
-        </button>
-      </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+      <button type="button" class="btn-primary" [disabled]="isSaving() || !selectedMemberId()"
+        (click)="transferResponsibility()">
+        @if (isSaving()) { <span class="spinner"></span> Transferindo... } @else { Transferir }
+      </button>
     </div>
   </div>
+</div>
 }
 
 <!-- Modal: confirmar saída -->
 @if (activeModal() === 'confirm-leave') {
-  <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
-      <div class="confirm-icon confirm-icon--warning">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/>
-          <line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-      </div>
-      <h3>Sair do grupo?</h3>
-      <p>Você perderá o acesso ao grupo <strong>{{ group()?.name }}</strong>. Esta ação não pode ser desfeita.</p>
-      <ng-container *ngTemplateOutlet="errorBanner" />
-      <div class="modal-actions modal-actions--center">
-        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="leaveGroup()">
-          @if (isSaving()) { <span class="spinner spinner--light"></span> Saindo... } @else { Sair do grupo }
-        </button>
-      </div>
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+    <div class="confirm-icon confirm-icon--warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    </div>
+    <h3>Sair do grupo?</h3>
+    <p>Você perderá o acesso ao grupo <strong>{{ group()?.name }}</strong>. Esta ação não pode ser desfeita.</p>
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <div class="modal-actions modal-actions--center">
+      <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+      <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="leaveGroup()">
+        @if (isSaving()) { <span class="spinner spinner--light"></span> Saindo... } @else { Sair do grupo }
+      </button>
     </div>
   </div>
+</div>
 }
 
 <!-- Modal: confirmar exclusão -->
 @if (activeModal() === 'confirm-delete') {
-  <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
-      <div class="confirm-icon confirm-icon--danger">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"/>
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-          <path d="M10 11v6M14 11v6"/>
-          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-        </svg>
-      </div>
-      <h3>Deletar grupo?</h3>
-      <p>O grupo <strong>{{ group()?.name }}</strong> e todos os seus dados serão removidos permanentemente.</p>
-      <ng-container *ngTemplateOutlet="errorBanner" />
-      <div class="modal-actions modal-actions--center">
-        <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteGroup()">
-          @if (isSaving()) { <span class="spinner spinner--light"></span> Deletando... } @else { Deletar grupo }
-        </button>
-      </div>
+<div class="modal-overlay" (click)="closeModal()">
+  <div class="modal modal--confirm" (click)="$event.stopPropagation()">
+    <div class="confirm-icon confirm-icon--danger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+        stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      </svg>
+    </div>
+    <h3>Deletar grupo?</h3>
+    <p>O grupo <strong>{{ group()?.name }}</strong> e todos os seus dados serão removidos permanentemente.</p>
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <div class="modal-actions modal-actions--center">
+      <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+      <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteGroup()">
+        @if (isSaving()) { <span class="spinner spinner--light"></span> Deletando... } @else { Deletar grupo }
+      </button>
     </div>
   </div>
+</div>
+}
+
+<!-- Modal de compartilhar informações -->
+@if (activeModal() === 'share-permissions') {
+<app-group-share-permissions [groupId]="groupId" (closed)="closeModal()" />
 }
 
 <!-- Template compartilhado: banner de erro dentro de modal -->
 <ng-template #errorBanner>
   @if (errorMessage()) {
-    <div class="modal-error">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-      {{ errorMessage() }}
-    </div>
+  <div class="modal-error">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    {{ errorMessage() }}
+  </div>
   }
 </ng-template>

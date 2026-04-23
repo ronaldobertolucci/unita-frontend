@@ -10,6 +10,22 @@ import {
   TransferResponsibilityRequest,
 } from '../models/group.model';
 
+export type ShareType =
+  | 'BALANCE'
+  | 'CREDIT_CARD_BILLS'
+  | 'INVESTMENTS'
+  | 'EXPENSES_BY_CATEGORY'
+  | 'INCOME_BY_CATEGORY';
+
+export interface SharePermissionDto {
+  shareType: ShareType;
+  enabled: boolean;
+}
+
+export interface UpdateSharePermissionsRequest {
+  permissions: SharePermissionDto[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class GroupService {
   private readonly http = inject(HttpClient);
@@ -90,6 +106,22 @@ export class GroupService {
   getMembers(id: number): Observable<GroupMembership[]> {
     return this.http.get<GroupMembership[]>(
       `${environment.apiUrl}/groups/${id}/members`
+    );
+  }
+
+  getSharePermissions(groupId: number): Observable<SharePermissionDto[]> {
+    return this.http.get<SharePermissionDto[]>(
+      `${environment.apiUrl}/groups/${groupId}/share/permissions`
+    );
+  }
+
+  updateSharePermissions(
+    groupId: number,
+    request: UpdateSharePermissionsRequest
+  ): Observable<SharePermissionDto[]> {
+    return this.http.put<SharePermissionDto[]>(
+      `${environment.apiUrl}/groups/${groupId}/share/permissions`,
+      request
     );
   }
 }

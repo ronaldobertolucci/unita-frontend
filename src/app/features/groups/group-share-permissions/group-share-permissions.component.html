@@ -1,0 +1,73 @@
+<div class="modal-overlay" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+
+    <!-- Cabeçalho -->
+    <div class="modal-header">
+      <h3>Compartilhamento</h3>
+      <button class="modal-close" (click)="close()" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <p class="modal-description">
+      Escolha quais informações deseja compartilhar com os membros deste grupo.
+    </p>
+
+    <!-- Banner de erro -->
+    @if (errorMessage()) {
+      <div class="modal-error">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        {{ errorMessage() }}
+      </div>
+    }
+
+    <!-- Loading -->
+    @if (isLoading()) {
+      <div class="modal-loading">
+        <span class="spinner-lg"></span>
+      </div>
+    } @else {
+
+      <!-- Lista de permissões -->
+      <ul class="permission-list">
+        @for (row of permissions(); track row.shareType) {
+          <li class="permission-item">
+            <div class="permission-info">
+              <span class="permission-label">{{ row.label }}</span>
+              <span class="permission-description">{{ row.description }}</span>
+            </div>
+            <button
+              type="button"
+              class="toggle"
+              [class.toggle--on]="row.enabled"
+              (click)="toggle(row.shareType)"
+              [attr.aria-label]="(row.enabled ? 'Desabilitar' : 'Habilitar') + ' ' + row.label"
+              [attr.aria-checked]="row.enabled"
+              role="switch"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+          </li>
+        }
+      </ul>
+
+      <!-- Ações -->
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="close()">Cancelar</button>
+        <button type="button" class="btn-primary" [disabled]="isSaving()" (click)="save()">
+          @if (isSaving()) {
+            <span class="spinner"></span> Salvando...
+          } @else {
+            Salvar
+          }
+        </button>
+      </div>
+
+    }
+
+  </div>
+</div>
