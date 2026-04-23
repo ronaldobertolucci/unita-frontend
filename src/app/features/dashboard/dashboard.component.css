@@ -130,7 +130,7 @@
   letter-spacing: 0.5px;
 }
 
-.summary-rows { display: flex; flex-direction: column; gap: 6px; }
+.summary-rows { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 
 .summary-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 
@@ -171,7 +171,6 @@
   font-weight: 700;
   color: var(--error);
   letter-spacing: -0.5px;
-  margin-top: auto;
 }
 
 .bills-amount--zero { color: var(--text-muted); }
