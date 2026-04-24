@@ -26,12 +26,13 @@ import {
 
 export const BANK_ACCOUNT_TYPES: BankAccountTypeDto[] = [
   { id: 1, name: 'Corrente' },
+  { id: 4, name: 'Investimento' },
   { id: 2, name: 'Poupança' },
   { id: 3, name: 'Salário' },
-  { id: 4, name: 'Investimento' },
 ];
 
 export const BENEFIT_TYPES: BenefitTypeDto[] = [
+  { id: 3, name: 'Premiação' },
   { id: 1, name: 'Vale-Alimentação' },
   { id: 2, name: 'Vale-Refeição' },
 ];
