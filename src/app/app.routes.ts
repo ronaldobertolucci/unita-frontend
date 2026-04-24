@@ -89,7 +89,7 @@ export const routes: Routes = [
         data: { title: 'Transações' }
       },
       {
-        path: 'transferencias',
+        path: 'transfers',
         loadComponent: () =>
           import('./features/transfers/transfers.component').then(m => m.TransfersComponent),
         data: { title: 'Transferências' },
