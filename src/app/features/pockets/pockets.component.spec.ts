@@ -240,7 +240,7 @@ describe('PocketsComponent', () => {
       pocketServiceSpy.createBankAccount.mockReturnValue(of(mockBankAccount));
       component.bankAccountForm.setValue({
         legalEntityId: 1, number: '12345-6', agency: '0001',
-        bankAccountTypeId: 1, status: 'ACTIVE',
+        bankAccountTypeId: 1,
       });
       component.createBankAccount();
       expect(pocketServiceSpy.createBankAccount).toHaveBeenCalled();
@@ -253,7 +253,7 @@ describe('PocketsComponent', () => {
       );
       component.bankAccountForm.setValue({
         legalEntityId: 1, number: '12345-6', agency: '0001',
-        bankAccountTypeId: 1, status: 'ACTIVE',
+        bankAccountTypeId: 1,
       });
       component.createBankAccount();
       expect(component.errorMessage()).toBeTruthy();

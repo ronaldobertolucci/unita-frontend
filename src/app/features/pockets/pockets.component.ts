@@ -91,13 +91,11 @@ export class PocketsComponent implements OnInit {
     number: ['', [Validators.required, Validators.maxLength(20)]],
     agency: ['', [Validators.required, Validators.maxLength(10)]],
     bankAccountTypeId: [null as number | null, Validators.required],
-    status: ['ACTIVE'],
   });
 
   readonly benefitAccountForm = this.fb.group({
     legalEntityId: [null as number | null, Validators.required],
     benefitTypeId: [null as number | null, Validators.required],
-    status: ['ACTIVE'],
   });
 
   readonly fgtsForm = this.fb.group({
@@ -105,7 +103,6 @@ export class PocketsComponent implements OnInit {
     employerId: [null as number | null, Validators.required],
     admissionDate: ['', Validators.required],
     dismissalDate: [''],
-    status: ['ACTIVE'],
   });
 
   readonly editBankAccountForm = this.fb.group({
@@ -191,9 +188,9 @@ export class PocketsComponent implements OnInit {
 
   selectPocketType(type: PocketType): void {
     this.errorMessage.set(null);
-    this.bankAccountForm.reset({ status: 'ACTIVE' });
-    this.benefitAccountForm.reset({ status: 'ACTIVE' });
-    this.fgtsForm.reset({ employerType: 'individual', status: 'ACTIVE' });
+    this.bankAccountForm.reset();
+    this.benefitAccountForm.reset();
+    this.fgtsForm.reset({ employerType: 'individual' });
 
     if (type === 'BANK_ACCOUNT') {
       this.activeModal.set('create-bank-account');
@@ -323,7 +320,6 @@ export class PocketsComponent implements OnInit {
       number: v.number!,
       agency: v.agency!,
       bankAccountTypeId: v.bankAccountTypeId!,
-      status: (v.status as any) ?? 'ACTIVE',
     }).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
@@ -344,7 +340,6 @@ export class PocketsComponent implements OnInit {
     this.pocketService.createBenefitAccount({
       legalEntityId: v.legalEntityId!,
       benefitTypeId: v.benefitTypeId!,
-      status: (v.status as any) ?? 'ACTIVE',
     }).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
@@ -365,7 +360,6 @@ export class PocketsComponent implements OnInit {
     const payload: any = {
       employerId: v.employerId!,
       admissionDate: v.admissionDate!,
-      status: v.status ?? 'ACTIVE',
     };
     if (v.dismissalDate) payload.dismissalDate = v.dismissalDate;
     this.pocketService.createFgts(payload).subscribe({

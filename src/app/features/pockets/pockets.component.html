@@ -313,15 +313,6 @@
           }
         </div>
 
-        <div class="field">
-          <label for="baStatus">Status</label>
-          <select id="baStatus" formControlName="status">
-            <option value="ACTIVE">Ativa</option>
-            <option value="INACTIVE">Inativa</option>
-            <option value="BLOCKED">Bloqueada</option>
-          </select>
-        </div>
-
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
           <button type="submit" class="btn-primary" [disabled]="isSaving()">
@@ -380,14 +371,6 @@
           @if (bfBenefitTypeId.invalid && bfBenefitTypeId.touched) {
             <span class="field-error">Tipo é obrigatório</span>
           }
-        </div>
-
-        <div class="field">
-          <label for="bfStatus">Status</label>
-          <select id="bfStatus" formControlName="status">
-            <option value="ACTIVE">Ativa</option>
-            <option value="INACTIVE">Inativa</option>
-          </select>
         </div>
 
         <div class="modal-actions">
@@ -469,14 +452,6 @@
             <label for="fgtsDismissal">Data de demissão</label>
             <input id="fgtsDismissal" type="date" formControlName="dismissalDate" />
           </div>
-        </div>
-
-        <div class="field">
-          <label for="fgtsStatus">Status</label>
-          <select id="fgtsStatus" formControlName="status">
-            <option value="ACTIVE">Ativo</option>
-            <option value="INACTIVE">Inativo</option>
-          </select>
         </div>
 
         <div class="modal-actions">
