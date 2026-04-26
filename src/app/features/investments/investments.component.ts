@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import {
@@ -63,6 +63,17 @@ export class InvestmentsComponent implements OnInit {
     this.legalEntityService.loadLegalEntities().subscribe();
     this.buildForms();
   }
+
+  // ── Redeemed ──────────────────────────────────────────────────────────────
+  readonly activeAssets = computed(() =>
+    this.assetService.assets().filter(a => a.status !== 'REDEEMED')
+  );
+
+  readonly redeemedAssets = computed(() =>
+    this.assetService.assets().filter(a => a.status === 'REDEEMED')
+  );
+
+  readonly redeemedVisible = signal(false);
 
   // ── Helpers de exibição ───────────────────────────────────────────────────
   categoryLabel(category: AssetCategory): string {
