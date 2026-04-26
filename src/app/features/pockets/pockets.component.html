@@ -48,7 +48,7 @@
 
     <!-- Grid de pockets -->
     <div class="pockets-grid">
-      @for (pocket of pockets(); track pocket.id) {
+      @for (pocket of activePockets(); track pocket.id) {
         <a class="pocket-card" [routerLink]="['/pockets', pocket.id]">
           <div class="pocket-card-icon pocket-card-icon--{{ pocket.type | lowercase }}">
             @if (pocket.type === 'BANK_ACCOUNT') {
@@ -94,9 +94,75 @@
           </div>
         </a>
       }
-    </div>
-  }
 
+      @if (inactivePockets().length > 0) {
+        <button
+          type="button"
+          class="section-toggle"
+          (click)="inactivePocketsVisible.set(!inactivePocketsVisible())"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"
+              [style.transform]="inactivePocketsVisible() ? 'rotate(180deg)' : 'rotate(0deg)'"
+              style="transition: transform 0.2s ease; width:14px; height:14px; flex-shrink:0">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+          Pockets inativos ({{ inactivePockets().length }})
+        </button>
+
+        @if (inactivePocketsVisible()) {
+          <div class="pockets-grid pockets-grid--inactive">
+          @for (pocket of inactivePockets(); track pocket.id) {
+            <a class="pocket-card">
+              <div class="pocket-card-icon pocket-card-icon--{{ pocket.type | lowercase }}">
+                @if (pocket.type === 'BANK_ACCOUNT') {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="3"/>
+                    <path d="M2 10h20"/>
+                  </svg>
+                } @else if (pocket.type === 'BENEFIT_ACCOUNT') {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                    <circle cx="12" cy="12" r="2"/>
+                    <path d="M6 12h.01M18 12h.01"/>
+                  </svg>
+                } @else if (pocket.type === 'FGTS_EMPLOYER_ACCOUNT') {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                    <path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>
+                  </svg>
+                }
+              </div>
+              <div class="pocket-card-body">
+                <span class="pocket-card-label">{{ pocket.label }}</span>
+                <span class="pocket-card-type">{{ getPocketTypeLabel(pocket.type) }}</span>
+              </div>
+              <div class="pocket-card-right">
+                <span class="pocket-card-balance">{{ formatCurrency(pocket.balance) }}</span>
+                <button
+                  class="pocket-settings-btn"
+                  (click)="$event.stopPropagation(); $event.preventDefault(); openDetailModal(pocket)"
+                  aria-label="Configurações do pocket"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
+              </div>
+            </a>
+      }
+        </div>
+      }
+    }
+  </div>
+  }
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════

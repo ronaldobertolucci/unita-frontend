@@ -59,9 +59,18 @@ export class PocketsComponent implements OnInit {
   // ─── Pockets ──────────────────────────────────────────────────────────────
 
   readonly pockets = this.pocketService.pockets;
+  readonly activePockets = computed(() =>
+    this.pockets().filter(p => p.active)
+  );
+
+  readonly inactivePockets = computed(() =>
+    this.pockets().filter(p => !p.active)
+  );
+
+  readonly inactivePocketsVisible = signal(false);
 
   readonly totalBalance = computed(() =>
-    this.pockets().reduce((sum, p) => sum + p.balance, 0)
+    this.activePockets().reduce((sum, p) => sum + p.balance, 0)
   );
 
   readonly hasCash = computed(() =>

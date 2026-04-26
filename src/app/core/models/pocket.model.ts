@@ -7,6 +7,7 @@ export interface PocketSummaryDto {
   id: number;
   type: PocketType;
   label: string;
+  active: boolean;
   balance: number;
 }
 

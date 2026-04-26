@@ -846,3 +846,32 @@
   width: 15px;
   height: 15px;
 }
+
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  transition: color 0.15s ease;
+}
+
+.section-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.pockets-grid--inactive {
+  opacity: 0.6;
+}
+
+.pockets-grid--inactive .pocket-card {
+  cursor: default;
+}

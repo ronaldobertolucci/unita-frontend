@@ -20,6 +20,7 @@ const ERROR_MAP: Record<string, string> = {
   'Bill is closed. Reopen it before adding installments': 'Fatura fechada. Reabra antes de adicionar compras/parcelas.',
   'Cannot add installment to a paid bill': 'Não é possível adicionar uma compra/parcela a uma fatura paga.',
   'Asset has transactions and cannot be deleted': 'Investimento com transações não pode ser excluída.',
+  'Pocket must be empty to be deactivated.': 'Somente pockets zerados podem ser desabilitados ou bloqueados'
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {

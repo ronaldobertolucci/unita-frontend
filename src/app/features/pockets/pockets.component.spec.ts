@@ -6,10 +6,10 @@ import { PocketService } from '../../core/services/pocket.service';
 import { PocketSummaryDto, BankAccountDto, BenefitAccountDto, FgtsEmployerAccountDto } from '../../core/models/pocket.model';
 import { RouterTestingModule } from '@angular/router/testing';
 
-const mockSummaryBank: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 1500 };
-const mockSummaryBenefit: PocketSummaryDto = { id: 2, type: 'BENEFIT_ACCOUNT', label: 'Empresa Y – VA', balance: 300 };
-const mockSummaryFgts: PocketSummaryDto = { id: 3, type: 'FGTS_EMPLOYER_ACCOUNT', label: 'FGTS – Empresa Z', balance: 5000 };
-const mockSummaryCash: PocketSummaryDto = { id: 4, type: 'CASH', label: 'Carteira', balance: 200 };
+const mockSummaryBank: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 1500, active: true };
+const mockSummaryBenefit: PocketSummaryDto = { id: 2, type: 'BENEFIT_ACCOUNT', label: 'Empresa Y – VA', balance: 300, active: true };
+const mockSummaryFgts: PocketSummaryDto = { id: 3, type: 'FGTS_EMPLOYER_ACCOUNT', label: 'FGTS – Empresa Z', balance: 5000, active: true };
+const mockSummaryCash: PocketSummaryDto = { id: 4, type: 'CASH', label: 'Carteira', balance: 200, active: true };
 
 const mockBankAccount: BankAccountDto = {
   id: 1, legalEntityCorporateName: 'Banco X', number: '12345-6',
