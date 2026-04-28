@@ -41,11 +41,25 @@
 
   <!-- Lista de ativos -->
   @else {
+
+  <!-- Filtro de custodiante -->
+  @if (availableCustodians().length > 0) {
+  <div class="custodian-filter">
+    <select class="custodian-select" [value]="selectedCustodianName() ?? ''"
+      (change)="selectedCustodianName.set($any($event.target).value || null)">
+      <option value="">Todas as custodiantes</option>
+      @for (name of availableCustodians(); track name) {
+      <option [value]="name">{{ name }}</option>
+      }
+    </select>
+  </div>
+  }
+
+  <!-- Ativos -->
   <div class="assets-list">
     @for (asset of activeAssets(); track asset.id) {
     <div class="asset-card" (click)="openDetail(asset.id)">
 
-      <!-- Ícone + info principal -->
       <div class="asset-card-left">
         <div class="asset-icon" [class.asset-icon--pension]="asset.category === 'PREVIDENCIA'">
           @if (asset.category === 'RENDA_FIXA') {
@@ -72,11 +86,13 @@
           <div class="asset-meta">
             <span class="badge-category">{{ categoryLabel(asset.category) }}</span>
             <span class="asset-institution">{{ asset.legalEntityName }}</span>
+            @if (asset.custodianLegalEntityName) {
+            <span class="asset-custodian">· {{ asset.custodianLegalEntityName }}</span>
+            }
           </div>
         </div>
       </div>
 
-      <!-- Valores -->
       <div class="asset-card-right">
         <span class="asset-current-value">
           {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
@@ -98,7 +114,6 @@
         </span>
       </div>
 
-      <!-- Seta -->
       <svg class="asset-card-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
         stroke-linecap="round" stroke-linejoin="round">
         <path d="M6 4l4 4-4 4" />
@@ -106,81 +121,84 @@
 
     </div>
     }
+  </div>
 
-    <!-- Resgatados -->
-    @if (redeemedAssets().length > 0) {
-    <button type="button" class="section-toggle" (click)="redeemedVisible.set(!redeemedVisible())">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
-        stroke-linejoin="round" [style.transform]="redeemedVisible() ? 'rotate(180deg)' : 'rotate(0)'"
-        style="transition: transform 0.2s ease; width:14px; height:14px; flex-shrink:0">
-        <path d="M6 9l6 6 6-6" />
-      </svg>
-      Investimentos resgatados ({{ redeemedAssets().length }})
-    </button>
+  <!-- Resgatados -->
+  @if (redeemedAssets().length > 0) {
+  <button type="button" class="section-toggle" (click)="redeemedVisible.set(!redeemedVisible())">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+      stroke-linejoin="round" [style.transform]="redeemedVisible() ? 'rotate(180deg)' : 'rotate(0)'"
+      style="transition: transform 0.2s ease; width:14px; height:14px; flex-shrink:0">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    Investimentos resgatados ({{ redeemedAssets().length }})
+  </button>
 
-    @if (redeemedVisible()) {
-    <div class="assets-list assets-list--redeemed">
-      @for (asset of redeemedAssets(); track asset.id) {
-      <div class="asset-card">
+  @if (redeemedVisible()) {
+  <div class="assets-list assets-list--redeemed">
+    @for (asset of redeemedAssets(); track asset.id) {
+    <div class="asset-card">
 
-        <!-- Ícone + info principal -->
-        <div class="asset-card-left">
-          <div class="asset-icon" [class.asset-icon--pension]="asset.category === 'PREVIDENCIA'">
-            @if (asset.category === 'RENDA_FIXA') {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
-              stroke-linejoin="round">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-              <polyline points="16 7 22 7 22 13" />
-            </svg>
-            } @else {
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
-              stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+      <div class="asset-card-left">
+        <div class="asset-icon" [class.asset-icon--pension]="asset.category === 'PREVIDENCIA'">
+          @if (asset.category === 'RENDA_FIXA') {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+            <polyline points="16 7 22 7 22 13" />
+          </svg>
+          } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          }
+        </div>
+
+        <div class="asset-info">
+          <div class="asset-name-row">
+            <span class="asset-name">{{ asset.name }}</span>
+            <span class="badge-status" [class]="'badge-status--' + asset.status.toLowerCase()">
+              {{ statusLabel(asset.status) }}
+            </span>
+          </div>
+          <div class="asset-meta">
+            <span class="badge-category">{{ categoryLabel(asset.category) }}</span>
+            <span class="asset-institution">{{ asset.legalEntityName }}</span>
+            @if (asset.custodianLegalEntityName) {
+            <span class="asset-custodian">· {{ asset.custodianLegalEntityName }}</span>
             }
           </div>
-
-          <div class="asset-info">
-            <div class="asset-name-row">
-              <span class="asset-name">{{ asset.name }}</span>
-              <span class="badge-status" [class]="'badge-status--' + asset.status.toLowerCase()">
-                {{ statusLabel(asset.status) }}
-              </span>
-            </div>
-            <div class="asset-meta">
-              <span class="badge-category">{{ categoryLabel(asset.category) }}</span>
-              <span class="asset-institution">{{ asset.legalEntityName }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Valores -->
-        <div class="asset-card-right">
-          <span class="asset-current-value">
-            {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
-          </span>
-          <div class="asset-variation" [class.asset-variation--positive]="variation(asset) >= 0"
-            [class.asset-variation--negative]="variation(asset) < 0">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-              stroke-linejoin="round">
-              @if (variation(asset) >= 0) {
-              <polyline points="2 10 8 4 14 10" />
-              } @else {
-              <polyline points="2 6 8 12 14 6" />
-              }
-            </svg>
-            {{ variation(asset) | number:'1.2-2':'pt-BR' }}%
-          </div>
-          <span class="asset-invested">
-            Investido: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
-          </span>
         </div>
       </div>
-      }
+
+      <div class="asset-card-right">
+        <span class="asset-current-value">
+          {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+        </span>
+        <div class="asset-variation" [class.asset-variation--positive]="variation(asset) >= 0"
+          [class.asset-variation--negative]="variation(asset) < 0">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+            stroke-linejoin="round">
+            @if (variation(asset) >= 0) {
+            <polyline points="2 10 8 4 14 10" />
+            } @else {
+            <polyline points="2 6 8 12 14 6" />
+            }
+          </svg>
+          {{ variation(asset) | number:'1.2-2':'pt-BR' }}%
+        </div>
+        <span class="asset-invested">
+          Investido: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+        </span>
+      </div>
+
     </div>
     }
-    }
   </div>
+  }
+  }
+
   }
 
 </div>
@@ -251,6 +269,16 @@
         @if (fi['legalEntityId'].invalid && fi['legalEntityId'].touched) {
         <span class="field-error">Instituição é obrigatória</span>
         }
+      </div>
+
+      <div class="field">
+        <label for="fi-custodian">Custodiante <span class="field-optional">(opcional)</span></label>
+        <select id="fi-custodian" formControlName="custodianLegalEntityId">
+          <option [value]="null">Nenhuma</option>
+          @for (entity of legalEntityService.legalEntities(); track entity.id) {
+          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          }
+        </select>
       </div>
 
       <div class="form-row">
@@ -333,6 +361,16 @@
         @if (pe['legalEntityId'].invalid && pe['legalEntityId'].touched) {
         <span class="field-error">Instituição é obrigatória</span>
         }
+      </div>
+
+      <div class="field">
+        <label for="pe-custodian">Custodiante <span class="field-optional">(opcional)</span></label>
+        <select id="pe-custodian" formControlName="custodianLegalEntityId">
+          <option [value]="null">Nenhuma</option>
+          @for (entity of legalEntityService.legalEntities(); track entity.id) {
+          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          }
+        </select>
       </div>
 
       <div class="form-row">

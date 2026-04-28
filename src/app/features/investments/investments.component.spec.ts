@@ -14,26 +14,54 @@ import { LegalEntityService } from '../../core/services/legal-entity.service';
 import { AssetSummaryDto } from '../../core/models/asset.model';
 import { LegalEntityDto } from '../../core/models/legal-entity.model';
 
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
+
 const mockAsset: AssetSummaryDto = {
   id: 1,
   name: 'CDB Banco X',
   category: 'RENDA_FIXA',
   status: 'ACTIVE',
   legalEntityName: 'Banco X',
+  custodianLegalEntityName: 'Custodiante A',
   currentValue: 10500,
   totalInvested: 10000,
   redeemedValue: 0,
 };
 
-const mockAssetRedeemed: AssetSummaryDto = {
+const mockAssetMatured: AssetSummaryDto = {
   id: 2,
+  name: 'LCI Banco Y',
+  category: 'RENDA_FIXA',
+  status: 'MATURED',
+  legalEntityName: 'Banco Y',
+  custodianLegalEntityName: 'Custodiante B',
+  currentValue: 5200,
+  totalInvested: 5000,
+  redeemedValue: 0,
+};
+
+const mockAssetRedeemed: AssetSummaryDto = {
+  id: 3,
   name: 'PGBL Banco Y',
   category: 'PREVIDENCIA',
   status: 'REDEEMED',
   legalEntityName: 'Banco Y',
+  custodianLegalEntityName: 'Custodiante A',
   currentValue: 0,
   totalInvested: 5000,
   redeemedValue: 5300,
+};
+
+const mockAssetNoCustodian: AssetSummaryDto = {
+  id: 4,
+  name: 'CDB Banco Z',
+  category: 'RENDA_FIXA',
+  status: 'ACTIVE',
+  legalEntityName: 'Banco Z',
+  custodianLegalEntityName: null,
+  currentValue: 1000,
+  totalInvested: 1000,
+  redeemedValue: 0,
 };
 
 const mockLegalEntity: LegalEntityDto = {
@@ -43,6 +71,16 @@ const mockLegalEntity: LegalEntityDto = {
   tradeName: null,
   stateRegistration: null,
 };
+
+const mockLegalEntity2: LegalEntityDto = {
+  id: 2,
+  cnpj: '98765432000111',
+  corporateName: 'Custodiante A LTDA',
+  tradeName: 'Custodiante A',
+  stateRegistration: null,
+};
+
+// ─── Builders ─────────────────────────────────────────────────────────────────
 
 function buildAssetService(assets: AssetSummaryDto[] = []) {
   return {
@@ -60,6 +98,8 @@ function buildLegalEntityService(entities: LegalEntityDto[] = []) {
     loadLegalEntities: jest.fn().mockReturnValue(of(entities)),
   };
 }
+
+// ─── Suite ────────────────────────────────────────────────────────────────────
 
 describe('InvestmentsComponent', () => {
   let fixture: ComponentFixture<InvestmentsComponent>;
@@ -111,6 +151,151 @@ describe('InvestmentsComponent', () => {
     it('should start with fixed-income tab active', () => {
       expect(component.activeTab()).toBe('fixed-income');
     });
+
+    it('should start with redeemedVisible false', () => {
+      expect(component.redeemedVisible()).toBe(false);
+    });
+
+    it('should start with selectedCustodianName null', () => {
+      expect(component.selectedCustodianName()).toBeNull();
+    });
+  });
+
+  // ─── activeAssets ─────────────────────────────────────────────────────────
+
+  describe('activeAssets', () => {
+    it('should include ACTIVE and MATURED assets', () => {
+      setup([mockAsset, mockAssetMatured, mockAssetRedeemed]);
+      const result = component.activeAssets();
+      expect(result.length).toBe(2);
+      expect(result.find(a => a.status === 'REDEEMED')).toBeUndefined();
+    });
+
+    it('should return empty when all assets are REDEEMED', () => {
+      setup([mockAssetRedeemed]);
+      expect(component.activeAssets()).toEqual([]);
+    });
+
+    it('should return all non-redeemed when no custodian filter', () => {
+      setup([mockAsset, mockAssetMatured, mockAssetRedeemed]);
+      expect(component.activeAssets().length).toBe(2);
+    });
+
+    it('should filter by selectedCustodianName', () => {
+      setup([mockAsset, mockAssetMatured, mockAssetRedeemed]);
+      component.selectedCustodianName.set('Custodiante A');
+      // mockAsset has custodianA, mockAssetMatured has custodianB
+      const result = component.activeAssets();
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe(mockAsset.id);
+    });
+
+    it('should show all active assets when custodian filter is reset to null', () => {
+      setup([mockAsset, mockAssetMatured]);
+      component.selectedCustodianName.set('Custodiante A');
+      component.selectedCustodianName.set(null);
+      expect(component.activeAssets().length).toBe(2);
+    });
+  });
+
+  // ─── redeemedAssets ───────────────────────────────────────────────────────
+
+  describe('redeemedAssets', () => {
+    it('should include only REDEEMED assets', () => {
+      setup([mockAsset, mockAssetRedeemed]);
+      expect(component.redeemedAssets().length).toBe(1);
+      expect(component.redeemedAssets()[0].status).toBe('REDEEMED');
+    });
+
+    it('should return empty when no redeemed assets', () => {
+      setup([mockAsset]);
+      expect(component.redeemedAssets()).toEqual([]);
+    });
+
+    it('should filter redeemed assets by selectedCustodianName', () => {
+      const redeemedB: AssetSummaryDto = {
+        ...mockAssetRedeemed,
+        id: 99,
+        custodianLegalEntityName: 'Custodiante B',
+      };
+      setup([mockAssetRedeemed, redeemedB]);
+      component.selectedCustodianName.set('Custodiante A');
+      expect(component.redeemedAssets().length).toBe(1);
+      expect(component.redeemedAssets()[0].custodianLegalEntityName).toBe('Custodiante A');
+    });
+  });
+
+  // ─── redeemedVisible ──────────────────────────────────────────────────────
+
+  describe('redeemedVisible', () => {
+    beforeEach(() => setup([mockAsset, mockAssetRedeemed]));
+
+    it('should toggle redeemedVisible', () => {
+      component.redeemedVisible.set(true);
+      expect(component.redeemedVisible()).toBe(true);
+      component.redeemedVisible.set(false);
+      expect(component.redeemedVisible()).toBe(false);
+    });
+  });
+
+  // ─── availableCustodians ──────────────────────────────────────────────────
+
+  describe('availableCustodians', () => {
+    it('should extract unique custodian names from all assets', () => {
+      setup([mockAsset, mockAssetMatured, mockAssetRedeemed]);
+      // mockAsset → Custodiante A, mockAssetMatured → Custodiante B, mockAssetRedeemed → Custodiante A
+      expect(component.availableCustodians().length).toBe(2);
+      expect(component.availableCustodians()).toContain('Custodiante A');
+      expect(component.availableCustodians()).toContain('Custodiante B');
+    });
+
+    it('should sort custodians alphabetically', () => {
+      setup([mockAssetMatured, mockAsset]); // B before A order in array
+      const result = component.availableCustodians();
+      expect(result[0]).toBe('Custodiante A');
+      expect(result[1]).toBe('Custodiante B');
+    });
+
+    it('should exclude assets without custodian', () => {
+      setup([mockAsset, mockAssetNoCustodian]);
+      expect(component.availableCustodians().length).toBe(1);
+      expect(component.availableCustodians()[0]).toBe('Custodiante A');
+    });
+
+    it('should return empty when no assets have custodians', () => {
+      setup([mockAssetNoCustodian]);
+      expect(component.availableCustodians()).toEqual([]);
+    });
+
+    it('should return empty when no assets', () => {
+      setup([]);
+      expect(component.availableCustodians()).toEqual([]);
+    });
+  });
+
+  // ─── selectedCustodianName filtering ─────────────────────────────────────
+
+  describe('selectedCustodianName filtering', () => {
+    beforeEach(() => setup([mockAsset, mockAssetMatured, mockAssetRedeemed]));
+
+    it('should show all sections when null (no filter)', () => {
+      expect(component.activeAssets().length).toBe(2);
+      expect(component.redeemedAssets().length).toBe(1);
+    });
+
+    it('should filter both active and redeemed sections simultaneously', () => {
+      component.selectedCustodianName.set('Custodiante A');
+      // active: only mockAsset (Custodiante A), not mockAssetMatured (Custodiante B)
+      expect(component.activeAssets().length).toBe(1);
+      // redeemed: mockAssetRedeemed (Custodiante A)
+      expect(component.redeemedAssets().length).toBe(1);
+    });
+
+    it('should return empty sections when custodian has no matching assets', () => {
+      component.selectedCustodianName.set('Custodiante Inexistente');
+      expect(component.activeAssets()).toEqual([]);
+      expect(component.redeemedAssets()).toEqual([]);
+    });
   });
 
   // ─── openModal() ──────────────────────────────────────────────────────────
@@ -135,10 +320,16 @@ describe('InvestmentsComponent', () => {
       expect(component.errorMessage()).toBe('');
     });
 
-    it('should rebuild forms', () => {
+    it('should rebuild forms including custodianLegalEntityId', () => {
       component.openModal();
-      expect(component.fixedIncomeForm).toBeTruthy();
-      expect(component.pensionForm).toBeTruthy();
+      expect(component.fixedIncomeForm.contains('custodianLegalEntityId')).toBe(true);
+      expect(component.pensionForm.contains('custodianLegalEntityId')).toBe(true);
+    });
+
+    it('should initialize custodianLegalEntityId as null', () => {
+      component.openModal();
+      expect(component.fixedIncomeForm.get('custodianLegalEntityId')?.value).toBeNull();
+      expect(component.pensionForm.get('custodianLegalEntityId')?.value).toBeNull();
     });
   });
 
@@ -211,8 +402,7 @@ describe('InvestmentsComponent', () => {
     });
 
     it('should return 0 when totalInvested is 0', () => {
-      const asset = { ...mockAsset, totalInvested: 0 };
-      expect(component.variation(asset)).toBe(0);
+      expect(component.variation({ ...mockAsset, totalInvested: 0 })).toBe(0);
     });
   });
 
@@ -248,20 +438,45 @@ describe('InvestmentsComponent', () => {
       expect(component.fixedIncomeForm.touched).toBe(true);
     });
 
-    it('should call createFixedIncome and close modal on success', () => {
+    it('should call createFixedIncome with custodianLegalEntityId on success', () => {
       assetServiceSpy.createFixedIncome.mockReturnValue(of({}));
       component.openModal();
       component.fixedIncomeForm.setValue({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
         annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        custodianLegalEntityId: 1,
       });
       component.onSubmit();
       expect(assetServiceSpy.createFixedIncome).toHaveBeenCalledWith({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
         annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        custodianLegalEntityId: 1,
       });
       expect(component.modalOpen()).toBe(false);
       expect(component.isSaving()).toBe(false);
+    });
+
+    it('should send custodianLegalEntityId as undefined when null', () => {
+      assetServiceSpy.createFixedIncome.mockReturnValue(of({}));
+      component.openModal();
+      component.fixedIncomeForm.setValue({
+        name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        custodianLegalEntityId: null,
+      });
+      component.onSubmit();
+      const [payload] = assetServiceSpy.createFixedIncome.mock.calls[0];
+      expect(payload.custodianLegalEntityId).toBeNull();
+    });
+
+    it('should custodianLegalEntityId be optional — form is valid without it', () => {
+      component.openModal();
+      component.fixedIncomeForm.patchValue({
+        name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
+        annualRate: 12.5, maturityDate: '2027-01-15',
+      });
+      // custodianLegalEntityId is null (not set)
+      expect(component.fixedIncomeForm.get('custodianLegalEntityId')?.valid).toBe(true);
     });
 
     it('should set errorMessage and stop saving on error', () => {
@@ -272,6 +487,7 @@ describe('InvestmentsComponent', () => {
       component.fixedIncomeForm.setValue({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
         annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        custodianLegalEntityId: 1,
       });
       component.onSubmit();
       expect(component.errorMessage()).toBeTruthy();
@@ -292,21 +508,37 @@ describe('InvestmentsComponent', () => {
       expect(assetServiceSpy.createPension).not.toHaveBeenCalled();
     });
 
-    it('should call createPension and close modal on success', () => {
+    it('should call createPension with custodianLegalEntityId on success', () => {
       assetServiceSpy.createPension.mockReturnValue(of({}));
       component.openModal();
       component.setTab('pension');
       component.pensionForm.setValue({
         name: 'PGBL Banco X', legalEntityId: 1,
         pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+        custodianLegalEntityId: 1,
       });
       component.onSubmit();
       expect(assetServiceSpy.createPension).toHaveBeenCalledWith({
         name: 'PGBL Banco X', legalEntityId: 1,
         pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+        custodianLegalEntityId: 1,
       });
       expect(component.modalOpen()).toBe(false);
       expect(component.isSaving()).toBe(false);
+    });
+
+    it('should send custodianLegalEntityId as undefined when null', () => {
+      assetServiceSpy.createPension.mockReturnValue(of({}));
+      component.openModal();
+      component.setTab('pension');
+      component.pensionForm.setValue({
+        name: 'PGBL Banco X', legalEntityId: 1,
+        pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+        custodianLegalEntityId: null,
+      });
+      component.onSubmit();
+      const [payload] = assetServiceSpy.createPension.mock.calls[0];
+      expect(payload.custodianLegalEntityId).toBeNull();
     });
 
     it('should set errorMessage and stop saving on error', () => {
@@ -318,6 +550,7 @@ describe('InvestmentsComponent', () => {
       component.pensionForm.setValue({
         name: 'PGBL Banco X', legalEntityId: 1,
         pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+        custodianLegalEntityId: null,
       });
       component.onSubmit();
       expect(component.errorMessage()).toBeTruthy();

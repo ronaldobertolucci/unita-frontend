@@ -220,12 +220,13 @@ export class InvestmentDetailComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { name, legalEntityId } = this.editForm.value;
+    const { name, legalEntityId, custodianLegalEntityId } = this.editForm.value;
 
     this.assetService
       .updateAsset(this.assetId, {
         name: name.trim(),
         legalEntityId: Number(legalEntityId),
+        custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
       .subscribe({
         next: (updated) => {
@@ -385,6 +386,7 @@ export class InvestmentDetailComponent implements OnInit {
     this.editForm = this.fb.group({
       name: [a?.name ?? '', [Validators.required, Validators.maxLength(255)]],
       legalEntityId: [a?.legalEntity.id ?? '', Validators.required],
+      custodianLegalEntityId: [a?.custodianLegalEntity?.id ?? null],
     });
   }
 

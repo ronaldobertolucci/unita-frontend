@@ -297,6 +297,16 @@
         }
       </div>
 
+      <div class="field">
+        <label>Custodiante <span class="label-optional">(opcional)</span></label>
+        <select formControlName="custodianLegalEntityId">
+          <option [value]="null">Nenhuma</option>
+          @for (e of legalEntityService.legalEntities(); track e.id) {
+          <option [value]="e.id">{{ e.tradeName ?? e.corporateName }}</option>
+          }
+        </select>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
         <button type="submit" class="btn-primary" [disabled]="isSaving()">

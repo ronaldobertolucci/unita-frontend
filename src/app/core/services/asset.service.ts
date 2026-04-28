@@ -112,6 +112,8 @@ export class AssetService {
       status: detail.status,
       legalEntityName:
         detail.legalEntity.tradeName ?? detail.legalEntity.corporateName,
+      custodianLegalEntityName:
+        detail.custodianLegalEntity != null ? detail.legalEntity.corporateName : null,
       currentValue: detail.position.currentValue,
       totalInvested: detail.position.totalInvested,
       redeemedValue: detail.position.redeemedValue,

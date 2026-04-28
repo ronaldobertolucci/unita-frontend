@@ -85,6 +85,37 @@
   margin-bottom: 0.5rem;
 }
 
+/* ─── Filtro de custodiante ─── */
+.custodian-filter {
+  margin-bottom: 1.25rem;
+}
+
+.custodian-select {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-input);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b87a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.custodian-select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.custodian-select option { background: #0d1629; color: var(--text-primary); }
+
 /* ─── Lista de ativos ─── */
 .assets-list {
   display: flex;
@@ -190,6 +221,14 @@
   text-overflow: ellipsis;
 }
 
+.asset-custodian {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Badge de status */
 .badge-status {
   display: inline-flex;
@@ -264,6 +303,40 @@
 .asset-card:hover .asset-card-arrow {
   transform: translateX(3px);
   color: var(--text-secondary);
+}
+
+/* ─── Seção resgatados ─── */
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  margin-top: 0.75rem;
+  transition: color 0.15s ease;
+}
+
+.section-toggle:hover { color: var(--text-secondary); }
+
+.assets-list--redeemed {
+  opacity: 0.55;
+  margin-top: 0.5rem;
+}
+
+.assets-list--redeemed .asset-card {
+  cursor: default;
+}
+
+.assets-list--redeemed .asset-card:hover {
+  transform: none;
+  border-color: var(--border-subtle);
+  background: var(--bg-card);
 }
 
 /* ─── Botões ─── */
@@ -449,6 +522,11 @@
   color: var(--text-secondary);
 }
 
+.field-optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -562,39 +640,8 @@
   .asset-card-right {
     display: none;
   }
-}
 
-.section-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-family: var(--font-body);
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0.5rem 0;
-  margin-top: 0.75rem;
-  transition: color 0.15s ease;
-}
-
-.section-toggle:hover {
-  color: var(--text-secondary);
-}
-
-.assets-list--redeemed {
-  opacity: 0.55;
-  margin-top: 0.5rem;
-}
-
-.assets-list--redeemed .asset-card {
-  cursor: default;
-}
-
-.assets-list--redeemed .asset-card:hover {
-  transform: none;
-  border-color: var(--border-subtle);
-  background: var(--bg-card);
+  .custodian-select {
+    width: 100%;
+  }
 }

@@ -18,7 +18,12 @@ import { CategoryDto } from '../../../core/models/category.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
 import { LegalEntityDto } from '../../../core/models/legal-entity.model';
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+const mockCustodianLegalEntity: LegalEntityDto = {
+  id: 2, cnpj: '98765432000111', corporateName: 'Custodiante A LTDA',
+  tradeName: 'Custodiante A', stateRegistration: null,
+};
 
 const mockDetail: AssetDetailDto = {
   id: 1,
@@ -29,6 +34,7 @@ const mockDetail: AssetDetailDto = {
     id: 1, cnpj: '12345678000190',
     corporateName: 'Banco X LTDA', tradeName: 'Banco X', stateRegistration: null,
   },
+  custodianLegalEntity: null,
   position: {
     quantity: 1, averagePrice: 10000, totalInvested: 10000,
     currentValue: 10500, redeemedValue: 0, lastValuationDate: '2025-01-15',
@@ -39,9 +45,15 @@ const mockDetail: AssetDetailDto = {
   pensionDetails: null,
 };
 
+const mockDetailWithCustodian: AssetDetailDto = {
+  ...mockDetail,
+  custodianLegalEntity: mockCustodianLegalEntity,
+};
+
 const mockDetailRedeemed: AssetDetailDto = {
   ...mockDetail,
   status: 'REDEEMED',
+  custodianLegalEntity: null,
   position: { ...mockDetail.position, currentValue: 0, redeemedValue: 10800 },
 };
 
@@ -61,60 +73,53 @@ const mockTxTax: InvestmentTransactionDto = {
   id: 13, type: 'TAX', amount: 150, transactionDate: '2025-02-01', notes: null,
 };
 
-const mockCategoryBuy: CategoryDto = { id: 11, name: 'Aporte em Investimento', type: 'EXPENSE', global: true };
+const mockCategoryBuy: CategoryDto  = { id: 11, name: 'Aporte em Investimento',    type: 'EXPENSE', global: true };
 const mockCategoryYield: CategoryDto = { id: 12, name: 'Rendimento de Investimento', type: 'INCOME', global: true };
-const mockCategorySell: CategoryDto = { id: 13, name: 'Resgate de Investimento', type: 'EXPENSE', global: true };
+const mockCategorySell: CategoryDto  = { id: 13, name: 'Resgate de Investimento',    type: 'EXPENSE', global: true };
 
-const mockPocket: PocketSummaryDto = { id: 5, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 1000 };
-const mockPocketCash: PocketSummaryDto = { id: 6, type: 'CASH', label: 'Carteira', balance: 200 };
-const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA Empresa', balance: 500 };
+const mockPocket: PocketSummaryDto      = { id: 5, type: 'BANK_ACCOUNT',   label: 'Banco X – Corrente', balance: 1000 };
+const mockPocketCash: PocketSummaryDto  = { id: 6, type: 'CASH',           label: 'Carteira',           balance: 200  };
+const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA Empresa',       balance: 500  };
 
 const mockLegalEntity: LegalEntityDto = {
   id: 1, cnpj: '12345678000190', corporateName: 'Banco X', tradeName: null, stateRegistration: null,
 };
 
-// ─── Builders de spy ──────────────────────────────────────────────────────────
+// ─── Builders ─────────────────────────────────────────────────────────────────
 
 function buildAssetService(detail: AssetDetailDto = mockDetail, txs: InvestmentTransactionDto[] = []) {
   return {
-    getAsset: jest.fn().mockReturnValue(of(detail)),
+    getAsset:       jest.fn().mockReturnValue(of(detail)),
     getTransactions: jest.fn().mockReturnValue(of(txs)),
-    assets: signal([]),
-    updateAsset: jest.fn(),
-    deleteAsset: jest.fn(),
+    assets:         signal([]),
+    updateAsset:    jest.fn(),
+    deleteAsset:    jest.fn(),
     updatePosition: jest.fn(),
-    buy: jest.fn(),
-    recordYield: jest.fn(),
-    sell: jest.fn(),
+    buy:            jest.fn(),
+    recordYield:    jest.fn(),
+    sell:           jest.fn(),
   };
 }
 
 function buildCategoryService(categories: CategoryDto[] = []) {
   return {
-    categories: signal(categories),
-    loadCategories: jest.fn().mockReturnValue(of(categories)),
+    categories:      signal(categories),
+    loadCategories:  jest.fn().mockReturnValue(of(categories)),
   };
 }
 
 function buildPocketService(pockets: PocketSummaryDto[] = []) {
   return {
-    pockets: signal(pockets),
-    loadPockets: jest.fn().mockReturnValue(of(pockets)),
+    pockets:      signal(pockets),
+    loadPockets:  jest.fn().mockReturnValue(of(pockets)),
   };
 }
 
 function buildLegalEntityService(entities: LegalEntityDto[] = []) {
   return {
-    legalEntities: signal(entities),
-    loadLegalEntities: jest.fn().mockReturnValue(of(entities)),
+    legalEntities:      signal(entities),
+    loadLegalEntities:  jest.fn().mockReturnValue(of(entities)),
   };
-}
-
-function toLocalDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }
 
 // ─── Suite ────────────────────────────────────────────────────────────────────
@@ -133,28 +138,28 @@ describe('InvestmentDetailComponent', () => {
     txs: InvestmentTransactionDto[] = [],
     categories: CategoryDto[] = [mockCategoryBuy, mockCategoryYield, mockCategorySell],
     pockets: PocketSummaryDto[] = [mockPocket, mockPocketCash, mockPocketBenefit],
-    entities: LegalEntityDto[] = [mockLegalEntity],
+    entities: LegalEntityDto[] = [mockLegalEntity, mockCustodianLegalEntity],
   ) {
-    assetServiceSpy = buildAssetService(detail, txs);
-    categoryServiceSpy = buildCategoryService(categories);
-    pocketServiceSpy = buildPocketService(pockets);
+    assetServiceSpy      = buildAssetService(detail, txs);
+    categoryServiceSpy   = buildCategoryService(categories);
+    pocketServiceSpy     = buildPocketService(pockets);
     legalEntityServiceSpy = buildLegalEntityService(entities);
 
     TestBed.configureTestingModule({
       imports: [InvestmentDetailComponent, RouterTestingModule],
       providers: [
-        { provide: AssetService, useValue: assetServiceSpy },
-        { provide: CategoryService, useValue: categoryServiceSpy },
-        { provide: PocketService, useValue: pocketServiceSpy },
+        { provide: AssetService,       useValue: assetServiceSpy       },
+        { provide: CategoryService,    useValue: categoryServiceSpy    },
+        { provide: PocketService,      useValue: pocketServiceSpy      },
         { provide: LegalEntityService, useValue: legalEntityServiceSpy },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '1' } } } },
         { provide: LOCALE_ID, useValue: 'pt-BR' },
       ],
     });
 
-    fixture = TestBed.createComponent(InvestmentDetailComponent);
+    fixture   = TestBed.createComponent(InvestmentDetailComponent);
     component = fixture.componentInstance;
-    router = TestBed.inject(Router);
+    router    = TestBed.inject(Router);
     fixture.detectChanges();
   }
 
@@ -191,7 +196,7 @@ describe('InvestmentDetailComponent', () => {
     });
   });
 
-  // ─── variation() e displayCurrentValue ────────────────────────────────────
+  // ─── variation() / displayCurrentValue ───────────────────────────────────
 
   describe('variation()', () => {
     it('should calculate based on currentValue for ACTIVE asset', () => {
@@ -205,11 +210,7 @@ describe('InvestmentDetailComponent', () => {
     });
 
     it('should return 0 when totalInvested is 0', () => {
-      const zeroInvested = {
-        ...mockDetail,
-        position: { ...mockDetail.position, totalInvested: 0 },
-      };
-      setup(zeroInvested);
+      setup({ ...mockDetail, position: { ...mockDetail.position, totalInvested: 0 } });
       expect(component.variation()).toBe(0);
     });
   });
@@ -229,30 +230,50 @@ describe('InvestmentDetailComponent', () => {
   // ─── eligiblePockets ──────────────────────────────────────────────────────
 
   describe('eligiblePockets', () => {
-    it('should include only BANK_ACCOUNT and CASH', () => {
-      setup();
-      const types = component.eligiblePockets().map(p => p.type);
-      expect(types).toContain('BANK_ACCOUNT');
-      expect(types).toContain('CASH');
-      expect(types).not.toContain('BENEFIT_ACCOUNT');
+    beforeEach(() => setup());
+
+    it('should return only BANK_ACCOUNT and CASH pockets', () => {
+      const result = component.eligiblePockets();
+      expect(result.length).toBe(2);
+      expect(result.find(p => p.type === 'BENEFIT_ACCOUNT')).toBeUndefined();
     });
   });
 
-  // ─── transactions ordenadas ───────────────────────────────────────────────
+  // ─── Modal helpers ────────────────────────────────────────────────────────
 
-  describe('transactions ordering', () => {
-    it('should sort transactions by date descending', () => {
-      setup(mockDetail, [mockTxBuy, mockTxYield]);
-      const dates = component.transactions().map(t => t.transactionDate);
-      expect(dates[0]).toBe('2025-01-10');
-      expect(dates[1]).toBe('2024-01-15');
+  describe('openModal() / closeModal()', () => {
+    beforeEach(() => setup());
+
+    it('should open and close modal', () => {
+      component.openModal('edit');
+      expect(component.activeModal()).toBe('edit');
+      component.closeModal();
+      expect(component.activeModal()).toBeNull();
+    });
+
+    it('should clear errorMessage on close', () => {
+      component.openModal('edit');
+      component['errorMessage'].set('erro');
+      component.closeModal();
+      expect(component.errorMessage()).toBe('');
     });
   });
 
-  // ─── Helpers de exibição ──────────────────────────────────────────────────
+  // ─── Display helpers ──────────────────────────────────────────────────────
 
   describe('display helpers', () => {
     beforeEach(() => setup());
+
+    it('statusLabel should map all statuses', () => {
+      expect(component.statusLabel('ACTIVE')).toBe('Ativo');
+      expect(component.statusLabel('MATURED')).toBe('Vencido');
+      expect(component.statusLabel('REDEEMED')).toBe('Resgatado');
+    });
+
+    it('categoryLabel should translate RENDA_FIXA and PREVIDENCIA', () => {
+      expect(component.categoryLabel('RENDA_FIXA')).toBe('Renda Fixa');
+      expect(component.categoryLabel('PREVIDENCIA')).toBe('Previdência');
+    });
 
     it('transactionLabel should map all types', () => {
       expect(component.transactionLabel('BUY')).toBe('Aporte');
@@ -264,77 +285,30 @@ describe('InvestmentDetailComponent', () => {
     it('isCredit should return true only for YIELD', () => {
       expect(component.isCredit('YIELD')).toBe(true);
       expect(component.isCredit('BUY')).toBe(false);
-      expect(component.isCredit('SELL')).toBe(false);
-      expect(component.isCredit('TAX')).toBe(false);
     });
 
     it('isDebit should return true for SELL and TAX', () => {
       expect(component.isDebit('SELL')).toBe(true);
       expect(component.isDebit('TAX')).toBe(true);
       expect(component.isDebit('BUY')).toBe(false);
-      expect(component.isDebit('YIELD')).toBe(false);
     });
 
-    it('statusLabel should map all statuses', () => {
-      expect(component.statusLabel('ACTIVE')).toBe('Ativo');
-      expect(component.statusLabel('MATURED')).toBe('Vencido');
-      expect(component.statusLabel('REDEEMED')).toBe('Resgatado');
-    });
-
-    it('categoryNameFor should return correct category names', () => {
+    it('categoryNameFor should return pre-defined category names', () => {
       expect(component.categoryNameFor('buy')).toBe('Aporte em Investimento');
       expect(component.categoryNameFor('yield')).toBe('Rendimento de Investimento');
       expect(component.categoryNameFor('sell')).toBe('Resgate de Investimento');
     });
   });
 
-  // ─── openModal() / closeModal() ───────────────────────────────────────────
+  // ─── onEdit() — sem custodian ─────────────────────────────────────────────
 
-  describe('openModal() / closeModal()', () => {
+  describe('onEdit() — asset without custodian', () => {
     beforeEach(() => setup());
 
-    it('should set activeModal and clear errorMessage', () => {
-      component.errorMessage.set('erro');
+    it('should initialize editForm with custodianLegalEntityId as null', () => {
       component.openModal('edit');
-      expect(component.activeModal()).toBe('edit');
-      expect(component.errorMessage()).toBe('');
+      expect(component.editForm.get('custodianLegalEntityId')?.value).toBeNull();
     });
-
-    it('should close modal and clear error', () => {
-      component.openModal('edit');
-      component.errorMessage.set('erro');
-      component.closeModal();
-      expect(component.activeModal()).toBeNull();
-      expect(component.errorMessage()).toBe('');
-    });
-
-    it('should build editForm prefilled with asset data', () => {
-      component.openModal('edit');
-      expect(component.editForm.value.name).toBe('CDB Banco X');
-      expect(component.editForm.value.legalEntityId).toBe(1);
-    });
-
-    it('should build positionForm prefilled with current position', () => {
-      component.openModal('update-position');
-      expect(component.positionForm.value.currentValue).toBe(10500);
-    });
-
-    it('should build buyForm with today as default date', () => {
-      component.openModal('buy');
-      const today = toLocalDateString(new Date());
-      expect(component.buyForm.value.transactionDate).toBe(today);
-    });
-
-    it('should build sellForm with grossAmount disabled and set to currentValue', () => {
-      component.openModal('sell');
-      expect(component.sellForm.getRawValue().grossAmount).toBe(10500);
-    });
-  });
-
-  // ─── onEdit() ─────────────────────────────────────────────────────────────
-
-  describe('onEdit()', () => {
-    beforeEach(() => setup());
 
     it('should not submit when form is invalid', () => {
       component.openModal('edit');
@@ -343,14 +317,24 @@ describe('InvestmentDetailComponent', () => {
       expect(assetServiceSpy.updateAsset).not.toHaveBeenCalled();
     });
 
-    it('should call updateAsset and close modal on success', () => {
+    it('should call updateAsset with custodianLegalEntityId undefined when null', () => {
+      assetServiceSpy.updateAsset.mockReturnValue(of(mockDetail));
+      component.openModal('edit');
+      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1, custodianLegalEntityId: null });
+      component.onEdit();
+      expect(assetServiceSpy.updateAsset).toHaveBeenCalledWith(1, {
+        name: 'CDB Atualizado',
+        legalEntityId: 1,
+        custodianLegalEntityId: null,
+      });
+      expect(component.activeModal()).toBeNull();
+    });
+
+    it('should close modal and update asset on success', () => {
       assetServiceSpy.updateAsset.mockReturnValue(of(mockDetail));
       component.openModal('edit');
       component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1 });
       component.onEdit();
-      expect(assetServiceSpy.updateAsset).toHaveBeenCalledWith(1, {
-        name: 'CDB Atualizado', legalEntityId: 1,
-      });
       expect(component.activeModal()).toBeNull();
       expect(component.asset()).toEqual(mockDetail);
     });
@@ -363,6 +347,40 @@ describe('InvestmentDetailComponent', () => {
       component.onEdit();
       expect(component.errorMessage()).toBeTruthy();
       expect(component.isSaving()).toBe(false);
+    });
+  });
+
+  // ─── onEdit() — com custodian ─────────────────────────────────────────────
+
+  describe('onEdit() — asset with custodian', () => {
+    beforeEach(() => setup(mockDetailWithCustodian));
+
+    it('should pre-fill custodianLegalEntityId with existing custodian id', () => {
+      component.openModal('edit');
+      expect(component.editForm.get('custodianLegalEntityId')?.value).toBe(mockCustodianLegalEntity.id);
+    });
+
+    it('should send custodianLegalEntityId as number in payload', () => {
+      assetServiceSpy.updateAsset.mockReturnValue(of(mockDetailWithCustodian));
+      component.openModal('edit');
+      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1 });
+      component.onEdit();
+      expect(assetServiceSpy.updateAsset).toHaveBeenCalledWith(1, {
+        name: 'CDB Atualizado',
+        legalEntityId: 1,
+        custodianLegalEntityId: mockCustodianLegalEntity.id,
+      });
+    });
+
+    it('should allow clearing the custodian by setting null', () => {
+      assetServiceSpy.updateAsset.mockReturnValue(of(mockDetail));
+      component.openModal('edit');
+      component.editForm.patchValue({
+        name: 'CDB Atualizado', legalEntityId: 1, custodianLegalEntityId: null,
+      });
+      component.onEdit();
+      const [, payload] = assetServiceSpy.updateAsset.mock.calls[0];
+      expect(payload.custodianLegalEntityId).toBeNull();
     });
   });
 

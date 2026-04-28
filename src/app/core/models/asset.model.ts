@@ -11,6 +11,7 @@ export interface AssetSummaryDto {
   category: AssetCategory;
   status: AssetStatus;
   legalEntityName: string;
+  custodianLegalEntityName: string | null;
   currentValue: number;
   totalInvested: number;
   redeemedValue: number;
@@ -49,6 +50,13 @@ export interface AssetDetailDto {
     tradeName: string | null;
     stateRegistration: string | null;
   };
+  custodianLegalEntity: {
+    id: number;
+    cnpj: string;
+    corporateName: string;
+    tradeName: string | null;
+    stateRegistration: string | null;
+  };
   position: AssetPositionDto;
   fixedIncomeDetails: FixedIncomeDetailsDto | null;
   pensionDetails: PensionDetailsDto | null;
@@ -71,6 +79,7 @@ export interface CreateFixedIncomePayload {
   annualRate: number;
   maturityDate: string;
   taxFree: boolean;
+  custodianLegalEntityId: number | null;
 }
 
 export interface CreatePensionPayload {
@@ -78,11 +87,13 @@ export interface CreatePensionPayload {
   legalEntityId: number;
   pensionType: PensionType;
   taxRegime: TaxRegime;
+  custodianLegalEntityId: number | null;
 }
 
 export interface UpdateAssetPayload {
   name?: string;
   legalEntityId?: number;
+  custodianLegalEntityId: number | null;
 }
 
 export interface UpdatePositionPayload {

@@ -56,24 +56,42 @@ export class InvestmentsComponent implements OnInit {
     REGRESSIVO: 'Regressivo',
   };
 
+  // ── Filtro de custodiante ─────────────────────────────────────────────────
+  readonly selectedCustodianName = signal<string | null>(null);
+
+  readonly availableCustodians = computed(() => {
+    const names = new Set<string>();
+    for (const asset of this.assetService.assets()) {
+      if (asset.custodianLegalEntityName) {
+        names.add(asset.custodianLegalEntityName);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  });
+
+  // ── Listas filtradas ──────────────────────────────────────────────────────
+  readonly activeAssets = computed(() => {
+    const custodian = this.selectedCustodianName();
+    return this.assetService.assets()
+      .filter(a => a.status !== 'REDEEMED')
+      .filter(a => !custodian || a.custodianLegalEntityName === custodian);
+  });
+
+  readonly redeemedAssets = computed(() => {
+    const custodian = this.selectedCustodianName();
+    return this.assetService.assets()
+      .filter(a => a.status === 'REDEEMED')
+      .filter(a => !custodian || a.custodianLegalEntityName === custodian);
+  });
+
+  readonly redeemedVisible = signal(false);
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.assetService.loadAssets();
-    // FIX 1: sempre recarrega para garantir disponibilidade no modal
     this.legalEntityService.loadLegalEntities().subscribe();
     this.buildForms();
   }
-
-  // ── Redeemed ──────────────────────────────────────────────────────────────
-  readonly activeAssets = computed(() =>
-    this.assetService.assets().filter(a => a.status !== 'REDEEMED')
-  );
-
-  readonly redeemedAssets = computed(() =>
-    this.assetService.assets().filter(a => a.status === 'REDEEMED')
-  );
-
-  readonly redeemedVisible = signal(false);
 
   // ── Helpers de exibição ───────────────────────────────────────────────────
   categoryLabel(category: AssetCategory): string {
@@ -82,19 +100,17 @@ export class InvestmentsComponent implements OnInit {
 
   statusLabel(status: string): string {
     const map: Record<string, string> = {
-      ACTIVE: 'Ativo',
-      MATURED: 'Vencido',
+      ACTIVE:   'Ativo',
+      MATURED:  'Vencido',
       REDEEMED: 'Resgatado',
     };
     return map[status] ?? status;
   }
 
-  // FIX 2: exibe redeemedValue quando resgatado; currentValue caso contrário
   displayValue(asset: AssetSummaryDto): number {
     return asset.status === 'REDEEMED' ? asset.redeemedValue : asset.currentValue;
   }
 
-  // FIX 2: calcula variação sobre o valor de referência correto
   variation(asset: AssetSummaryDto): number {
     if (!asset.totalInvested) return 0;
     const reference = asset.status === 'REDEEMED' ? asset.redeemedValue : asset.currentValue;
@@ -139,7 +155,7 @@ export class InvestmentsComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { name, legalEntityId, indexer, annualRate, maturityDate, taxFree } =
+    const { name, legalEntityId, indexer, annualRate, maturityDate, taxFree, custodianLegalEntityId } =
       this.fixedIncomeForm.value;
 
     this.assetService
@@ -150,9 +166,11 @@ export class InvestmentsComponent implements OnInit {
         annualRate: Number(annualRate),
         maturityDate,
         taxFree: !!taxFree,
+        custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
       .subscribe({
         next: () => {
+          this.assetService.loadAssets();
           this.isSaving.set(false);
           this.closeModal();
         },
@@ -170,7 +188,8 @@ export class InvestmentsComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { name, legalEntityId, pensionType, taxRegime } = this.pensionForm.value;
+    const { name, legalEntityId, pensionType, taxRegime, custodianLegalEntityId } =
+      this.pensionForm.value;
 
     this.assetService
       .createPension({
@@ -178,9 +197,11 @@ export class InvestmentsComponent implements OnInit {
         legalEntityId: Number(legalEntityId),
         pensionType,
         taxRegime,
+        custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
       .subscribe({
         next: () => {
+          this.assetService.loadAssets();
           this.isSaving.set(false);
           this.closeModal();
         },
@@ -194,19 +215,21 @@ export class InvestmentsComponent implements OnInit {
   // ── Form builders ─────────────────────────────────────────────────────────
   private buildForms(): void {
     this.fixedIncomeForm = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(255)]],
-      legalEntityId: ['', Validators.required],
-      indexer: ['', Validators.required],
-      annualRate: ['', [Validators.required, Validators.min(0)]],
-      maturityDate: ['', Validators.required],
-      taxFree: [false],
+      name:                   ['', [Validators.required, Validators.maxLength(255)]],
+      legalEntityId:          ['', Validators.required],
+      indexer:                ['', Validators.required],
+      annualRate:             ['', [Validators.required, Validators.min(0)]],
+      maturityDate:           ['', Validators.required],
+      taxFree:                [false],
+      custodianLegalEntityId: [null],
     });
 
     this.pensionForm = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(255)]],
-      legalEntityId: ['', Validators.required],
-      pensionType: ['', Validators.required],
-      taxRegime: ['', Validators.required],
+      name:                   ['', [Validators.required, Validators.maxLength(255)]],
+      legalEntityId:          ['', Validators.required],
+      pensionType:            ['', Validators.required],
+      taxRegime:              ['', Validators.required],
+      custodianLegalEntityId: [null],
     });
   }
 
