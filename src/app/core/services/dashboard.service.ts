@@ -33,6 +33,16 @@ export interface MonthlyDataDto {
   totalExpense: number;
 }
 
+export interface IssuerRiskDto {
+  legalEntityName: string;
+  totalCurrentValue: number;
+}
+
+export interface IndexerSummaryDto {
+  indexer: string;
+  totalCurrentValue: number;
+}
+
 // ── Individual ────────────────────────────────────────────────────────────────
 
 export interface DashboardDto {
@@ -78,6 +88,24 @@ export interface GroupCategorySummaryResponseDto {
   members: GroupMemberCategorySummaryDto[];
 }
 
+export interface GroupMemberIssuerRiskDto {
+  user: UserDto;
+  issuerRisk: IssuerRiskDto[] | null;
+}
+
+export interface GroupIssuerRiskResponseDto {
+  members: GroupMemberIssuerRiskDto[];
+}
+
+export interface GroupMemberIndexerSummaryDto {
+  user: UserDto;
+  indexerSummary: IndexerSummaryDto[] | null;
+}
+
+export interface GroupIndexerSummaryResponseDto {
+  members: GroupMemberIndexerSummaryDto[];
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -102,6 +130,14 @@ export class DashboardService {
     });
   }
 
+  getIssuerRisk(): Observable<IssuerRiskDto[]> {
+    return this.http.get<IssuerRiskDto[]>(`${this.baseUrl}/dashboard/issuer-risk`);
+  }
+
+  getIndexerSummary(): Observable<IndexerSummaryDto[]> {
+    return this.http.get<IndexerSummaryDto[]>(`${this.baseUrl}/dashboard/indexer-summary`);
+  }
+
   // Group
   getGroupDashboard(groupId: number): Observable<GroupDashboardDto> {
     return this.http.get<GroupDashboardDto>(`${this.baseUrl}/groups/${groupId}/dashboard`);
@@ -117,5 +153,13 @@ export class DashboardService {
     return this.http.get<GroupCategorySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/summary`, {
       params: { startDate, endDate },
     });
+  }
+
+  getGroupIssuerRisk(groupId: number): Observable<GroupIssuerRiskResponseDto> {
+    return this.http.get<GroupIssuerRiskResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/issuer-risk`);
+  }
+
+  getGroupIndexerSummary(groupId: number): Observable<GroupIndexerSummaryResponseDto> {
+    return this.http.get<GroupIndexerSummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/indexer-summary`);
   }
 }

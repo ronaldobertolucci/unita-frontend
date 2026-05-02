@@ -67,6 +67,44 @@
 /* Oculta seção inativa sem remover do DOM */
 .section--hidden { display: none; }
 
+/* ─── Sub-navegação ─── */
+.sub-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sub-nav::-webkit-scrollbar { display: none; }
+
+.sub-nav-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sub-nav-item:hover { color: var(--text-primary); }
+
+.sub-nav-item--active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent);
+}
+
 /* ─── Loading ─── */
 .loading-state { display: flex; justify-content: center; padding: 4rem 0; }
 
@@ -171,6 +209,7 @@
   font-weight: 700;
   color: var(--error);
   letter-spacing: -0.5px;
+  margin-top: auto;
 }
 
 .bills-amount--zero { color: var(--text-muted); }
@@ -196,6 +235,7 @@
   gap: 0.75rem;
   margin-bottom: 0.6rem;
   padding: 0 0.25rem;
+  margin-top: 1.25rem;
 }
 
 .chart-filter-label {
@@ -205,7 +245,6 @@
   white-space: nowrap;
 }
 
-/* Filtro de datas (De / Até) */
 .chart-filter--dates .date-fields {
   display: flex;
   align-items: center;
@@ -244,7 +283,6 @@
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-/* Filtro de mês/ano */
 .chart-filter-selects { display: flex; gap: 8px; }
 
 .filter-select {
@@ -286,9 +324,11 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   padding: 1.25rem 1.5rem;
-  margin-bottom: 0; /* espaçamento gerenciado pelo contexto pai */
+  margin-bottom: 0;
   min-width: 0;
 }
+
+.chart-filter + .chart-card { margin-top: 0.6rem; }
 
 .chart-card-header {
   display: flex;
@@ -340,18 +380,13 @@
 .chart-container { position: relative; width: 100%; }
 .chart-container--line { height: 220px; }
 .chart-container--bar  { height: 300px; }
+.chart-container--pie  { height: 260px; }
 .chart-container--hidden { display: none; }
 
 .chart-loading { display: flex; justify-content: center; padding: 3rem 0; }
 
 .chart-empty { display: flex; justify-content: center; padding: 2.5rem 0; }
 .chart-empty p { font-size: 0.845rem; color: var(--text-muted); }
-
-/* ─── Espaçamento entre blocos de gráficos ─── */
-.chart-filter { margin-top: 1.25rem; }
-
-/* Gráfico de linha fica abaixo do seu filtro */
-.chart-filter + .chart-card { margin-top: 0.6rem; }
 
 /* ─── Gráficos de categoria lado a lado ─── */
 .charts-row {
@@ -432,23 +467,13 @@
 /* ─── Responsividade ─── */
 @media (max-width: 640px) {
   .cards-grid { grid-template-columns: 1fr; }
-
-  /* Gráficos de categoria empilhados em telas pequenas */
   .charts-row { grid-template-columns: 1fr; }
-
   .chart-container--line { height: 200px; }
   .chart-container--bar  { height: 260px; }
-
+  .chart-container--pie  { height: 240px; }
   .chart-card { padding: 1rem; }
-
-  .chart-filter {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
+  .chart-filter { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
   .chart-filter--dates .date-fields { flex-direction: column; align-items: flex-start; }
-
   .member-filter { flex-direction: column; align-items: flex-start; }
 }
 

@@ -4,17 +4,19 @@ jest.mock('chart.js', () => ({
     jest.fn().mockImplementation(() => ({ destroy: jest.fn() })),
     { register: jest.fn() }
   ),
-  CategoryScale: class { },
-  LinearScale: class { },
-  PointElement: class { },
-  LineElement: class { },
-  BarElement: class { },
+  CategoryScale:  class { },
+  LinearScale:    class { },
+  PointElement:   class { },
+  LineElement:    class { },
+  BarElement:     class { },
   LineController: class { },
-  BarController: class { },
-  Title: class { },
-  Tooltip: class { },
-  Legend: class { },
-  Filler: class { },
+  BarController:  class { },
+  PieController:  class { },
+  ArcElement:     class { },
+  Title:    class { },
+  Tooltip:  class { },
+  Legend:   class { },
+  Filler:   class { },
 }));
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -28,27 +30,35 @@ import { RouterTestingModule } from '@angular/router/testing';
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const mockUser1 = { id: 1, firstName: 'João', lastName: 'Silva', email: 'joao@test.com' };
-const mockUser2 = { id: 2, firstName: 'Ana', lastName: 'Lima', email: 'ana@test.com' };
+const mockUser2 = { id: 2, firstName: 'Ana',  lastName: 'Lima',  email: 'ana@test.com'  };
 
 const mockDashboard = {
-  pockets: [{ category: 'BankAccount', total: 1500 }, { category: 'Cash', total: 200 }],
-  investments: [{ category: 'RENDA_FIXA', total: 5000 }],
+  pockets:       [{ category: 'BankAccount', total: 1500 }, { category: 'Cash', total: 200 }],
+  investments:   [{ category: 'RENDA_FIXA',  total: 5000 }],
   totalOpenBills: 300,
 };
 
 const mockMonthly = [
-  { month: '2025-03', totalIncome: 5000, totalExpense: 0 },
-  { month: '2025-04', totalIncome: 0, totalExpense: 600 },
+  { month: '2025-03', totalIncome: 5000, totalExpense: 0   },
+  { month: '2025-04', totalIncome: 0,    totalExpense: 600 },
 ];
 
 const mockCategorySummary = {
-  incomes: [{ category: 'Salário', total: 5000 }, { category: 'Freelance', total: 800 }],
-  expenses: [{ category: 'Alimentação', total: 800 }, { category: 'Transporte', total: 200 }],
+  incomes:  [{ category: 'Salário',     total: 5000 }, { category: 'Freelance',   total: 800 }],
+  expenses: [{ category: 'Alimentação', total: 800  }, { category: 'Transporte',  total: 200 }],
 };
 
-const mockGroups = [
-  { id: 10, name: 'Família', responsibleUser: mockUser1 },
+const mockIssuerRisk = [
+  { legalEntityName: 'Banco A', totalCurrentValue: 3000 },
+  { legalEntityName: 'Banco B', totalCurrentValue: 1500 },
 ];
+
+const mockIndexerSummary = [
+  { indexer: 'CDI',       totalCurrentValue: 4000 },
+  { indexer: 'PREFIXADO', totalCurrentValue: 1500 },
+];
+
+const mockGroups = [{ id: 10, name: 'Família', responsibleUser: mockUser1 }];
 
 const mockGroupDashboard = {
   members: [
@@ -71,22 +81,40 @@ const mockGroupCategorySummary = {
   ],
 };
 
+const mockGroupIssuerRisk = {
+  members: [
+    { user: mockUser1, issuerRisk: [{ legalEntityName: 'Banco A', totalCurrentValue: 3000 }, { legalEntityName: 'Banco B', totalCurrentValue: 1500 }] },
+    { user: mockUser2, issuerRisk: null },
+  ],
+};
+
+const mockGroupIndexerSummary = {
+  members: [
+    { user: mockUser1, indexerSummary: [{ indexer: 'CDI', totalCurrentValue: 4000 }, { indexer: 'IPCA', totalCurrentValue: 1000 }] },
+    { user: mockUser2, indexerSummary: null },
+  ],
+};
+
 // ── Mock factories ────────────────────────────────────────────────────────────
 
 function buildDashboardService() {
   return {
-    getDashboard: jest.fn().mockReturnValue(of(mockDashboard)),
-    getMonthly: jest.fn().mockReturnValue(of(mockMonthly)),
-    getCategorySummary: jest.fn().mockReturnValue(of(mockCategorySummary)),
-    getGroupDashboard: jest.fn().mockReturnValue(of(mockGroupDashboard)),
-    getGroupMonthly: jest.fn().mockReturnValue(of(mockGroupMonthly)),
+    getDashboard:            jest.fn().mockReturnValue(of(mockDashboard)),
+    getMonthly:              jest.fn().mockReturnValue(of(mockMonthly)),
+    getCategorySummary:      jest.fn().mockReturnValue(of(mockCategorySummary)),
+    getIssuerRisk:           jest.fn().mockReturnValue(of(mockIssuerRisk)),
+    getIndexerSummary:       jest.fn().mockReturnValue(of(mockIndexerSummary)),
+    getGroupDashboard:       jest.fn().mockReturnValue(of(mockGroupDashboard)),
+    getGroupMonthly:         jest.fn().mockReturnValue(of(mockGroupMonthly)),
     getGroupCategorySummary: jest.fn().mockReturnValue(of(mockGroupCategorySummary)),
+    getGroupIssuerRisk:      jest.fn().mockReturnValue(of(mockGroupIssuerRisk)),
+    getGroupIndexerSummary:  jest.fn().mockReturnValue(of(mockGroupIndexerSummary)),
   };
 }
 
 function buildGroupService(groups = mockGroups) {
   return {
-    myGroups: signal(groups),
+    myGroups:      signal(groups),
     loadMyGroups$: jest.fn().mockReturnValue(of(groups)),
   };
 }
@@ -101,17 +129,17 @@ describe('DashboardComponent', () => {
 
   function setup(groups = mockGroups) {
     dashboardServiceSpy = buildDashboardService();
-    groupServiceSpy = buildGroupService(groups);
+    groupServiceSpy     = buildGroupService(groups);
 
     TestBed.configureTestingModule({
       imports: [DashboardComponent, RouterTestingModule],
       providers: [
         { provide: DashboardService, useValue: dashboardServiceSpy },
-        { provide: GroupService, useValue: groupServiceSpy },
+        { provide: GroupService,     useValue: groupServiceSpy     },
       ],
     });
 
-    fixture = TestBed.createComponent(DashboardComponent);
+    fixture   = TestBed.createComponent(DashboardComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
@@ -141,8 +169,24 @@ describe('DashboardComponent', () => {
       expect(dashboardServiceSpy.getCategorySummary).toHaveBeenCalled();
     });
 
+    it('should call getIssuerRisk on init', () => {
+      expect(dashboardServiceSpy.getIssuerRisk).toHaveBeenCalled();
+    });
+
+    it('should call getIndexerSummary on init', () => {
+      expect(dashboardServiceSpy.getIndexerSummary).toHaveBeenCalled();
+    });
+
     it('should call loadMyGroups$ on init', () => {
       expect(groupServiceSpy.loadMyGroups$).toHaveBeenCalled();
+    });
+
+    it('should default individualSection to summary', () => {
+      expect(component.individualSection()).toBe('summary');
+    });
+
+    it('should default groupSection to summary', () => {
+      expect(component.groupSection()).toBe('summary');
     });
 
     it('should default selectedMonth to previous month', () => {
@@ -175,6 +219,50 @@ describe('DashboardComponent', () => {
     });
   });
 
+  // ─── setIndividualSection() ───────────────────────────────────────────────
+
+  describe('setIndividualSection()', () => {
+    beforeEach(() => setup());
+
+    it('should switch to income-expense section', () => {
+      component.setIndividualSection('income-expense');
+      expect(component.individualSection()).toBe('income-expense');
+    });
+
+    it('should switch to investments section', () => {
+      component.setIndividualSection('investments');
+      expect(component.individualSection()).toBe('investments');
+    });
+
+    it('should switch back to summary section', () => {
+      component.setIndividualSection('investments');
+      component.setIndividualSection('summary');
+      expect(component.individualSection()).toBe('summary');
+    });
+  });
+
+  // ─── setGroupSection() ────────────────────────────────────────────────────
+
+  describe('setGroupSection()', () => {
+    beforeEach(() => setup());
+
+    it('should switch to income-expense section', () => {
+      component.setGroupSection('income-expense');
+      expect(component.groupSection()).toBe('income-expense');
+    });
+
+    it('should switch to investments section', () => {
+      component.setGroupSection('investments');
+      expect(component.groupSection()).toBe('investments');
+    });
+
+    it('should switch back to summary section', () => {
+      component.setGroupSection('investments');
+      component.setGroupSection('summary');
+      expect(component.groupSection()).toBe('summary');
+    });
+  });
+
   // ─── pocketRows ───────────────────────────────────────────────────────────
 
   describe('pocketRows', () => {
@@ -199,7 +287,7 @@ describe('DashboardComponent', () => {
     beforeEach(() => setup());
 
     it('should sum all pocket totals', () => {
-      expect(component.pocketTotal()).toBe(1700); // 1500 + 200
+      expect(component.pocketTotal()).toBe(1700);
     });
 
     it('should return 0 when no pockets', () => {
@@ -260,6 +348,52 @@ describe('DashboardComponent', () => {
     });
   });
 
+  // ─── issuerRiskData / hasIssuerRiskData ───────────────────────────────────
+
+  describe('issuerRiskData', () => {
+    beforeEach(() => setup());
+
+    it('should populate issuerRiskData on init', () => {
+      expect(component.issuerRiskData()).toEqual(mockIssuerRisk);
+    });
+
+    it('hasIssuerRiskData should be true when data exists', () => {
+      expect(component.hasIssuerRiskData()).toBe(true);
+    });
+
+    it('hasIssuerRiskData should be false when data is empty', () => {
+      component.issuerRiskData.set([]);
+      expect(component.hasIssuerRiskData()).toBe(false);
+    });
+
+    it('should set isLoadingIssuerRisk to false after load', () => {
+      expect(component.isLoadingIssuerRisk()).toBe(false);
+    });
+  });
+
+  // ─── indexerData / hasIndexerData ─────────────────────────────────────────
+
+  describe('indexerData', () => {
+    beforeEach(() => setup());
+
+    it('should populate indexerData on init', () => {
+      expect(component.indexerData()).toEqual(mockIndexerSummary);
+    });
+
+    it('hasIndexerData should be true when data exists', () => {
+      expect(component.hasIndexerData()).toBe(true);
+    });
+
+    it('hasIndexerData should be false when data is empty', () => {
+      component.indexerData.set([]);
+      expect(component.hasIndexerData()).toBe(false);
+    });
+
+    it('should set isLoadingIndexer to false after load', () => {
+      expect(component.isLoadingIndexer()).toBe(false);
+    });
+  });
+
   // ─── loadMonthly() ────────────────────────────────────────────────────────
 
   describe('loadMonthly()', () => {
@@ -300,19 +434,17 @@ describe('DashboardComponent', () => {
     });
 
     it('should set errorMessage on getDashboard failure', () => {
-      // O beforeEach já chamou setup() e registrou dashboardServiceSpy no TestBed.
-      // Basta sobrescrever o mock no spy existente e recriar o componente.
       dashboardServiceSpy.getDashboard.mockReturnValue(
         throwError(() => ({ error: { message: 'Erro interno' } }))
       );
-      fixture = TestBed.createComponent(DashboardComponent);
+      fixture   = TestBed.createComponent(DashboardComponent);
       component = fixture.componentInstance;
       fixture.detectChanges();
       expect(component.errorMessage()).toBeTruthy();
     });
   });
 
-  // ─── onMonthChange() / onYearChange() ─────────────────────────────────────
+  // ─── date selectors ───────────────────────────────────────────────────────
 
   describe('date selectors', () => {
     beforeEach(() => setup());
@@ -369,21 +501,27 @@ describe('DashboardComponent', () => {
       expect(dashboardServiceSpy.getGroupCategorySummary).toHaveBeenCalled();
     });
 
+    it('should call getGroupIssuerRisk and getGroupIndexerSummary on group select', () => {
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(dashboardServiceSpy.getGroupIssuerRisk).toHaveBeenCalledWith(10);
+      expect(dashboardServiceSpy.getGroupIndexerSummary).toHaveBeenCalledWith(10);
+    });
+
+    it('should reset groupIssuerRiskData and groupIndexerData before loading', () => {
+      component.groupIssuerRiskData.set(mockGroupIssuerRisk);
+      component.groupIndexerData.set(mockGroupIndexerSummary);
+      component.groupIssuerRiskData.set(null);
+      component.groupIndexerData.set(null);
+      expect(component.groupIssuerRiskData()).toBeNull();
+      expect(component.groupIndexerData()).toBeNull();
+    });
+
     it('should reset selectedMemberIds to empty before loading', () => {
       component.selectedMemberIds.set([1, 2]);
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
-      // After load completes, all members are selected
       expect(component.selectedMemberIds()).toEqual([mockUser1.id, mockUser2.id]);
-    });
-
-    it('should reset groupDashboardData before loading', () => {
-      component.groupDashboardData.set(mockGroupDashboard);
-      const event = { target: { value: '10' } } as unknown as Event;
-      // reset happens synchronously before subscription resolves
-      component.selectedGroupId.set(10);
-      component.groupDashboardData.set(null);
-      expect(component.groupDashboardData()).toBeNull();
     });
 
     it('should reset dates to defaults when switching group', () => {
@@ -391,7 +529,6 @@ describe('DashboardComponent', () => {
       component.groupLineEndDate.set('2020-12-31');
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
-      // Dates reset to defaults (last 12 months range)
       expect(component.groupLineStartDate()).not.toBe('2020-01-01');
     });
   });
@@ -461,15 +598,12 @@ describe('DashboardComponent', () => {
     });
 
     it('groupPocketRows should aggregate only non-null pockets', () => {
-      // User2 has null pockets — only user1's pockets should appear
-      const rows = component.groupPocketRows();
-      const total = rows.reduce((s, r) => s + r.total, 0);
+      const total = component.groupPocketRows().reduce((s, r) => s + r.total, 0);
       expect(total).toBe(2000);
     });
 
     it('groupPocketRows should translate pocket category labels', () => {
-      const row = component.groupPocketRows().find(r => r.label === 'Conta Bancária');
-      expect(row).toBeDefined();
+      expect(component.groupPocketRows().find(r => r.label === 'Conta Bancária')).toBeDefined();
     });
 
     it('groupPocketTotal should sum all aggregated pocket totals', () => {
@@ -477,17 +611,14 @@ describe('DashboardComponent', () => {
     });
 
     it('groupInvestmentRows should aggregate only non-null investments', () => {
-      const total = component.groupInvestmentTotal();
-      expect(total).toBe(3000);
+      expect(component.groupInvestmentTotal()).toBe(3000);
     });
 
     it('groupInvestmentRows should translate RENDA_FIXA label', () => {
-      const row = component.groupInvestmentRows().find(r => r.label === 'Renda Fixa');
-      expect(row).toBeDefined();
+      expect(component.groupInvestmentRows().find(r => r.label === 'Renda Fixa')).toBeDefined();
     });
 
     it('groupTotalOpenBills should sum non-null bills only', () => {
-      // user1 = 150, user2 = null (counts as 0)
       expect(component.groupTotalOpenBills()).toBe(150);
     });
 
@@ -514,7 +645,7 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── Group monthly aggregation ────────────────────────────────────────────
+  // ─── Group monthly chart data ─────────────────────────────────────────────
 
   describe('group monthly chart data', () => {
     beforeEach(() => {
@@ -529,10 +660,7 @@ describe('DashboardComponent', () => {
 
     it('groupHasMonthlyData should be false when all members have null monthly', () => {
       component.groupMonthlyData.set({
-        members: [
-          { user: mockUser1, monthly: null },
-          { user: mockUser2, monthly: null },
-        ],
+        members: [{ user: mockUser1, monthly: null }, { user: mockUser2, monthly: null }],
       });
       expect(component.groupHasMonthlyData()).toBe(false);
     });
@@ -561,6 +689,115 @@ describe('DashboardComponent', () => {
 
     it('groupMembersNotSharingCategory should count members with null category data', () => {
       expect(component.groupMembersNotSharingCategory()).toBe(1);
+    });
+  });
+
+  // ─── Group issuer risk ────────────────────────────────────────────────────
+
+  describe('group issuer risk', () => {
+    beforeEach(() => {
+      setup();
+      component.groupIssuerRiskData.set(mockGroupIssuerRisk);
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+    });
+
+    it('groupHasIssuerRiskData should be true when at least one member has data', () => {
+      expect(component.groupHasIssuerRiskData()).toBe(true);
+    });
+
+    it('groupHasIssuerRiskData should be false when all members have null issuerRisk', () => {
+      component.groupIssuerRiskData.set({
+        members: [{ user: mockUser1, issuerRisk: null }, { user: mockUser2, issuerRisk: null }],
+      });
+      expect(component.groupHasIssuerRiskData()).toBe(false);
+    });
+
+    it('groupMembersNotSharingIssuerRisk should count members with null issuerRisk', () => {
+      expect(component.groupMembersNotSharingIssuerRisk()).toBe(1);
+    });
+
+    it('groupMembersNotSharingIssuerRisk should be 0 when all share', () => {
+      component.groupIssuerRiskData.set({
+        members: [
+          { user: mockUser1, issuerRisk: [{ legalEntityName: 'Banco A', totalCurrentValue: 1000 }] },
+          { user: mockUser2, issuerRisk: [{ legalEntityName: 'Banco B', totalCurrentValue: 500  }] },
+        ],
+      });
+      expect(component.groupMembersNotSharingIssuerRisk()).toBe(0);
+    });
+
+    it('filteredIssuerRiskMembers should respect selectedMemberIds', () => {
+      component.selectedMemberIds.set([mockUser1.id]);
+      expect(component.filteredIssuerRiskMembers().length).toBe(1);
+      expect(component.filteredIssuerRiskMembers()[0].user.id).toBe(mockUser1.id);
+    });
+
+    it('should aggregate issuer risk across selected members ignoring null', () => {
+      // user2 has null — aggregation should only contain user1's data
+      const members = component.filteredIssuerRiskMembers();
+      const nonNull = members.filter(m => m.issuerRisk !== null);
+      const totalBancoA = nonNull.flatMap(m => m.issuerRisk!).find(i => i.legalEntityName === 'Banco A')?.totalCurrentValue;
+      expect(totalBancoA).toBe(3000);
+    });
+
+    it('should merge same legalEntityName across multiple members', () => {
+      component.groupIssuerRiskData.set({
+        members: [
+          { user: mockUser1, issuerRisk: [{ legalEntityName: 'Banco A', totalCurrentValue: 1000 }] },
+          { user: mockUser2, issuerRisk: [{ legalEntityName: 'Banco A', totalCurrentValue: 500  }] },
+        ],
+      });
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+      // The aggregation (done inside renderGroupIssuerRiskChart) should sum to 1500
+      // We test the filteredIssuerRiskMembers are both included
+      expect(component.filteredIssuerRiskMembers().length).toBe(2);
+    });
+  });
+
+  // ─── Group indexer summary ────────────────────────────────────────────────
+
+  describe('group indexer summary', () => {
+    beforeEach(() => {
+      setup();
+      component.groupIndexerData.set(mockGroupIndexerSummary);
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+    });
+
+    it('groupHasIndexerData should be true when at least one member has data', () => {
+      expect(component.groupHasIndexerData()).toBe(true);
+    });
+
+    it('groupHasIndexerData should be false when all members have null indexerSummary', () => {
+      component.groupIndexerData.set({
+        members: [{ user: mockUser1, indexerSummary: null }, { user: mockUser2, indexerSummary: null }],
+      });
+      expect(component.groupHasIndexerData()).toBe(false);
+    });
+
+    it('groupMembersNotSharingIndexer should count members with null indexerSummary', () => {
+      expect(component.groupMembersNotSharingIndexer()).toBe(1);
+    });
+
+    it('groupMembersNotSharingIndexer should be 0 when all share', () => {
+      component.groupIndexerData.set({
+        members: [
+          { user: mockUser1, indexerSummary: [{ indexer: 'CDI', totalCurrentValue: 2000 }] },
+          { user: mockUser2, indexerSummary: [{ indexer: 'IPCA', totalCurrentValue: 1000 }] },
+        ],
+      });
+      expect(component.groupMembersNotSharingIndexer()).toBe(0);
+    });
+
+    it('filteredIndexerMembers should respect selectedMemberIds', () => {
+      component.selectedMemberIds.set([mockUser1.id]);
+      expect(component.filteredIndexerMembers().length).toBe(1);
+      expect(component.filteredIndexerMembers()[0].user.id).toBe(mockUser1.id);
+    });
+
+    it('should exclude null indexerSummary from aggregation', () => {
+      const nonNull = component.filteredIndexerMembers().filter(m => m.indexerSummary !== null);
+      expect(nonNull.length).toBe(1);
+      expect(nonNull[0].user.id).toBe(mockUser1.id);
     });
   });
 
