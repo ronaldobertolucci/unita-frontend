@@ -41,8 +41,8 @@ export class InvestmentsComponent implements OnInit {
   pensionForm!: FormGroup;
 
   // ── Opções ────────────────────────────────────────────────────────────────
-  readonly indexers = ['CDI', 'IPCA', 'SELIC', 'PREFIXADO'] as const;
-  readonly pensionTypes = ['PGBL', 'VGBL', 'ENTIDADE_FECHADA'] as const;
+  readonly indexers = ['CDI', 'IPCA', 'PREFIXADO', 'SELIC'] as const;
+  readonly pensionTypes = ['ENTIDADE_FECHADA', 'PGBL', 'VGBL'] as const;
   readonly taxRegimes = ['PROGRESSIVO', 'REGRESSIVO'] as const;
 
   readonly pensionTypeLabels: Record<string, string> = {
