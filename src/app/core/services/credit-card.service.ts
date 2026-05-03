@@ -22,11 +22,11 @@ import {
 // ─── Dados de referência hardcoded ───────────────────────────────────────────
 
 export const CARD_BRANDS: CardBrandDto[] = [
-  { id: 1, name: 'Visa' },
-  { id: 2, name: 'Mastercard' },
-  { id: 3, name: 'Elo' },
   { id: 4, name: 'American Express' },
+  { id: 3, name: 'Elo' },
   { id: 5, name: 'Hipercard' },
+  { id: 2, name: 'Mastercard' },
+  { id: 1, name: 'Visa' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export class CreditCardService {
 
   loadCreditCards(): Observable<CreditCardDto[]> {
     return this.http.get<CreditCardDto[]>(`${this.base}/credit-cards/my`).pipe(
-      tap(list => this._creditCards.set(list))
+      tap(list => this._creditCards.set(this.sort(list)))
     );
   }
 
@@ -53,14 +53,14 @@ export class CreditCardService {
 
   createCreditCard(payload: CreateCreditCardPayload): Observable<CreditCardDto> {
     return this.http.post<CreditCardDto>(`${this.base}/credit-cards`, payload).pipe(
-      tap(card => this._creditCards.update(list => [...list, card]))
+      tap(card => this._creditCards.update(list => this.sort([...list, card])))
     );
   }
 
   updateCreditCard(id: number, payload: UpdateCreditCardPayload): Observable<CreditCardDto> {
     return this.http.patch<CreditCardDto>(`${this.base}/credit-cards/${id}`, payload).pipe(
       tap(updated => this._creditCards.update(list =>
-        list.map(c => c.id === id ? updated : c)
+        this.sort(list.map(c => c.id === id ? updated : c))
       ))
     );
   }
@@ -69,6 +69,10 @@ export class CreditCardService {
     return this.http.delete<void>(`${this.base}/credit-cards/${id}`).pipe(
       tap(() => this._creditCards.update(list => list.filter(c => c.id !== id)))
     );
+  }
+
+  private sort(list: CreditCardDto[]): CreditCardDto[] {
+    return [...list].sort((a, b) => a.legalEntityCorporateName.localeCompare(b.legalEntityCorporateName, 'pt-BR'));
   }
 
   // ─── Faturas ─────────────────────────────────────────────────────────────
