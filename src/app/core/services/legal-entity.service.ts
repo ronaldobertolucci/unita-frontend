@@ -20,7 +20,7 @@ export class LegalEntityService {
 
   loadLegalEntities(): Observable<LegalEntityDto[]> {
     return this.http.get<LegalEntityDto[]>(`${this.base}/legal-entities`).pipe(
-      tap(list => this._legalEntities.set(list))
+      tap(list => this._legalEntities.set(this.sort(list)))
     );
   }
 
@@ -28,14 +28,14 @@ export class LegalEntityService {
 
   create(payload: CreateLegalEntityPayload): Observable<LegalEntityDto> {
     return this.http.post<LegalEntityDto>(`${this.base}/legal-entities`, payload).pipe(
-      tap(created => this._legalEntities.update(list => [...list, created]))
+      tap(entity => this._legalEntities.update(list => this.sort([...list, entity])))
     );
   }
 
   update(id: number, payload: UpdateLegalEntityPayload): Observable<LegalEntityDto> {
     return this.http.patch<LegalEntityDto>(`${this.base}/legal-entities/${id}`, payload).pipe(
       tap(updated => this._legalEntities.update(list =>
-        list.map(e => e.id === id ? updated : e)
+        this.sort(list.map(e => e.id === updated.id ? updated : e))
       ))
     );
   }
@@ -44,5 +44,9 @@ export class LegalEntityService {
     return this.http.delete<void>(`${this.base}/legal-entities/${id}`).pipe(
       tap(() => this._legalEntities.update(list => list.filter(e => e.id !== id)))
     );
+  }
+
+  private sort(list: LegalEntityDto[]): LegalEntityDto[] {
+    return [...list].sort((a, b) => a.corporateName.localeCompare(b.corporateName, 'pt-BR'));
   }
 }

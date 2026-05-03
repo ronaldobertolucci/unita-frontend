@@ -40,7 +40,7 @@ describe('CategoryService', () => {
     it('should load and set categories signal', () => {
       service.loadCategories().subscribe();
       http.expectOne(`${base}/categories`).flush([mockExpense, mockIncome, mockUserCategory]);
-      expect(service.categories()).toEqual([mockExpense, mockIncome, mockUserCategory]);
+      expect(service.categories()).toEqual([mockExpense, mockUserCategory, mockIncome]);
     });
 
     it('should include both global and user categories', () => {

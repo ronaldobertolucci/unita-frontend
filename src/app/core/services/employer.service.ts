@@ -26,20 +26,20 @@ export class EmployerService {
 
   loadIndividualEmployers(): Observable<IndividualEmployerDto[]> {
     return this.http.get<IndividualEmployerDto[]>(`${this.base}/employers/individual`).pipe(
-      tap(list => this._individualEmployers.set(list))
+      tap(list => this._individualEmployers.set(this.individualSort(list)))
     );
   }
 
   createIndividual(payload: CreateIndividualEmployerPayload): Observable<IndividualEmployerDto> {
     return this.http.post<IndividualEmployerDto>(`${this.base}/employers/individual`, payload).pipe(
-      tap(created => this._individualEmployers.update(list => [...list, created]))
+      tap(created => this._individualEmployers.update(list => this.individualSort([...list, created])))
     );
   }
 
   updateIndividual(id: number, payload: UpdateIndividualEmployerPayload): Observable<IndividualEmployerDto> {
     return this.http.patch<IndividualEmployerDto>(`${this.base}/employers/individual/${id}`, payload).pipe(
       tap(updated => this._individualEmployers.update(list =>
-        list.map(e => e.id === id ? updated : e)
+        this.individualSort(list.map(e => e.id === id ? updated : e))
       ))
     );
   }
@@ -50,24 +50,28 @@ export class EmployerService {
     );
   }
 
+  private individualSort(list: IndividualEmployerDto[]): IndividualEmployerDto[] {
+    return [...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }
+
   // ─── Empregador PJ ────────────────────────────────────────────────────────
 
   loadLegalEntityEmployers(): Observable<LegalEntityEmployerDto[]> {
     return this.http.get<LegalEntityEmployerDto[]>(`${this.base}/employers/legal-entity`).pipe(
-      tap(list => this._legalEntityEmployers.set(list))
+      tap(list => this._legalEntityEmployers.set(this.legalEntitySort(list)))
     );
   }
 
   createLegalEntity(payload: CreateLegalEntityEmployerPayload): Observable<LegalEntityEmployerDto> {
     return this.http.post<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity`, payload).pipe(
-      tap(created => this._legalEntityEmployers.update(list => [...list, created]))
+      tap(created => this._legalEntityEmployers.update(list => this.legalEntitySort([...list, created])))
     );
   }
 
   updateLegalEntity(id: number, payload: UpdateLegalEntityEmployerPayload): Observable<LegalEntityEmployerDto> {
     return this.http.patch<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity/${id}`, payload).pipe(
       tap(updated => this._legalEntityEmployers.update(list =>
-        list.map(e => e.id === id ? updated : e)
+        this.legalEntitySort(list.map(e => e.id === id ? updated : e))
       ))
     );
   }
@@ -76,5 +80,9 @@ export class EmployerService {
     return this.http.delete<void>(`${this.base}/employers/legal-entity/${id}`).pipe(
       tap(() => this._legalEntityEmployers.update(list => list.filter(e => e.id !== id)))
     );
+  }
+
+  private legalEntitySort(list: LegalEntityEmployerDto[]): LegalEntityEmployerDto[] {
+    return [...list].sort((a, b) => a.legalEntity.corporateName.localeCompare(b.legalEntity.corporateName, 'pt-BR'));
   }
 }

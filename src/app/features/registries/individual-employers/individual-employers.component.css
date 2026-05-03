@@ -134,7 +134,7 @@
   text-overflow: ellipsis;
 }
 
-.employer-cnpj {
+.employer-doc {
   font-size: 0.75rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;

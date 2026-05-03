@@ -20,7 +20,7 @@ export class CategoryService {
 
   loadCategories(): Observable<CategoryDto[]> {
     return this.http.get<CategoryDto[]>(`${this.base}/categories`).pipe(
-      tap(list => this._categories.set(list))
+      tap(list => this._categories.set(this.sort(list)))
     );
   }
 
@@ -28,14 +28,14 @@ export class CategoryService {
 
   create(payload: CreateCategoryPayload): Observable<CategoryDto> {
     return this.http.post<CategoryDto>(`${this.base}/categories`, payload).pipe(
-      tap(created => this._categories.update(list => [...list, created]))
+      tap(created => this._categories.update(list => this.sort([...list, created])))
     );
   }
 
   update(id: number, payload: UpdateCategoryPayload): Observable<CategoryDto> {
     return this.http.patch<CategoryDto>(`${this.base}/categories/${id}`, payload).pipe(
       tap(updated => this._categories.update(list =>
-        list.map(c => c.id === id ? updated : c)
+        this.sort(list.map(c => c.id === id ? updated : c))
       ))
     );
   }
@@ -44,5 +44,9 @@ export class CategoryService {
     return this.http.delete<void>(`${this.base}/categories/${id}`).pipe(
       tap(() => this._categories.update(list => list.filter(c => c.id !== id)))
     );
+  }
+
+  private sort(list: CategoryDto[]): CategoryDto[] {
+    return [...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   }
 }
