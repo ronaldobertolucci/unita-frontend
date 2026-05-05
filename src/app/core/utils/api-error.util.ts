@@ -21,7 +21,9 @@ const ERROR_MAP: Record<string, string> = {
   'Cannot add installment to a paid bill': 'Não é possível adicionar uma compra/parcela a uma fatura paga.',
   'Asset has transactions and cannot be deleted': 'Investimento com transações não pode ser excluída.',
   'Pocket must be empty to be deactivated.': 'Somente pockets zerados podem ser desabilitados ou bloqueados',
-  'An asset with this name already exists': 'Já existe um investimento com esse nome.'
+  'An asset with this name already exists': 'Já existe um investimento com esse nome.',
+  'Invalid email or password': 'Credenciais inválidas (Email ou senha).',
+  'Email already registered': 'Email já cadastrado.'
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {

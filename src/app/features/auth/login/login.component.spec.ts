@@ -128,7 +128,7 @@ describe('LoginComponent', () => {
       component.form.setValue({ email: 'joao@email.com', password: 'wrong' });
       component.onSubmit();
 
-      expect(component.errorMessage()).toBe('Ocorreu um erro. Tente novamente.');
+      expect(component.errorMessage()).toBe('Erro ao entrar.');
     });
   });
 

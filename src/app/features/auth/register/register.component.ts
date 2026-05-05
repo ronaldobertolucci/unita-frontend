@@ -12,6 +12,7 @@ import {
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { translateApiError } from '../../../core/utils/api-error.util';
 
 function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
   const password = group.get('password')?.value;
@@ -106,9 +107,7 @@ export class RegisterComponent {
           if (details?.length) {
             this.errorMessage.set(details.join(' • '));
           } else {
-            this.errorMessage.set(
-              err.error?.message ?? 'Ocorreu um erro. Tente novamente.'
-            );
+            this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta.'));
           }
         },
       });

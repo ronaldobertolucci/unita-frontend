@@ -39,6 +39,11 @@ export const routes: Routes = [
             m => m.ResetPasswordComponent
           ),
       },
+      {
+        path: 'verify-email',
+        loadComponent: () => import('./features/auth/verify-email/verify-email.component')
+          .then(m => m.VerifyEmailComponent),
+      },
     ],
   },
 
@@ -100,26 +105,29 @@ export const routes: Routes = [
           import('./features/credit-cards/credit-cards.component').then(m => m.CreditCardsComponent),
         data: { title: 'Cartões de Crédito' },
       },
-      { path: 'credit-cards/:id', 
-        loadComponent: () => 
-          import('./features/credit-cards/credit-card-detail/credit-card-detail.component').then(m => m.CreditCardDetailComponent), 
-        data: { title: 'Cartões de Crédito' } 
+      {
+        path: 'credit-cards/:id',
+        loadComponent: () =>
+          import('./features/credit-cards/credit-card-detail/credit-card-detail.component').then(m => m.CreditCardDetailComponent),
+        data: { title: 'Cartões de Crédito' }
       },
-      { path: 'credit-cards/:id/bills/:billId', 
-        loadComponent: () => 
-          import('./features/credit-cards/credit-card-bill-detail/credit-card-bill-detail.component').then(m => m.CreditCardBillDetailComponent), 
-        data: { title: 'Fatura' } 
+      {
+        path: 'credit-cards/:id/bills/:billId',
+        loadComponent: () =>
+          import('./features/credit-cards/credit-card-bill-detail/credit-card-bill-detail.component').then(m => m.CreditCardBillDetailComponent),
+        data: { title: 'Fatura' }
       },
-            {
+      {
         path: 'investments',
         loadComponent: () =>
           import('./features/investments/investments.component').then(m => m.InvestmentsComponent),
         data: { title: 'Investimentos' },
       },
-      { path: 'investments/:id', 
-        loadComponent: () => 
-          import('./features/investments/investment-detail/investment-detail.component').then(m => m.InvestmentDetailComponent), 
-        data: { title: 'Investimento' } 
+      {
+        path: 'investments/:id',
+        loadComponent: () =>
+          import('./features/investments/investment-detail/investment-detail.component').then(m => m.InvestmentDetailComponent),
+        data: { title: 'Investimento' }
       },
       {
         path: 'cadastros',

@@ -8,18 +8,18 @@ import { LoginRequest, LoginResponse, RegisterRequest } from '../models/auth.mod
 import { environment } from '../../../environments/environment';
 
 const TOKEN_KEY = 'unita_token';
-const USER_KEY = 'unita_user';
+const USER_KEY  = 'unita_user';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly http = inject(HttpClient);
+  private readonly http   = inject(HttpClient);
   private readonly router = inject(Router);
 
   private readonly _token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
-  private readonly _user = signal<User | null>(this.loadUserFromStorage());
+  private readonly _user  = signal<User | null>(this.loadUserFromStorage());
 
-  readonly token = this._token.asReadonly();
-  readonly currentUser = this._user.asReadonly();
+  readonly token           = this._token.asReadonly();
+  readonly currentUser     = this._user.asReadonly();
   readonly isAuthenticated = computed(() => !!this._token());
 
   login(credentials: LoginRequest): Observable<LoginResponse> {
@@ -30,6 +30,19 @@ export class AuthService {
 
   register(data: RegisterRequest): Observable<User> {
     return this.http.post<User>(`${environment.apiUrl}/auth/register`, data);
+  }
+
+  verifyEmail(token: string): Observable<void> {
+    return this.http.get<void>(`${environment.apiUrl}/auth/verify-email`, {
+      params: { token },
+    });
+  }
+
+  resendVerification(email: string): Observable<void> {
+    return this.http.post<void>(
+      `${environment.apiUrl}/auth/resend-verification`,
+      { email }
+    );
   }
 
   logout(): void {

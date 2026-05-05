@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { translateApiError } from '../../../core/utils/api-error.util';
 
 @Component({
   selector: 'app-login',
@@ -20,8 +21,9 @@ export class LoginComponent {
   readonly errorMessage = signal<string | null>(null);
   readonly showPassword = signal(false);
 
-  /** Exibe mensagem de sucesso após cadastro */
+  /** Exibe mensagem de sucesso após cadastro ou verificação */
   readonly justRegistered = this.route.snapshot.queryParamMap.has('registered');
+  readonly verified = this.route.snapshot.queryParamMap.has('verified');
 
   readonly form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -55,9 +57,7 @@ export class LoginComponent {
       next: () => this.router.navigate(['/dashboard']), // TODO: rota principal
       error: err => {
         this.isLoading.set(false);
-        this.errorMessage.set(
-          err.error?.message ?? 'Ocorreu um erro. Tente novamente.'
-        );
+        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao entrar.'));
       },
     });
   }
