@@ -23,7 +23,8 @@ const ERROR_MAP: Record<string, string> = {
   'Pocket must be empty to be deactivated.': 'Somente pockets zerados podem ser desabilitados ou bloqueados',
   'An asset with this name already exists': 'Já existe um investimento com esse nome.',
   'Invalid email or password': 'Credenciais inválidas (Email ou senha).',
-  'Email already registered': 'Email já cadastrado.'
+  'Email already registered': 'Email já cadastrado.',
+  'Category is in use and cannot be deleted': 'Categoria não pode ser excluída pois está sendo usada.'
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {
