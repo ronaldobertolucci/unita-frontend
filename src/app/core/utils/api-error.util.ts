@@ -24,7 +24,8 @@ const ERROR_MAP: Record<string, string> = {
   'An asset with this name already exists': 'Já existe um investimento com esse nome.',
   'Invalid email or password': 'Credenciais inválidas (Email ou senha).',
   'Email already registered': 'Email já cadastrado.',
-  'Category is in use and cannot be deleted': 'Categoria não pode ser excluída pois está sendo usada.'
+  'Category is in use and cannot be deleted': 'Categoria não pode ser excluída pois está sendo usada.',
+  'Yield value cannot be greater than current value.': 'Valor resgatado parcialmente não pode ser maior do que o atual.'
 };
 
 export function translateApiError(message: string | undefined, fallback?: string): string {

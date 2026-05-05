@@ -164,18 +164,18 @@ export class InvestmentDetailComponent implements OnInit {
     const map: Record<InvestmentTransactionType, string> = {
       BUY: 'Aporte',
       SELL: 'Resgate',
-      YIELD: 'Rendimento',
+      YIELD: 'Rendimento resgatado',
       TAX: 'Imposto',
     };
     return map[type];
   }
 
   isCredit(type: InvestmentTransactionType): boolean {
-    return type === 'YIELD';
+    return type === 'BUY';
   }
 
   isDebit(type: InvestmentTransactionType): boolean {
-    return type === 'SELL' || type === 'TAX';
+    return type === 'SELL' || type === 'TAX' || type === 'YIELD';
   }
 
   pensionTypeLabel(type: string): string {

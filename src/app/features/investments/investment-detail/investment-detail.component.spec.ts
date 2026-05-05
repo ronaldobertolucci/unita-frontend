@@ -278,19 +278,18 @@ describe('InvestmentDetailComponent', () => {
     it('transactionLabel should map all types', () => {
       expect(component.transactionLabel('BUY')).toBe('Aporte');
       expect(component.transactionLabel('SELL')).toBe('Resgate');
-      expect(component.transactionLabel('YIELD')).toBe('Rendimento');
+      expect(component.transactionLabel('YIELD')).toBe('Rendimento resgatado');
       expect(component.transactionLabel('TAX')).toBe('Imposto');
     });
 
-    it('isCredit should return true only for YIELD', () => {
-      expect(component.isCredit('YIELD')).toBe(true);
-      expect(component.isCredit('BUY')).toBe(false);
+    it('isCredit should return true only for BUY', () => {
+      expect(component.isCredit('BUY')).toBe(true);
     });
 
-    it('isDebit should return true for SELL and TAX', () => {
+    it('isDebit should return true for SELL, TAX and YIELD', () => {
       expect(component.isDebit('SELL')).toBe(true);
       expect(component.isDebit('TAX')).toBe(true);
-      expect(component.isDebit('BUY')).toBe(false);
+      expect(component.isDebit('YIELD')).toBe(true);
     });
 
     it('categoryNameFor should return pre-defined category names', () => {
