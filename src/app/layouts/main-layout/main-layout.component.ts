@@ -4,6 +4,7 @@ import {
   signal,
   computed,
   OnInit,
+  OnDestroy,
   HostListener,
   ElementRef,
 } from '@angular/core';
@@ -16,7 +17,7 @@ import { NotificationService } from '../../core/services/notification.service';
 export interface NavItem {
   label: string;
   path: string;
-  icons: string[]; // array de paths SVG
+  icons: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -83,7 +84,7 @@ const NAV_ITEMS: NavItem[] = [
 const PRIMARY_NAV_PATHS = new Set(['/dashboard', '/pockets', '/investments', '/credit-cards']);
 
 type NotificationSource = 'sidebar' | 'topbar' | 'mobile' | null;
-type UserMenuSource = 'sidebar' | 'topbar' | null;
+type UserMenuSource     = 'sidebar' | 'topbar' | null;
 
 @Component({
   selector: 'app-main-layout',
@@ -92,37 +93,42 @@ type UserMenuSource = 'sidebar' | 'topbar' | null;
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.css',
 })
-export class MainLayoutComponent implements OnInit {
-  private readonly authService = inject(AuthService);
+export class MainLayoutComponent implements OnInit, OnDestroy {
+  private readonly authService         = inject(AuthService);
   private readonly notificationService = inject(NotificationService);
-  private readonly router = inject(Router);
-  private readonly elementRef = inject(ElementRef);
+  private readonly router              = inject(Router);
+  private readonly elementRef          = inject(ElementRef);
 
-  readonly navItems = NAV_ITEMS;
-  readonly primaryNavItems = NAV_ITEMS.filter(i => PRIMARY_NAV_PATHS.has(i.path));
+  readonly navItems         = NAV_ITEMS;
+  readonly primaryNavItems  = NAV_ITEMS.filter(i =>  PRIMARY_NAV_PATHS.has(i.path));
   readonly overflowNavItems = NAV_ITEMS.filter(i => !PRIMARY_NAV_PATHS.has(i.path));
 
-  readonly currentUser = this.authService.currentUser;
+  readonly currentUser  = this.authService.currentUser;
   readonly userInitials = computed(() => {
     const user = this.currentUser();
     if (!user) return '?';
     return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
   });
 
-  readonly invitations = this.notificationService.invitations;
-  readonly pendingCount = this.notificationService.pendingCount;
+  readonly invitations          = this.notificationService.invitations;
+  readonly pendingCount         = this.notificationService.pendingCount;
   readonly notificationsLoading = this.notificationService.loading;
-  readonly respondError = this.notificationService.respondError;
+  readonly respondError         = this.notificationService.respondError;
+  readonly sseToast             = this.notificationService.sseToast;
 
   readonly notificationSource = signal<NotificationSource>(null);
-  readonly userMenuSource = signal<UserMenuSource>(null);
-  readonly moreMenuOpen = signal(false);
-
-  readonly pageTitle = signal('Dashboard');
+  readonly userMenuSource     = signal<UserMenuSource>(null);
+  readonly moreMenuOpen       = signal(false);
+  readonly pageTitle          = signal('Dashboard');
 
   ngOnInit(): void {
     this.notificationService.loadInvitations();
+    this.notificationService.connectSSE();
     this.syncPageTitle();
+  }
+
+  ngOnDestroy(): void {
+    this.notificationService.disconnectSSE();
   }
 
   private syncPageTitle(): void {
@@ -165,7 +171,12 @@ export class MainLayoutComponent implements OnInit {
     this.notificationService.respondToInvitation(id, accept);
   }
 
+  dismissToast(): void {
+    this.notificationService.dismissToast();
+  }
+
   logout(): void {
+    this.notificationService.disconnectSSE();
     this.authService.logout();
   }
 
@@ -174,21 +185,15 @@ export class MainLayoutComponent implements OnInit {
     const target = event.target as HTMLElement;
     if (!this.elementRef.nativeElement.contains(target)) return;
 
-    const clickedNotifBtn = target.closest('[data-notif-btn]');
+    const clickedNotifBtn   = target.closest('[data-notif-btn]');
     const clickedNotifPanel = target.closest('[data-notif-panel]');
-    const clickedUserBtn = target.closest('[data-user-btn]');
-    const clickedUserMenu = target.closest('[data-user-menu]');
-    const clickedMoreBtn = target.closest('[data-more-btn]');
-    const clickedMorePanel = target.closest('[data-more-panel]');
+    const clickedUserBtn    = target.closest('[data-user-btn]');
+    const clickedUserMenu   = target.closest('[data-user-menu]');
+    const clickedMoreBtn    = target.closest('[data-more-btn]');
+    const clickedMorePanel  = target.closest('[data-more-panel]');
 
-    if (!clickedNotifBtn && !clickedNotifPanel) {
-      this.notificationSource.set(null);
-    }
-    if (!clickedUserBtn && !clickedUserMenu) {
-      this.userMenuSource.set(null);
-    }
-    if (!clickedMoreBtn && !clickedMorePanel) {
-      this.moreMenuOpen.set(false);
-    }
+    if (!clickedNotifBtn && !clickedNotifPanel) this.notificationSource.set(null);
+    if (!clickedUserBtn  && !clickedUserMenu)   this.userMenuSource.set(null);
+    if (!clickedMoreBtn  && !clickedMorePanel)  this.moreMenuOpen.set(false);
   }
 }
