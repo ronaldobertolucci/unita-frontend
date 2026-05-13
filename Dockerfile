@@ -7,6 +7,7 @@ RUN npm ci --only=production && \
     npm install -g http-server
 
 COPY . .
+RUN npm install
 RUN npm run build -- --configuration production
 
 EXPOSE 4200
