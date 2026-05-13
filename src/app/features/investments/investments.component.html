@@ -263,7 +263,7 @@
         <select id="fi-entity" formControlName="legalEntityId">
           <option value="">Selecione...</option>
           @for (entity of legalEntityService.legalEntities(); track entity.id) {
-          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          <option [value]="entity.id">{{ entity.tradeName || entity.corporateName }}</option>
           }
         </select>
         @if (fi['legalEntityId'].invalid && fi['legalEntityId'].touched) {
@@ -276,7 +276,7 @@
         <select id="fi-custodian" formControlName="custodianLegalEntityId">
           <option [value]="null">Nenhuma</option>
           @for (entity of legalEntityService.legalEntities(); track entity.id) {
-          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          <option [value]="entity.id">{{ entity.tradeName || entity.corporateName }}</option>
           }
         </select>
       </div>
@@ -355,7 +355,7 @@
         <select id="pe-entity" formControlName="legalEntityId">
           <option value="">Selecione...</option>
           @for (entity of legalEntityService.legalEntities(); track entity.id) {
-          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          <option [value]="entity.id">{{ entity.tradeName || entity.corporateName }}</option>
           }
         </select>
         @if (pe['legalEntityId'].invalid && pe['legalEntityId'].touched) {
@@ -368,7 +368,7 @@
         <select id="pe-custodian" formControlName="custodianLegalEntityId">
           <option [value]="null">Nenhuma</option>
           @for (entity of legalEntityService.legalEntities(); track entity.id) {
-          <option [value]="entity.id">{{ entity.tradeName ?? entity.corporateName }}</option>
+          <option [value]="entity.id">{{ entity.tradeName || entity.corporateName }}</option>
           }
         </select>
       </div>

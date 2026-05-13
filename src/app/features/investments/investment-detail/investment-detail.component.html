@@ -44,7 +44,7 @@
       </div>
       <div class="asset-header-meta">
         <span class="badge-category">{{ categoryLabel(a.category) }}</span>
-        <span class="asset-institution">{{ a.legalEntity.tradeName ?? a.legalEntity.corporateName }}</span>
+        <span class="asset-institution">{{ a.legalEntity.tradeName || a.legalEntity.corporateName }}</span>
       </div>
     </div>
 
@@ -289,7 +289,7 @@
         <select formControlName="legalEntityId">
           <option value="">Selecione...</option>
           @for (e of legalEntityService.legalEntities(); track e.id) {
-          <option [value]="e.id">{{ e.tradeName ?? e.corporateName }}</option>
+          <option [value]="e.id">{{ e.tradeName || e.corporateName }}</option>
           }
         </select>
         @if (ctrl(editForm,'legalEntityId').invalid && ctrl(editForm,'legalEntityId').touched) {
@@ -302,7 +302,7 @@
         <select formControlName="custodianLegalEntityId">
           <option [value]="null">Nenhuma</option>
           @for (e of legalEntityService.legalEntities(); track e.id) {
-          <option [value]="e.id">{{ e.tradeName ?? e.corporateName }}</option>
+          <option [value]="e.id">{{ e.tradeName || e.corporateName }}</option>
           }
         </select>
       </div>
