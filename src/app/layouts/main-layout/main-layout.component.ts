@@ -73,7 +73,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     label: 'Cadastros',
-    path: '/cadastros',
+    path: '/registries',
     icons: [
       'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
       'M9 22V12h6v10',

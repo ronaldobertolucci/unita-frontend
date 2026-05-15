@@ -34,18 +34,18 @@ describe('RegistriesComponent', () => {
   it('should have correct routerLink for empresas', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const links = compiled.querySelectorAll('a.sub-nav-item');
-    expect(links[0].getAttribute('href')).toContain('empresas');
+    expect(links[0].getAttribute('href')).toContain('legal-entities');
   });
 
   it('should have correct routerLink for empregadores-pf', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const links = compiled.querySelectorAll('a.sub-nav-item');
-    expect(links[1].getAttribute('href')).toContain('empregadores-pf');
+    expect(links[1].getAttribute('href')).toContain('individual-employers');
   });
 
   it('should have correct routerLink for empregadores-pj', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const links = compiled.querySelectorAll('a.sub-nav-item');
-    expect(links[2].getAttribute('href')).toContain('empregadores-pj');
+    expect(links[2].getAttribute('href')).toContain('legal-entity-employers');
   });
 });

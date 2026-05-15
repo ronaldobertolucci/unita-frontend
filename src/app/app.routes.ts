@@ -130,31 +130,31 @@ export const routes: Routes = [
         data: { title: 'Investimento' }
       },
       {
-        path: 'cadastros',
+        path: 'registries',
         loadComponent: () =>
           import('./features/registries/registries.component').then(m => m.RegistriesComponent),
         children: [
-          { path: '', redirectTo: 'empresas', pathMatch: 'full' },
+          { path: '', redirectTo: 'legal-entities', pathMatch: 'full' },
           {
-            path: 'empresas',
+            path: 'legal-entities',
             loadComponent: () =>
               import('./features/registries/legal-entities/legal-entities.component').then(m => m.LegalEntitiesComponent),
             data: { title: 'Cadastros' },
           },
           {
-            path: 'empregadores-pf',
+            path: 'individual-employers',
             loadComponent: () =>
               import('./features/registries/individual-employers/individual-employers.component').then(m => m.IndividualEmployersComponent),
             data: { title: 'Cadastros' },
           },
           {
-            path: 'empregadores-pj',
+            path: 'legal-entity-employers',
             loadComponent: () =>
               import('./features/registries/legal-entity-employers/legal-entity-employers.component').then(m => m.LegalEntityEmployersComponent),
             data: { title: 'Cadastros' },
           },
           {
-            path: 'categorias',
+            path: 'categories',
             loadComponent: () =>
               import('./features/registries/categories/categories.component').then(m => m.CategoriesComponent),
             data: { title: 'Cadastros' },
