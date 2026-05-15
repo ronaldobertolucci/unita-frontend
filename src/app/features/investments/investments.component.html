@@ -55,6 +55,12 @@
   </div>
   }
 
+  <!-- Total consolidado -->
+  <div class="balance-card">
+    <span class="balance-label">Total consolidado</span>
+    <span class="balance-value">{{ totalConsolidated() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+  </div>
+
   <!-- Ativos -->
   <div class="assets-list">
     @for (asset of activeAssets(); track asset.id) {

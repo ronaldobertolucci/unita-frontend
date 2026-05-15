@@ -116,6 +116,34 @@
 
 .custodian-select option { background: #0d1629; color: var(--text-primary); }
 
+/* ─── Card de total consolidado ─── */
+.balance-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.4rem 1.6rem;
+  background: linear-gradient(135deg, rgba(25, 229, 168, 0.08) 0%, rgba(79, 70, 229, 0.08) 100%);
+  border: 1px solid var(--accent-glow);
+  border-radius: 20px;
+  margin-bottom: 1.5rem;
+}
+
+.balance-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.balance-value {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
 /* ─── Lista de ativos ─── */
 .assets-list {
   display: flex;
@@ -643,5 +671,9 @@
 
   .custodian-select {
     width: 100%;
+  }
+
+  .balance-value {
+    font-size: 1.5rem;
   }
 }

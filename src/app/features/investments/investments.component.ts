@@ -86,6 +86,11 @@ export class InvestmentsComponent implements OnInit {
 
   readonly redeemedVisible = signal(false);
 
+  // ── Total consolidado ─────────────────────────────────────────────────────
+  readonly totalConsolidated = computed(() =>
+    this.activeAssets().reduce((sum, a) => sum + a.currentValue, 0)
+  );
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.assetService.loadAssets();
