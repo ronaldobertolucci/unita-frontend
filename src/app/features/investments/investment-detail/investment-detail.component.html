@@ -148,7 +148,7 @@
   </div>
 
   <!-- Ações de transação -->
-  @if (a.status === 'ACTIVE') {
+  @if (a.status !== 'REDEEMED') {
   <div class="action-row">
     <button class="btn-tx btn-tx--buy" (click)="openModal('buy')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
