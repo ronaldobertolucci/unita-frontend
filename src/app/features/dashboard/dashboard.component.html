@@ -150,26 +150,24 @@
         </div>
       </div>
 
-      <div class="chart-filter chart-filter--month">
+      <div class="chart-filter chart-filter--dates">
         <span class="chart-filter-label">Despesas e Receitas por Categoria</span>
-        <div class="chart-filter-selects">
-          <select class="filter-select" [value]="selectedMonth()" (change)="onMonthChange($event)">
-            @for (name of monthNames; track $index) {
-              <option [value]="$index + 1" [selected]="selectedMonth() === $index + 1">{{ name }}</option>
-            }
-          </select>
-          <select class="filter-select" [value]="selectedYear()" (change)="onYearChange($event)">
-            @for (year of availableYears(); track year) {
-              <option [value]="year" [selected]="selectedYear() === year">{{ year }}</option>
-            }
-          </select>
+        <div class="date-fields">
+          <div class="date-field">
+            <label class="date-label">De</label>
+            <input type="date" class="date-input" [value]="categoryStartDate()" (change)="onCategoryStartDateChange($event)" />
+          </div>
+          <div class="date-field">
+            <label class="date-label">Até</label>
+            <input type="date" class="date-input" [value]="categoryEndDate()" (change)="onCategoryEndDateChange($event)" />
+          </div>
         </div>
       </div>
 
       <div class="charts-row">
-        <div class="chart-card">
+        <div class="chart-card chart-card--scrollable">
           <div class="chart-card-header">
-            <div><p class="chart-card-title">Despesas</p><p class="chart-card-subtitle">Top 10 — maior para o menor</p></div>
+            <div><p class="chart-card-title">Despesas</p><p class="chart-card-subtitle">Valor por categoria</p></div>
             <span class="chart-badge chart-badge--expense">Despesas</span>
           </div>
           @if (isLoadingCategory()) {
@@ -177,14 +175,16 @@
           } @else if (!hasExpenseData()) {
             <div class="chart-empty"><p>Nenhuma despesa no período.</p></div>
           }
-          <div class="chart-container chart-container--bar" [class.chart-container--hidden]="isLoadingCategory() || !hasExpenseData()">
-            <canvas #expenseChartCanvas></canvas>
+          <div class="chart-scroll-wrapper" [class.chart-container--hidden]="isLoadingCategory() || !hasExpenseData()">
+            <div class="chart-container chart-container--bar">
+              <canvas #expenseChartCanvas></canvas>
+            </div>
           </div>
         </div>
 
-        <div class="chart-card">
+        <div class="chart-card chart-card--scrollable">
           <div class="chart-card-header">
-            <div><p class="chart-card-title">Receitas</p><p class="chart-card-subtitle">Top 10 — maior para o menor</p></div>
+            <div><p class="chart-card-title">Receitas</p><p class="chart-card-subtitle">Valor por categoria</p></div>
             <span class="chart-badge chart-badge--income">Receitas</span>
           </div>
           @if (isLoadingCategory()) {
@@ -192,8 +192,10 @@
           } @else if (!hasIncomeData()) {
             <div class="chart-empty"><p>Nenhuma receita no período.</p></div>
           }
-          <div class="chart-container chart-container--bar" [class.chart-container--hidden]="isLoadingCategory() || !hasIncomeData()">
-            <canvas #incomeChartCanvas></canvas>
+          <div class="chart-scroll-wrapper" [class.chart-container--hidden]="isLoadingCategory() || !hasIncomeData()">
+            <div class="chart-container chart-container--bar">
+              <canvas #incomeChartCanvas></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -422,26 +424,24 @@
           </div>
         </div>
 
-        <div class="chart-filter chart-filter--month">
+        <div class="chart-filter chart-filter--dates">
           <span class="chart-filter-label">Despesas e Receitas por Categoria</span>
-          <div class="chart-filter-selects">
-            <select class="filter-select" [value]="groupSelectedMonth()" (change)="onGroupMonthChange($event)">
-              @for (name of monthNames; track $index) {
-                <option [value]="$index + 1" [selected]="groupSelectedMonth() === $index + 1">{{ name }}</option>
-              }
-            </select>
-            <select class="filter-select" [value]="groupSelectedYear()" (change)="onGroupYearChange($event)">
-              @for (year of availableYears(); track year) {
-                <option [value]="year" [selected]="groupSelectedYear() === year">{{ year }}</option>
-              }
-            </select>
+          <div class="date-fields">
+            <div class="date-field">
+              <label class="date-label">De</label>
+              <input type="date" class="date-input" [value]="groupCategoryStartDate()" (change)="onGroupCategoryStartDateChange($event)" />
+            </div>
+            <div class="date-field">
+              <label class="date-label">Até</label>
+              <input type="date" class="date-input" [value]="groupCategoryEndDate()" (change)="onGroupCategoryEndDateChange($event)" />
+            </div>
           </div>
         </div>
 
         <div class="charts-row">
-          <div class="chart-card">
+          <div class="chart-card chart-card--scrollable">
             <div class="chart-card-header">
-              <div><p class="chart-card-title">Despesas</p><p class="chart-card-subtitle">Top 10 — maior para o menor</p></div>
+              <div><p class="chart-card-title">Despesas</p><p class="chart-card-subtitle">Valor por categoria</p></div>
               <span class="chart-badge chart-badge--expense">Despesas</span>
             </div>
             @if (isLoadingGroupCategory()) {
@@ -449,17 +449,19 @@
             } @else if (!groupHasExpenseData()) {
               <div class="chart-empty"><p>Nenhuma despesa no período.</p></div>
             }
-            <div class="chart-container chart-container--bar" [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasExpenseData()">
-              <canvas #groupExpenseChartCanvas></canvas>
+            <div class="chart-scroll-wrapper" [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasExpenseData()">
+              <div class="chart-container chart-container--bar">
+                <canvas #groupExpenseChartCanvas></canvas>
+              </div>
             </div>
             @if (!isLoadingGroupCategory() && groupMembersNotSharingCategory() > 0) {
               <p class="sharing-notice sharing-notice--bottom">{{ groupMembersNotSharingCategory() }} membro(s) sem compartilhamento de categorias</p>
             }
           </div>
 
-          <div class="chart-card">
+          <div class="chart-card chart-card--scrollable">
             <div class="chart-card-header">
-              <div><p class="chart-card-title">Receitas</p><p class="chart-card-subtitle">Top 10 — maior para o menor</p></div>
+              <div><p class="chart-card-title">Receitas</p><p class="chart-card-subtitle">Valor por categoria</p></div>
               <span class="chart-badge chart-badge--income">Receitas</span>
             </div>
             @if (isLoadingGroupCategory()) {
@@ -467,12 +469,13 @@
             } @else if (!groupHasIncomeData()) {
               <div class="chart-empty"><p>Nenhuma receita no período.</p></div>
             }
-            <div class="chart-container chart-container--bar" [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasIncomeData()">
-              <canvas #groupIncomeChartCanvas></canvas>
+            <div class="chart-scroll-wrapper" [class.chart-container--hidden]="isLoadingGroupCategory() || !groupHasIncomeData()">
+              <div class="chart-container chart-container--bar">
+                <canvas #groupIncomeChartCanvas></canvas>
+              </div>
             </div>
           </div>
         </div>
-
       </div>
 
       <!-- ── Seção: Investimentos (grupo) ── -->

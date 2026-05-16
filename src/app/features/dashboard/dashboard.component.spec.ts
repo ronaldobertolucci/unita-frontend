@@ -188,18 +188,6 @@ describe('DashboardComponent', () => {
     it('should default groupSection to summary', () => {
       expect(component.groupSection()).toBe('summary');
     });
-
-    it('should default selectedMonth to previous month', () => {
-      const now = new Date();
-      const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-      expect(component.selectedMonth()).toBe(expectedMonth);
-    });
-
-    it('should default groupSelectedMonth to previous month', () => {
-      const now = new Date();
-      const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-      expect(component.groupSelectedMonth()).toBe(expectedMonth);
-    });
   });
 
   // ─── setTab() ─────────────────────────────────────────────────────────────
@@ -420,15 +408,6 @@ describe('DashboardComponent', () => {
   describe('loadCategoryData()', () => {
     beforeEach(() => setup());
 
-    it('should call getCategorySummary with correct month range', () => {
-      component.selectedMonth.set(3);
-      component.selectedYear.set(2025);
-      component.loadCategoryData();
-      const [start, end] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
-      expect(start).toBe('2025-03-01');
-      expect(end).toBe('2025-03-31');
-    });
-
     it('should populate categoryData on success', () => {
       expect(component.categoryData()).toEqual(mockCategorySummary);
     });
@@ -448,22 +427,6 @@ describe('DashboardComponent', () => {
 
   describe('date selectors', () => {
     beforeEach(() => setup());
-
-    it('onMonthChange should update selectedMonth and call loadCategoryData', () => {
-      const callsBefore = dashboardServiceSpy.getCategorySummary.mock.calls.length;
-      const event = { target: { value: '5' } } as unknown as Event;
-      component.onMonthChange(event);
-      expect(component.selectedMonth()).toBe(5);
-      expect(dashboardServiceSpy.getCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
-    });
-
-    it('onYearChange should update selectedYear and call loadCategoryData', () => {
-      const callsBefore = dashboardServiceSpy.getCategorySummary.mock.calls.length;
-      const event = { target: { value: '2024' } } as unknown as Event;
-      component.onYearChange(event);
-      expect(component.selectedYear()).toBe(2024);
-      expect(dashboardServiceSpy.getCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
-    });
 
     it('onLineStartDateChange should update lineStartDate and call loadMonthly', () => {
       const callsBefore = dashboardServiceSpy.getMonthly.mock.calls.length;
@@ -807,22 +770,6 @@ describe('DashboardComponent', () => {
     beforeEach(() => {
       setup();
       component.selectedGroupId.set(10);
-    });
-
-    it('onGroupMonthChange should update groupSelectedMonth and reload', () => {
-      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
-      const event = { target: { value: '6' } } as unknown as Event;
-      component.onGroupMonthChange(event);
-      expect(component.groupSelectedMonth()).toBe(6);
-      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
-    });
-
-    it('onGroupYearChange should update groupSelectedYear and reload', () => {
-      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
-      const event = { target: { value: '2024' } } as unknown as Event;
-      component.onGroupYearChange(event);
-      expect(component.groupSelectedYear()).toBe(2024);
-      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
     });
 
     it('onGroupLineStartDateChange should update groupLineStartDate and reload', () => {

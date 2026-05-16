@@ -31,6 +31,7 @@ import {
 import { GroupService } from '../../core/services/group.service';
 import { normalizeType } from '../../core/utils/pocket.utils';
 import { translateApiError } from '../../core/utils/api-error.util';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 Chart.register(
   CategoryScale, LinearScale,
@@ -39,6 +40,7 @@ Chart.register(
   LineController, BarController,
   PieController, ArcElement,
   Title, Tooltip, Legend, Filler,
+  ChartDataLabels,
 );
 
 type DashboardTab     = 'individual' | 'groups';
@@ -152,8 +154,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   readonly lineStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
   readonly lineEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
-  readonly selectedMonth = signal<number>(DashboardComponent.previousMonth().month);
-  readonly selectedYear  = signal<number>(DashboardComponent.previousMonth().year);
+  readonly categoryStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
+  readonly categoryEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
 
   readonly pocketRows = computed(() =>
     (this.dashboardData()?.pockets ?? []).map(p => ({
@@ -220,8 +222,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   readonly groupLineStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
   readonly groupLineEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
-  readonly groupSelectedMonth = signal<number>(DashboardComponent.previousMonth().month);
-  readonly groupSelectedYear  = signal<number>(DashboardComponent.previousMonth().year);
+  readonly groupCategoryStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
+  readonly groupCategoryEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
 
   readonly groupMembers = computed<UserDto[]>(() =>
     this.groupDashboardData()?.members.map(m => m.user) ?? []
@@ -442,8 +444,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadCategoryData(): void {
     this.isLoadingCategory.set(true);
-    const { startDate, endDate } = this.getMonthRange(this.selectedYear(), this.selectedMonth());
-    this.dashboardService.getCategorySummary(startDate, endDate).subscribe({
+    this.dashboardService.getCategorySummary(this.categoryStartDate(), this.categoryEndDate()).subscribe({
       next: data => {
         this.categoryData.set(data);
         this.isLoadingCategory.set(false);
@@ -487,15 +488,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadMonthly();
   }
 
-  onMonthChange(event: Event): void {
-    this.selectedMonth.set(Number((event.target as HTMLSelectElement).value));
+  onCategoryStartDateChange(event: Event): void {
+    this.categoryStartDate.set((event.target as HTMLInputElement).value);
     this.loadCategoryData();
   }
 
-  onYearChange(event: Event): void {
-    this.selectedYear.set(Number((event.target as HTMLSelectElement).value));
+  onCategoryEndDateChange(event: Event): void {
+    this.categoryEndDate.set((event.target as HTMLInputElement).value);
     this.loadCategoryData();
   }
+
 
   // ════════════════════════════════════════════════════════════════════
   // GROUP — Data loading & actions
@@ -507,8 +509,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     const prev  = DashboardComponent.previousMonth();
     const range = DashboardComponent.defaultLineRange();
-    this.groupSelectedMonth.set(prev.month);
-    this.groupSelectedYear.set(prev.year);
+    this.groupCategoryStartDate.set(range.start);
+    this.groupCategoryEndDate.set(range.end);
     this.groupLineStartDate.set(range.start);
     this.groupLineEndDate.set(range.end);
     this.selectedMemberIds.set([]);
@@ -556,17 +558,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (groupId) this.loadGroupMonthly(groupId);
   }
 
-  onGroupMonthChange(event: Event): void {
-    this.groupSelectedMonth.set(Number((event.target as HTMLSelectElement).value));
+  onGroupCategoryStartDateChange(event: Event): void {
+    this.groupCategoryStartDate.set((event.target as HTMLInputElement).value);
     const groupId = this.selectedGroupId();
     if (groupId) this.loadGroupCategoryData(groupId);
   }
 
-  onGroupYearChange(event: Event): void {
-    this.groupSelectedYear.set(Number((event.target as HTMLSelectElement).value));
-    const groupId = this.selectedGroupId();
-    if (groupId) this.loadGroupCategoryData(groupId);
-  }
+onGroupCategoryEndDateChange(event: Event): void {
+  this.groupCategoryEndDate.set((event.target as HTMLInputElement).value);
+  const groupId = this.selectedGroupId();
+  if (groupId) this.loadGroupCategoryData(groupId);
+}
 
   private loadGroupDashboard(groupId: number): void {
     this.isLoadingGroupDashboard.set(true);
@@ -596,8 +598,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadGroupCategoryData(groupId: number): void {
     this.isLoadingGroupCategory.set(true);
-    const { startDate, endDate } = this.getMonthRange(this.groupSelectedYear(), this.groupSelectedMonth());
-    this.dashboardService.getGroupCategorySummary(groupId, startDate, endDate).subscribe({
+    this.dashboardService.getGroupCategorySummary(groupId, this.groupCategoryStartDate(), this.groupCategoryEndDate()).subscribe({
       next: data => {
         this.groupCategoryData.set(data);
         this.isLoadingGroupCategory.set(false);
@@ -654,22 +655,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private renderBarCharts(): void {
     const data = this.categoryData();
 
-    const topExpenses = [...(data?.expenses ?? [])].sort((a, b) => b.total - a.total).slice(0, 10);
-    const topIncomes  = [...(data?.incomes  ?? [])].sort((a, b) => b.total - a.total).slice(0, 10);
+    const expenses = [...(data?.expenses ?? [])].sort((a, b) => b.total - a.total);
+    const incomes  = [...(data?.incomes  ?? [])].sort((a, b) => b.total - a.total);
 
     const expenseCanvas = this.expenseChartCanvas?.nativeElement;
     if (expenseCanvas) {
+      this.setBarContainerHeight(expenseCanvas, expenses.length);
       this.expenseChart?.destroy();
-      this.expenseChart = topExpenses.length > 0
-        ? new Chart(expenseCanvas, { type: 'bar', data: this.buildBarData(topExpenses, 'expense'), options: this.barChartOptions() })
+      this.expenseChart = expenses.length > 0
+        ? new Chart(expenseCanvas, { type: 'bar', data: this.buildBarData(expenses, 'expense'), options: this.barChartOptions() })
         : null;
     }
 
     const incomeCanvas = this.incomeChartCanvas?.nativeElement;
     if (incomeCanvas) {
+      this.setBarContainerHeight(incomeCanvas, incomes.length);
       this.incomeChart?.destroy();
-      this.incomeChart = topIncomes.length > 0
-        ? new Chart(incomeCanvas, { type: 'bar', data: this.buildBarData(topIncomes, 'income'), options: this.barChartOptions() })
+      this.incomeChart = incomes.length > 0
+        ? new Chart(incomeCanvas, { type: 'bar', data: this.buildBarData(incomes, 'income'), options: this.barChartOptions() })
         : null;
     }
   }
@@ -727,23 +730,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private renderGroupBarCharts(): void {
-    const members     = this.filteredCategoryMembers();
-    const topExpenses = this.aggregateCategories(members, 'expenses').sort((a, b) => b.total - a.total).slice(0, 10);
-    const topIncomes  = this.aggregateCategories(members, 'incomes' ).sort((a, b) => b.total - a.total).slice(0, 10);
+    const members  = this.filteredCategoryMembers();
+    const expenses = this.aggregateCategories(members, 'expenses').sort((a, b) => b.total - a.total);
+    const incomes  = this.aggregateCategories(members, 'incomes' ).sort((a, b) => b.total - a.total);
 
     const expenseCanvas = this.groupExpenseChartCanvas?.nativeElement;
     if (expenseCanvas) {
+      this.setBarContainerHeight(expenseCanvas, expenses.length);
       this.groupExpenseChart?.destroy();
-      this.groupExpenseChart = topExpenses.length > 0
-        ? new Chart(expenseCanvas, { type: 'bar', data: this.buildBarData(topExpenses, 'expense'), options: this.barChartOptions() })
+      this.groupExpenseChart = expenses.length > 0
+        ? new Chart(expenseCanvas, { type: 'bar', data: this.buildBarData(expenses, 'expense'), options: this.barChartOptions() })
         : null;
     }
 
     const incomeCanvas = this.groupIncomeChartCanvas?.nativeElement;
     if (incomeCanvas) {
+      this.setBarContainerHeight(incomeCanvas, incomes.length);
       this.groupIncomeChart?.destroy();
-      this.groupIncomeChart = topIncomes.length > 0
-        ? new Chart(incomeCanvas, { type: 'bar', data: this.buildBarData(topIncomes, 'income'), options: this.barChartOptions() })
+      this.groupIncomeChart = incomes.length > 0
+        ? new Chart(incomeCanvas, { type: 'bar', data: this.buildBarData(incomes, 'income'), options: this.barChartOptions() })
         : null;
     }
   }
@@ -814,14 +819,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const color = type === 'expense' ? '#ff6b6b' : '#19e5a8';
     const bg    = type === 'expense' ? 'rgba(255, 107, 107, 0.65)' : 'rgba(25, 229, 168, 0.65)';
     return {
-      labels: items.map(i => i.category),
+      labels: items.map(i => this.truncateLabel(i.category)),
       datasets: [{ data: items.map(i => i.total), backgroundColor: bg, borderColor: color, borderWidth: 1, borderRadius: 4 }],
     };
   }
 
   private buildIssuerBarData(items: IssuerRiskDto[]): ChartConfiguration['data'] {
     return {
-      labels: items.map(i => i.legalEntityName),
+      labels: items.map(i => this.truncateLabel(i.legalEntityName)),
       datasets: [{
         data: items.map(i => i.totalCurrentValue),
         backgroundColor: 'rgba(96, 165, 250, 0.65)',
@@ -856,6 +861,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           titleColor: '#dce9f8', bodyColor: '#6b87a6', padding: 10,
           callbacks: { label: ctx => ` ${this.formatCurrency(ctx.parsed.y ?? 0)}` },
         },
+        datalabels: { display: false },
       },
       scales: {
         x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b87a6', font: { family: 'DM Sans', size: 11 } } },
@@ -866,7 +872,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private barChartOptions(): ChartConfiguration['options'] {
     return {
-      indexAxis: 'y' as const, responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y' as const,
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { right: 72 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -874,10 +883,30 @@ export class DashboardComponent implements OnInit, OnDestroy {
           titleColor: '#dce9f8', bodyColor: '#6b87a6', padding: 10,
           callbacks: { label: ctx => ` ${this.formatCurrency(ctx.parsed.x ?? 0)}` },
         },
+        datalabels: {
+          anchor: 'end',
+          align: 'end',
+          clamp: true,
+          color: '#dce9f8',
+          font: () => ({ family: 'DM Sans', size: 11, weight: 'bold' }),
+          formatter: (value: number) => this.formatCurrencyShort(value),
+          padding: { right: 6 },
+        },
       },
       scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b87a6', font: { family: 'DM Sans', size: 11 }, callback: val => this.formatCurrencyShort(Number(val)) } },
-        y: { grid: { display: false }, ticks: { color: '#dce9f8', font: { family: 'DM Sans', size: 12 } } },
+        x: { display: false },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: '#dce9f8',
+            font: { family: 'DM Sans', size: 12 },
+            callback: function(_, index) {
+              const labels = this.chart.data.labels as string[];
+              const label = labels?.[index] ?? '';
+              return label.length > 14 ? label.slice(0, 14) + '…' : label;
+            },
+          },
+        },
       },
     };
   }
@@ -899,6 +928,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             },
           },
         },
+        datalabels: { display: false },
       },
     };
   }
@@ -986,6 +1016,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const start = new Date(year, month - 1, 1);
     const end   = new Date(year, month, 0);
     return { startDate: DashboardComponent.toIsoDate(start), endDate: DashboardComponent.toIsoDate(end) };
+  }
+
+  private setBarContainerHeight(canvas: HTMLCanvasElement, itemCount: number): void {
+    const BAR_ITEM_HEIGHT = 42;
+    const MIN_HEIGHT = 80;
+    const container = canvas.parentElement as HTMLElement;
+    container.style.height = `${Math.max(itemCount * BAR_ITEM_HEIGHT, MIN_HEIGHT)}px`;
+  }
+
+  private truncateLabel(label: string, maxLength = 22): string {
+    return label.length > maxLength ? label.slice(0, maxLength) + '…' : label;
   }
 
   // ── Formatting ────────────────────────────────────────────────────
