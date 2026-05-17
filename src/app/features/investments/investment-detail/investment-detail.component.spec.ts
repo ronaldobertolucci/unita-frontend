@@ -319,12 +319,13 @@ describe('InvestmentDetailComponent', () => {
     it('should call updateAsset with custodianLegalEntityId undefined when null', () => {
       assetServiceSpy.updateAsset.mockReturnValue(of(mockDetail));
       component.openModal('edit');
-      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1, custodianLegalEntityId: null });
+      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1, custodianLegalEntityId: null, liquidityType: 'DIARIA', });
       component.onEdit();
       expect(assetServiceSpy.updateAsset).toHaveBeenCalledWith(1, {
         name: 'CDB Atualizado',
         legalEntityId: 1,
         custodianLegalEntityId: null,
+        liquidityType: 'DIARIA',
       });
       expect(component.activeModal()).toBeNull();
     });
@@ -362,12 +363,13 @@ describe('InvestmentDetailComponent', () => {
     it('should send custodianLegalEntityId as number in payload', () => {
       assetServiceSpy.updateAsset.mockReturnValue(of(mockDetailWithCustodian));
       component.openModal('edit');
-      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1 });
+      component.editForm.patchValue({ name: 'CDB Atualizado', legalEntityId: 1, liquidityType: 'DIARIA' });
       component.onEdit();
       expect(assetServiceSpy.updateAsset).toHaveBeenCalledWith(1, {
         name: 'CDB Atualizado',
         legalEntityId: 1,
         custodianLegalEntityId: mockCustodianLegalEntity.id,
+        liquidityType: 'DIARIA',
       });
     });
 

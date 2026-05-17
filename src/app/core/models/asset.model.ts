@@ -4,6 +4,7 @@ export type FixedIncomeIndexer = 'CDI' | 'IPCA' | 'SELIC' | 'PREFIXADO';
 export type PensionType = 'PGBL' | 'VGBL' | 'ENTIDADE_FECHADA';
 export type TaxRegime = 'PROGRESSIVO' | 'REGRESSIVO';
 export type InvestmentTransactionType = 'BUY' | 'SELL' | 'YIELD' | 'TAX';
+export type LiquidityType = 'DIARIA' | 'MERCADO' | 'NO_VENCIMENTO' | 'PRAZO_FIXO' | 'PREVIDENCIARIA';
 
 export interface AssetSummaryDto {
   id: number;
@@ -43,6 +44,7 @@ export interface AssetDetailDto {
   name: string;
   category: AssetCategory;
   status: AssetStatus;
+  liquidityType?: LiquidityType | null;
   legalEntity: {
     id: number;
     cnpj: string;
@@ -79,6 +81,7 @@ export interface CreateFixedIncomePayload {
   annualRate: number;
   maturityDate: string;
   taxFree: boolean;
+  liquidityType: LiquidityType;
   custodianLegalEntityId: number | null;
 }
 
@@ -94,6 +97,7 @@ export interface UpdateAssetPayload {
   name?: string;
   legalEntityId?: number;
   custodianLegalEntityId: number | null;
+  liquidityType?: LiquidityType | null;
 }
 
 export interface UpdatePositionPayload {

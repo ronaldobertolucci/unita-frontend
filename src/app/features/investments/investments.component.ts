@@ -44,6 +44,15 @@ export class InvestmentsComponent implements OnInit {
   readonly indexers = ['CDI', 'IPCA', 'PREFIXADO', 'SELIC'] as const;
   readonly pensionTypes = ['ENTIDADE_FECHADA', 'PGBL', 'VGBL'] as const;
   readonly taxRegimes = ['PROGRESSIVO', 'REGRESSIVO'] as const;
+  readonly liquidityTypes = ['DIARIA', 'MERCADO', 'NO_VENCIMENTO', 'PRAZO_FIXO', 'PREVIDENCIARIA'] as const;
+
+  readonly liquidityTypeLabels: Record<string, string> = {
+    DIARIA:         'Diária',
+    MERCADO:        'Mercado secundário',
+    NO_VENCIMENTO:  'No vencimento',
+    PRAZO_FIXO:     'Prazo fixo',
+    PREVIDENCIARIA: 'Previdenciária',
+  };
 
   readonly pensionTypeLabels: Record<string, string> = {
     PGBL: 'PGBL',
@@ -160,7 +169,7 @@ export class InvestmentsComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { name, legalEntityId, indexer, annualRate, maturityDate, taxFree, custodianLegalEntityId } =
+    const { name, legalEntityId, indexer, annualRate, maturityDate, liquidityType, taxFree, custodianLegalEntityId } =
       this.fixedIncomeForm.value;
 
     this.assetService
@@ -170,6 +179,7 @@ export class InvestmentsComponent implements OnInit {
         indexer,
         annualRate: Number(annualRate),
         maturityDate,
+        liquidityType,   // ← novo
         taxFree: !!taxFree,
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
@@ -225,6 +235,7 @@ export class InvestmentsComponent implements OnInit {
       indexer:                ['', Validators.required],
       annualRate:             ['', [Validators.required, Validators.min(0)]],
       maturityDate:           ['', Validators.required],
+      liquidityType:          ['', Validators.required],  // ← novo
       taxFree:                [false],
       custodianLegalEntityId: [null],
     });

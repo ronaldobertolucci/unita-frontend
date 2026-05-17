@@ -443,13 +443,13 @@ describe('InvestmentsComponent', () => {
       component.openModal();
       component.fixedIncomeForm.setValue({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
-        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false, liquidityType: 'DIARIA',
         custodianLegalEntityId: 1,
       });
       component.onSubmit();
       expect(assetServiceSpy.createFixedIncome).toHaveBeenCalledWith({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
-        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false, liquidityType: 'DIARIA',
         custodianLegalEntityId: 1,
       });
       expect(component.modalOpen()).toBe(false);
@@ -461,7 +461,7 @@ describe('InvestmentsComponent', () => {
       component.openModal();
       component.fixedIncomeForm.setValue({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
-        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false, liquidityType: 'DIARIA',
         custodianLegalEntityId: null,
       });
       component.onSubmit();
@@ -486,7 +486,7 @@ describe('InvestmentsComponent', () => {
       component.openModal();
       component.fixedIncomeForm.setValue({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
-        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false,
+        annualRate: 12.5, maturityDate: '2027-01-15', taxFree: false, liquidityType: 'DIARIA',
         custodianLegalEntityId: 1,
       });
       component.onSubmit();

@@ -17,6 +17,7 @@ import {
   AssetDetailDto,
   InvestmentTransactionDto,
   InvestmentTransactionType,
+  LiquidityType,
 } from '../../../core/models/asset.model';
 import { translateApiError } from '../../../core/utils/api-error.util';
 
@@ -195,6 +196,21 @@ export class InvestmentDetailComponent implements OnInit {
     return map[regime] ?? regime;
   }
 
+  readonly liquidityTypes = ['DIARIA', 'MERCADO', 'NO_VENCIMENTO', 'PRAZO_FIXO', 'PREVIDENCIARIA'] as const;
+
+  readonly liquidityTypeLabels: Record<string, string> = {
+    DIARIA:         'Diária',
+    MERCADO:        'Mercado secundário',
+    NO_VENCIMENTO:  'No vencimento',
+    PRAZO_FIXO:     'Prazo fixo',
+    PREVIDENCIARIA: 'Previdenciária',
+  };
+
+  liquidityTypeLabel(type: string | null | undefined): string {
+    if (!type) return '—';
+    return this.liquidityTypeLabels[type] ?? type;
+  }
+
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
     this.errorMessage.set('');
@@ -214,19 +230,21 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Submits ───────────────────────────────────────────────────────────────
   onEdit(): void {
+    console.log(this.editForm.value)
     this.editForm.markAllAsTouched();
     if (this.editForm.invalid) return;
 
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    const { name, legalEntityId, custodianLegalEntityId } = this.editForm.value;
+    const { name, legalEntityId, custodianLegalEntityId, liquidityType } = this.editForm.value;
 
     this.assetService
       .updateAsset(this.assetId, {
         name: name.trim(),
         legalEntityId: Number(legalEntityId),
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
+        liquidityType: liquidityType || null,
       })
       .subscribe({
         next: (updated) => {
@@ -384,9 +402,10 @@ export class InvestmentDetailComponent implements OnInit {
   private buildEditForm(): void {
     const a = this.asset();
     this.editForm = this.fb.group({
-      name: [a?.name ?? '', [Validators.required, Validators.maxLength(255)]],
-      legalEntityId: [a?.legalEntity.id ?? '', Validators.required],
+      name:                   [a?.name ?? '', [Validators.required, Validators.maxLength(255)]],
+      legalEntityId:          [a?.legalEntity.id ?? '', Validators.required],
       custodianLegalEntityId: [a?.custodianLegalEntity?.id ?? null],
+      liquidityType:          [a?.liquidityType ?? null],
     });
   }
 

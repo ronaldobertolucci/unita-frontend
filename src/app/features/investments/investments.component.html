@@ -313,6 +313,19 @@
         </div>
       </div>
 
+      <div class="field" [class.field--invalid]="fi['liquidityType'].invalid && fi['liquidityType'].touched">
+        <label for="fi-liquidity">Tipo de liquidez</label>
+        <select id="fi-liquidity" formControlName="liquidityType">
+          <option value="">Selecione...</option>
+          @for (type of liquidityTypes; track type) {
+          <option [value]="type">{{ liquidityTypeLabels[type] }}</option>
+          }
+        </select>
+        @if (fi['liquidityType'].invalid && fi['liquidityType'].touched) {
+        <span class="field-error">Tipo de liquidez é obrigatório</span>
+        }
+      </div>
+
       <div class="form-row">
         <div class="field" [class.field--invalid]="fi['maturityDate'].invalid && fi['maturityDate'].touched">
           <label for="fi-maturity">Vencimento</label>
@@ -372,7 +385,7 @@
       <div class="field">
         <label for="pe-custodian">Custodiante <span class="field-optional">(opcional)</span></label>
         <select id="pe-custodian" formControlName="custodianLegalEntityId">
-          <option [value]="null">Nenhuma</option>
+          <option [ngValue]="null">Nenhuma</option>
           @for (entity of legalEntityService.legalEntities(); track entity.id) {
           <option [value]="entity.id">{{ entity.tradeName || entity.corporateName }}</option>
           }

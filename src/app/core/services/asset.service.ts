@@ -52,7 +52,7 @@ export class AssetService {
   }
 
   updateAsset(id: number, payload: UpdateAssetPayload): Observable<AssetDetailDto> {
-    return this.http.patch<AssetDetailDto>(`${this.base}/${id}`, payload).pipe(
+    return this.http.put<AssetDetailDto>(`${this.base}/${id}`, payload).pipe(
       tap((updated) =>
         this.assets.update((list) =>
           list.map((a) => (a.id === id ? this.toSummary(updated) : a)),

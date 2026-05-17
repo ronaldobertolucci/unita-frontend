@@ -74,6 +74,7 @@
     <span class="detail-chip">{{ a.fixedIncomeDetails.indexer }}</span>
     <span class="detail-chip">{{ a.fixedIncomeDetails.annualRate | number:'1.2-2':'pt-BR' }}% a.a.</span>
     <span class="detail-chip">Vence {{ a.fixedIncomeDetails.maturityDate | date:'dd/MM/yyyy' }}</span>
+    <span class="detail-chip">{{ liquidityTypeLabel(a.liquidityType) }}</span>
     @if (a.fixedIncomeDetails.taxFree) {
     <span class="detail-chip detail-chip--accent">Isento de IR</span>
     }
@@ -84,6 +85,7 @@
   <div class="detail-chips">
     <span class="detail-chip">{{ pensionTypeLabel(a.pensionDetails.pensionType) }}</span>
     <span class="detail-chip">Regime {{ taxRegimeLabel(a.pensionDetails.taxRegime) }}</span>
+    <span class="detail-chip">{{ liquidityTypeLabel(a.liquidityType) }}</span>
   </div>
   }
 
@@ -300,9 +302,19 @@
       <div class="field">
         <label>Custodiante <span class="label-optional">(opcional)</span></label>
         <select formControlName="custodianLegalEntityId">
-          <option [value]="null">Nenhuma</option>
+          <option [ngValue]="null">Nenhuma</option>
           @for (e of legalEntityService.legalEntities(); track e.id) {
           <option [value]="e.id">{{ e.tradeName || e.corporateName }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Tipo de liquidez <span class="label-optional">(opcional)</span></label>
+        <select formControlName="liquidityType">
+          <option [ngValue]="null">Não informado</option>
+          @for (type of liquidityTypes; track type) {
+          <option [value]="type">{{ liquidityTypeLabels[type] }}</option>
           }
         </select>
       </div>
