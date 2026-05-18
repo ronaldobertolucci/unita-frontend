@@ -222,20 +222,39 @@
         </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-card-header">
-          <div>
-            <p class="chart-card-title">Renda Fixa por Indexador</p>
-            <p class="chart-card-subtitle">Distribuição do valor atual por tipo de indexador</p>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <p class="chart-card-title">Renda Fixa por Indexador</p>
+              <p class="chart-card-subtitle">Distribuição por tipo de indexador</p>
+            </div>
+          </div>
+          @if (isLoadingIndexer()) {
+            <div class="chart-loading"><span class="spinner-lg"></span></div>
+          } @else if (!hasIndexerData()) {
+            <div class="chart-empty"><p>Nenhum ativo de renda fixa cadastrado.</p></div>
+          }
+          <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingIndexer() || !hasIndexerData()">
+            <canvas #indexerCanvas></canvas>
           </div>
         </div>
-        @if (isLoadingIndexer()) {
-          <div class="chart-loading"><span class="spinner-lg"></span></div>
-        } @else if (!hasIndexerData()) {
-          <div class="chart-empty"><p>Nenhum ativo de renda fixa cadastrado.</p></div>
-        }
-        <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingIndexer() || !hasIndexerData()">
-          <canvas #indexerCanvas></canvas>
+
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <p class="chart-card-title">Investimentos por Liquidez</p>
+              <p class="chart-card-subtitle">Distribuição por tipo de liquidez</p>
+            </div>
+          </div>
+          @if (isLoadingLiquidity()) {
+            <div class="chart-loading"><span class="spinner-lg"></span></div>
+          } @else if (!hasLiquidityData()) {
+            <div class="chart-empty"><p>Nenhum dado de liquidez disponível.</p></div>
+          }
+          <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingLiquidity() || !hasLiquidityData()">
+            <canvas #liquidityCanvas></canvas>
+          </div>
         </div>
       </div>
 
@@ -501,23 +520,45 @@
           </div>
         </div>
 
-        <div class="chart-card">
-          <div class="chart-card-header">
-            <div>
-              <p class="chart-card-title">Renda Fixa por Indexador</p>
-              <p class="chart-card-subtitle">Distribuição do valor atual por tipo de indexador</p>
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div>
+                <p class="chart-card-title">Renda Fixa por Indexador</p>
+                <p class="chart-card-subtitle">Distribuição por tipo de indexador</p>
+              </div>
+              @if (groupMembersNotSharingIndexer() > 0) {
+                <span class="sharing-badge">{{ groupMembersNotSharingIndexer() }} sem dados</span>
+              }
             </div>
-            @if (groupMembersNotSharingIndexer() > 0) {
-              <span class="sharing-badge">{{ groupMembersNotSharingIndexer() }} sem dados</span>
+            @if (isLoadingGroupIndexer()) {
+              <div class="chart-loading"><span class="spinner-lg"></span></div>
+            } @else if (!groupHasIndexerData()) {
+              <div class="chart-empty"><p>Nenhum dado disponível.</p></div>
             }
+            <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingGroupIndexer() || !groupHasIndexerData()">
+              <canvas #groupIndexerCanvas></canvas>
+            </div>
           </div>
-          @if (isLoadingGroupIndexer()) {
-            <div class="chart-loading"><span class="spinner-lg"></span></div>
-          } @else if (!groupHasIndexerData()) {
-            <div class="chart-empty"><p>Nenhum dado disponível.</p></div>
-          }
-          <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingGroupIndexer() || !groupHasIndexerData()">
-            <canvas #groupIndexerCanvas></canvas>
+
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div>
+                <p class="chart-card-title">Investimentos por Liquidez</p>
+                <p class="chart-card-subtitle">Distribuição por tipo de liquidez</p>
+              </div>
+              @if (groupMembersNotSharingLiquidity() > 0) {
+                <span class="sharing-badge">{{ groupMembersNotSharingLiquidity() }} sem dados</span>
+              }
+            </div>
+            @if (isLoadingGroupLiquidity()) {
+              <div class="chart-loading"><span class="spinner-lg"></span></div>
+            } @else if (!groupHasLiquidityData()) {
+              <div class="chart-empty"><p>Nenhum dado disponível.</p></div>
+            }
+            <div class="chart-container chart-container--pie" [class.chart-container--hidden]="isLoadingGroupLiquidity() || !groupHasLiquidityData()">
+              <canvas #groupLiquidityCanvas></canvas>
+            </div>
           </div>
         </div>
 

@@ -43,6 +43,11 @@ export interface IndexerSummaryDto {
   totalCurrentValue: number;
 }
 
+export interface LiquiditySummaryDto {
+  liquidityType: string;
+  totalCurrentValue: number;
+}
+
 // ── Individual ────────────────────────────────────────────────────────────────
 
 export interface DashboardDto {
@@ -106,6 +111,15 @@ export interface GroupIndexerSummaryResponseDto {
   members: GroupMemberIndexerSummaryDto[];
 }
 
+export interface GroupMemberLiquiditySummaryDto {
+  user: UserDto;
+  liquidityTypeSummary: LiquiditySummaryDto[] | null;
+}
+
+export interface GroupLiquiditySummaryResponseDto {
+  members: GroupMemberLiquiditySummaryDto[];
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -161,5 +175,13 @@ export class DashboardService {
 
   getGroupIndexerSummary(groupId: number): Observable<GroupIndexerSummaryResponseDto> {
     return this.http.get<GroupIndexerSummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/indexer-summary`);
+  }
+
+  getLiquiditySummary(): Observable<LiquiditySummaryDto[]> {
+    return this.http.get<LiquiditySummaryDto[]>(`${this.baseUrl}/dashboard/liquidity-summary`);
+  }
+
+  getGroupLiquiditySummary(groupId: number): Observable<GroupLiquiditySummaryResponseDto> {
+    return this.http.get<GroupLiquiditySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/liquidity-summary`);
   }
 }

@@ -19,6 +19,8 @@ jest.mock('chart.js', () => ({
   Filler:   class { },
 }));
 
+jest.mock('chartjs-plugin-datalabels', () => ({ default: {} }));
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
@@ -33,8 +35,8 @@ const mockUser1 = { id: 1, firstName: 'João', lastName: 'Silva', email: 'joao@t
 const mockUser2 = { id: 2, firstName: 'Ana',  lastName: 'Lima',  email: 'ana@test.com'  };
 
 const mockDashboard = {
-  pockets:       [{ category: 'BankAccount', total: 1500 }, { category: 'Cash', total: 200 }],
-  investments:   [{ category: 'RENDA_FIXA',  total: 5000 }],
+  pockets:        [{ category: 'BankAccount', total: 1500 }, { category: 'Cash', total: 200 }],
+  investments:    [{ category: 'RENDA_FIXA',  total: 5000 }],
   totalOpenBills: 300,
 };
 
@@ -44,8 +46,8 @@ const mockMonthly = [
 ];
 
 const mockCategorySummary = {
-  incomes:  [{ category: 'Salário',     total: 5000 }, { category: 'Freelance',   total: 800 }],
-  expenses: [{ category: 'Alimentação', total: 800  }, { category: 'Transporte',  total: 200 }],
+  incomes:  [{ category: 'Salário',     total: 5000 }, { category: 'Freelance',  total: 800 }],
+  expenses: [{ category: 'Alimentação', total: 800  }, { category: 'Transporte', total: 200 }],
 };
 
 const mockIssuerRisk = [
@@ -56,6 +58,12 @@ const mockIssuerRisk = [
 const mockIndexerSummary = [
   { indexer: 'CDI',       totalCurrentValue: 4000 },
   { indexer: 'PREFIXADO', totalCurrentValue: 1500 },
+];
+
+const mockLiquiditySummary = [
+  { liquidityType: 'DIARIA',        totalCurrentValue: 5077.68  },
+  { liquidityType: 'NO_VENCIMENTO', totalCurrentValue: 10647.23 },
+  { liquidityType: 'MERCADO',       totalCurrentValue: 89726.21 },
 ];
 
 const mockGroups = [{ id: 10, name: 'Família', responsibleUser: mockUser1 }];
@@ -95,20 +103,41 @@ const mockGroupIndexerSummary = {
   ],
 };
 
+const mockGroupLiquiditySummary = {
+  members: [
+    {
+      user: mockUser1,
+      liquidityTypeSummary: [
+        { liquidityType: 'MERCADO', totalCurrentValue: 71234.14 },
+      ],
+    },
+    {
+      user: mockUser2,
+      liquidityTypeSummary: [
+        { liquidityType: 'DIARIA',        totalCurrentValue: 5077.68  },
+        { liquidityType: 'NO_VENCIMENTO', totalCurrentValue: 10647.23 },
+        { liquidityType: 'MERCADO',       totalCurrentValue: 89726.21 },
+      ],
+    },
+  ],
+};
+
 // ── Mock factories ────────────────────────────────────────────────────────────
 
 function buildDashboardService() {
   return {
-    getDashboard:            jest.fn().mockReturnValue(of(mockDashboard)),
-    getMonthly:              jest.fn().mockReturnValue(of(mockMonthly)),
-    getCategorySummary:      jest.fn().mockReturnValue(of(mockCategorySummary)),
-    getIssuerRisk:           jest.fn().mockReturnValue(of(mockIssuerRisk)),
-    getIndexerSummary:       jest.fn().mockReturnValue(of(mockIndexerSummary)),
-    getGroupDashboard:       jest.fn().mockReturnValue(of(mockGroupDashboard)),
-    getGroupMonthly:         jest.fn().mockReturnValue(of(mockGroupMonthly)),
-    getGroupCategorySummary: jest.fn().mockReturnValue(of(mockGroupCategorySummary)),
-    getGroupIssuerRisk:      jest.fn().mockReturnValue(of(mockGroupIssuerRisk)),
-    getGroupIndexerSummary:  jest.fn().mockReturnValue(of(mockGroupIndexerSummary)),
+    getDashboard:             jest.fn().mockReturnValue(of(mockDashboard)),
+    getMonthly:               jest.fn().mockReturnValue(of(mockMonthly)),
+    getCategorySummary:       jest.fn().mockReturnValue(of(mockCategorySummary)),
+    getIssuerRisk:            jest.fn().mockReturnValue(of(mockIssuerRisk)),
+    getIndexerSummary:        jest.fn().mockReturnValue(of(mockIndexerSummary)),
+    getLiquiditySummary:      jest.fn().mockReturnValue(of(mockLiquiditySummary)),
+    getGroupDashboard:        jest.fn().mockReturnValue(of(mockGroupDashboard)),
+    getGroupMonthly:          jest.fn().mockReturnValue(of(mockGroupMonthly)),
+    getGroupCategorySummary:  jest.fn().mockReturnValue(of(mockGroupCategorySummary)),
+    getGroupIssuerRisk:       jest.fn().mockReturnValue(of(mockGroupIssuerRisk)),
+    getGroupIndexerSummary:   jest.fn().mockReturnValue(of(mockGroupIndexerSummary)),
+    getGroupLiquiditySummary: jest.fn().mockReturnValue(of(mockGroupLiquiditySummary)),
   };
 }
 
@@ -177,6 +206,10 @@ describe('DashboardComponent', () => {
       expect(dashboardServiceSpy.getIndexerSummary).toHaveBeenCalled();
     });
 
+    it('should call getLiquiditySummary on init', () => {
+      expect(dashboardServiceSpy.getLiquiditySummary).toHaveBeenCalled();
+    });
+
     it('should call loadMyGroups$ on init', () => {
       expect(groupServiceSpy.loadMyGroups$).toHaveBeenCalled();
     });
@@ -187,6 +220,18 @@ describe('DashboardComponent', () => {
 
     it('should default groupSection to summary', () => {
       expect(component.groupSection()).toBe('summary');
+    });
+
+    it('should initialize categoryStartDate as a valid date string', () => {
+      expect(component.categoryStartDate()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should initialize categoryEndDate as a valid date string', () => {
+      expect(component.categoryEndDate()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('categoryStartDate should be earlier than categoryEndDate', () => {
+      expect(component.categoryStartDate() < component.categoryEndDate()).toBe(true);
     });
   });
 
@@ -313,7 +358,7 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── hasMonthlyData / hasExpenseData / hasIncomeData ──────────────────────
+  // ─── data availability signals ────────────────────────────────────────────
 
   describe('data availability signals', () => {
     beforeEach(() => setup());
@@ -336,7 +381,7 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── issuerRiskData / hasIssuerRiskData ───────────────────────────────────
+  // ─── issuerRiskData ───────────────────────────────────────────────────────
 
   describe('issuerRiskData', () => {
     beforeEach(() => setup());
@@ -359,7 +404,7 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── indexerData / hasIndexerData ─────────────────────────────────────────
+  // ─── indexerData ──────────────────────────────────────────────────────────
 
   describe('indexerData', () => {
     beforeEach(() => setup());
@@ -379,6 +424,55 @@ describe('DashboardComponent', () => {
 
     it('should set isLoadingIndexer to false after load', () => {
       expect(component.isLoadingIndexer()).toBe(false);
+    });
+  });
+
+  // ─── liquidityData (individual) ───────────────────────────────────────────
+
+  describe('liquidityData', () => {
+    beforeEach(() => setup());
+
+    it('should populate liquidityData on init', () => {
+      expect(component.liquidityData()).toEqual(mockLiquiditySummary);
+    });
+
+    it('hasLiquidityData should be true when data exists', () => {
+      expect(component.hasLiquidityData()).toBe(true);
+    });
+
+    it('hasLiquidityData should be false when data is empty', () => {
+      component.liquidityData.set([]);
+      expect(component.hasLiquidityData()).toBe(false);
+    });
+
+    it('should set isLoadingLiquidity to false after load', () => {
+      expect(component.isLoadingLiquidity()).toBe(false);
+    });
+  });
+
+  // ─── liquidityTypeLabels ──────────────────────────────────────────────────
+
+  describe('liquidityTypeLabels', () => {
+    beforeEach(() => setup());
+
+    it('should translate DIARIA', () => {
+      expect(component.liquidityTypeLabels['DIARIA']).toBe('Diária');
+    });
+
+    it('should translate NO_VENCIMENTO', () => {
+      expect(component.liquidityTypeLabels['NO_VENCIMENTO']).toBe('No vencimento');
+    });
+
+    it('should translate MERCADO', () => {
+      expect(component.liquidityTypeLabels['MERCADO']).toBe('Mercado secundário');
+    });
+
+    it('should translate PRAZO_FIXO', () => {
+      expect(component.liquidityTypeLabels['PRAZO_FIXO']).toBe('Prazo fixo');
+    });
+
+    it('should translate PREVIDENCIARIA', () => {
+      expect(component.liquidityTypeLabels['PREVIDENCIARIA']).toBe('Previdenciária');
     });
   });
 
@@ -408,8 +502,21 @@ describe('DashboardComponent', () => {
   describe('loadCategoryData()', () => {
     beforeEach(() => setup());
 
+    it('should call getCategorySummary with categoryStartDate and categoryEndDate', () => {
+      component.categoryStartDate.set('2025-01-01');
+      component.categoryEndDate.set('2025-03-31');
+      component.loadCategoryData();
+      const [start, end] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
+      expect(start).toBe('2025-01-01');
+      expect(end).toBe('2025-03-31');
+    });
+
     it('should populate categoryData on success', () => {
       expect(component.categoryData()).toEqual(mockCategorySummary);
+    });
+
+    it('should set isLoadingCategory to false after success', () => {
+      expect(component.isLoadingCategory()).toBe(false);
     });
 
     it('should set errorMessage on getDashboard failure', () => {
@@ -423,9 +530,9 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── date selectors ───────────────────────────────────────────────────────
+  // ─── Date selectors — individual ──────────────────────────────────────────
 
-  describe('date selectors', () => {
+  describe('date selectors — individual', () => {
     beforeEach(() => setup());
 
     it('onLineStartDateChange should update lineStartDate and call loadMonthly', () => {
@@ -442,6 +549,36 @@ describe('DashboardComponent', () => {
       component.onLineEndDateChange(event);
       expect(component.lineEndDate()).toBe('2025-06-30');
       expect(dashboardServiceSpy.getMonthly.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onCategoryStartDateChange should update categoryStartDate and call loadCategoryData', () => {
+      const callsBefore = dashboardServiceSpy.getCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-01-01' } } as unknown as Event;
+      component.onCategoryStartDateChange(event);
+      expect(component.categoryStartDate()).toBe('2025-01-01');
+      expect(dashboardServiceSpy.getCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onCategoryEndDateChange should update categoryEndDate and call loadCategoryData', () => {
+      const callsBefore = dashboardServiceSpy.getCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-12-31' } } as unknown as Event;
+      component.onCategoryEndDateChange(event);
+      expect(component.categoryEndDate()).toBe('2025-12-31');
+      expect(dashboardServiceSpy.getCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onCategoryStartDateChange should pass updated date to getCategorySummary', () => {
+      const event = { target: { value: '2024-06-01' } } as unknown as Event;
+      component.onCategoryStartDateChange(event);
+      const [start] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
+      expect(start).toBe('2024-06-01');
+    });
+
+    it('onCategoryEndDateChange should pass updated date to getCategorySummary', () => {
+      const event = { target: { value: '2024-09-30' } } as unknown as Event;
+      component.onCategoryEndDateChange(event);
+      const [, end] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
+      expect(end).toBe('2024-09-30');
     });
   });
 
@@ -464,11 +601,17 @@ describe('DashboardComponent', () => {
       expect(dashboardServiceSpy.getGroupCategorySummary).toHaveBeenCalled();
     });
 
-    it('should call getGroupIssuerRisk and getGroupIndexerSummary on group select', () => {
+    it('should call getGroupIssuerRisk and getGroupIndexerSummary', () => {
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
       expect(dashboardServiceSpy.getGroupIssuerRisk).toHaveBeenCalledWith(10);
       expect(dashboardServiceSpy.getGroupIndexerSummary).toHaveBeenCalledWith(10);
+    });
+
+    it('should call getGroupLiquiditySummary', () => {
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(dashboardServiceSpy.getGroupLiquiditySummary).toHaveBeenCalledWith(10);
     });
 
     it('should reset groupIssuerRiskData and groupIndexerData before loading', () => {
@@ -480,19 +623,91 @@ describe('DashboardComponent', () => {
       expect(component.groupIndexerData()).toBeNull();
     });
 
-    it('should reset selectedMemberIds to empty before loading', () => {
+    it('should repopulate selectedMemberIds from group response', () => {
       component.selectedMemberIds.set([1, 2]);
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
       expect(component.selectedMemberIds()).toEqual([mockUser1.id, mockUser2.id]);
     });
 
-    it('should reset dates to defaults when switching group', () => {
+    it('should reset groupLineStartDate and groupLineEndDate to defaults', () => {
       component.groupLineStartDate.set('2020-01-01');
       component.groupLineEndDate.set('2020-12-31');
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
       expect(component.groupLineStartDate()).not.toBe('2020-01-01');
+      expect(component.groupLineEndDate()).not.toBe('2020-12-31');
+    });
+
+    it('should reset groupCategoryStartDate to default', () => {
+      component.groupCategoryStartDate.set('2020-01-01');
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(component.groupCategoryStartDate()).not.toBe('2020-01-01');
+    });
+
+    it('should reset groupCategoryEndDate to default', () => {
+      component.groupCategoryEndDate.set('2020-12-31');
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(component.groupCategoryEndDate()).not.toBe('2020-12-31');
+    });
+  });
+
+  // ─── Date selectors — grupo ───────────────────────────────────────────────
+
+  describe('date selectors — group', () => {
+    beforeEach(() => {
+      setup();
+      component.selectedGroupId.set(10);
+    });
+
+    it('onGroupCategoryStartDateChange should update groupCategoryStartDate and reload', () => {
+      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-01-01' } } as unknown as Event;
+      component.onGroupCategoryStartDateChange(event);
+      expect(component.groupCategoryStartDate()).toBe('2025-01-01');
+      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onGroupCategoryEndDateChange should update groupCategoryEndDate and reload', () => {
+      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-12-31' } } as unknown as Event;
+      component.onGroupCategoryEndDateChange(event);
+      expect(component.groupCategoryEndDate()).toBe('2025-12-31');
+      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onGroupCategoryStartDateChange should not call service when no group selected', () => {
+      component.selectedGroupId.set(null);
+      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-01-01' } } as unknown as Event;
+      component.onGroupCategoryStartDateChange(event);
+      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBe(callsBefore);
+    });
+
+    it('onGroupCategoryEndDateChange should not call service when no group selected', () => {
+      component.selectedGroupId.set(null);
+      const callsBefore = dashboardServiceSpy.getGroupCategorySummary.mock.calls.length;
+      const event = { target: { value: '2025-12-31' } } as unknown as Event;
+      component.onGroupCategoryEndDateChange(event);
+      expect(dashboardServiceSpy.getGroupCategorySummary.mock.calls.length).toBe(callsBefore);
+    });
+
+    it('onGroupLineStartDateChange should update groupLineStartDate and reload', () => {
+      const callsBefore = dashboardServiceSpy.getGroupMonthly.mock.calls.length;
+      const event = { target: { value: '2024-01-01' } } as unknown as Event;
+      component.onGroupLineStartDateChange(event);
+      expect(component.groupLineStartDate()).toBe('2024-01-01');
+      expect(dashboardServiceSpy.getGroupMonthly.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('onGroupLineEndDateChange should update groupLineEndDate and reload', () => {
+      const callsBefore = dashboardServiceSpy.getGroupMonthly.mock.calls.length;
+      const event = { target: { value: '2025-01-31' } } as unknown as Event;
+      component.onGroupLineEndDateChange(event);
+      expect(component.groupLineEndDate()).toBe('2025-01-31');
+      expect(dashboardServiceSpy.getGroupMonthly.mock.calls.length).toBeGreaterThan(callsBefore);
     });
   });
 
@@ -695,15 +910,13 @@ describe('DashboardComponent', () => {
       expect(component.filteredIssuerRiskMembers()[0].user.id).toBe(mockUser1.id);
     });
 
-    it('should aggregate issuer risk across selected members ignoring null', () => {
-      // user2 has null — aggregation should only contain user1's data
-      const members = component.filteredIssuerRiskMembers();
-      const nonNull = members.filter(m => m.issuerRisk !== null);
+    it('should aggregate issuer risk ignoring null members', () => {
+      const nonNull = component.filteredIssuerRiskMembers().filter(m => m.issuerRisk !== null);
       const totalBancoA = nonNull.flatMap(m => m.issuerRisk!).find(i => i.legalEntityName === 'Banco A')?.totalCurrentValue;
       expect(totalBancoA).toBe(3000);
     });
 
-    it('should merge same legalEntityName across multiple members', () => {
+    it('should include both members when same legalEntityName across multiple', () => {
       component.groupIssuerRiskData.set({
         members: [
           { user: mockUser1, issuerRisk: [{ legalEntityName: 'Banco A', totalCurrentValue: 1000 }] },
@@ -711,8 +924,6 @@ describe('DashboardComponent', () => {
         ],
       });
       component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
-      // The aggregation (done inside renderGroupIssuerRiskChart) should sum to 1500
-      // We test the filteredIssuerRiskMembers are both included
       expect(component.filteredIssuerRiskMembers().length).toBe(2);
     });
   });
@@ -744,7 +955,7 @@ describe('DashboardComponent', () => {
     it('groupMembersNotSharingIndexer should be 0 when all share', () => {
       component.groupIndexerData.set({
         members: [
-          { user: mockUser1, indexerSummary: [{ indexer: 'CDI', totalCurrentValue: 2000 }] },
+          { user: mockUser1, indexerSummary: [{ indexer: 'CDI',  totalCurrentValue: 2000 }] },
           { user: mockUser2, indexerSummary: [{ indexer: 'IPCA', totalCurrentValue: 1000 }] },
         ],
       });
@@ -757,35 +968,89 @@ describe('DashboardComponent', () => {
       expect(component.filteredIndexerMembers()[0].user.id).toBe(mockUser1.id);
     });
 
-    it('should exclude null indexerSummary from aggregation', () => {
+    it('should exclude null indexerSummary from non-null filter', () => {
       const nonNull = component.filteredIndexerMembers().filter(m => m.indexerSummary !== null);
       expect(nonNull.length).toBe(1);
       expect(nonNull[0].user.id).toBe(mockUser1.id);
     });
   });
 
-  // ─── Group date selectors ─────────────────────────────────────────────────
+  // ─── Group liquidity summary ──────────────────────────────────────────────
 
-  describe('group date selectors', () => {
+  describe('group liquidity summary', () => {
     beforeEach(() => {
       setup();
-      component.selectedGroupId.set(10);
+      component.groupLiquidityData.set(mockGroupLiquiditySummary);
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
     });
 
-    it('onGroupLineStartDateChange should update groupLineStartDate and reload', () => {
-      const callsBefore = dashboardServiceSpy.getGroupMonthly.mock.calls.length;
-      const event = { target: { value: '2024-01-01' } } as unknown as Event;
-      component.onGroupLineStartDateChange(event);
-      expect(component.groupLineStartDate()).toBe('2024-01-01');
-      expect(dashboardServiceSpy.getGroupMonthly.mock.calls.length).toBeGreaterThan(callsBefore);
+    it('groupHasLiquidityData should be true when at least one member has data', () => {
+      expect(component.groupHasLiquidityData()).toBe(true);
     });
 
-    it('onGroupLineEndDateChange should update groupLineEndDate and reload', () => {
-      const callsBefore = dashboardServiceSpy.getGroupMonthly.mock.calls.length;
-      const event = { target: { value: '2025-01-31' } } as unknown as Event;
-      component.onGroupLineEndDateChange(event);
-      expect(component.groupLineEndDate()).toBe('2025-01-31');
-      expect(dashboardServiceSpy.getGroupMonthly.mock.calls.length).toBeGreaterThan(callsBefore);
+    it('groupHasLiquidityData should be false when all members have null liquidityTypeSummary', () => {
+      component.groupLiquidityData.set({
+        members: [
+          { user: mockUser1, liquidityTypeSummary: null },
+          { user: mockUser2, liquidityTypeSummary: null },
+        ],
+      });
+      expect(component.groupHasLiquidityData()).toBe(false);
+    });
+
+    it('groupMembersNotSharingLiquidity should count members with null liquidityTypeSummary', () => {
+      component.groupLiquidityData.set({
+        members: [
+          { user: mockUser1, liquidityTypeSummary: [{ liquidityType: 'DIARIA', totalCurrentValue: 1000 }] },
+          { user: mockUser2, liquidityTypeSummary: null },
+        ],
+      });
+      expect(component.groupMembersNotSharingLiquidity()).toBe(1);
+    });
+
+    it('groupMembersNotSharingLiquidity should be 0 when all share', () => {
+      component.groupLiquidityData.set({
+        members: [
+          { user: mockUser1, liquidityTypeSummary: [{ liquidityType: 'DIARIA',  totalCurrentValue: 1000 }] },
+          { user: mockUser2, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 2000 }] },
+        ],
+      });
+      expect(component.groupMembersNotSharingLiquidity()).toBe(0);
+    });
+
+    it('filteredLiquidityMembers should respect selectedMemberIds', () => {
+      component.selectedMemberIds.set([mockUser1.id]);
+      expect(component.filteredLiquidityMembers().length).toBe(1);
+      expect(component.filteredLiquidityMembers()[0].user.id).toBe(mockUser1.id);
+    });
+
+    it('filteredLiquidityMembers should include all selected members', () => {
+      expect(component.filteredLiquidityMembers().length).toBe(2);
+    });
+
+    it('should aggregate same liquidityType totals across members', () => {
+      component.groupLiquidityData.set({
+        members: [
+          { user: mockUser1, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 71234.14 }] },
+          { user: mockUser2, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 89726.21 }] },
+        ],
+      });
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+      const members = component.filteredLiquidityMembers().filter(m => m.liquidityTypeSummary !== null);
+      const totalMercado = members
+        .flatMap(m => m.liquidityTypeSummary!)
+        .filter(i => i.liquidityType === 'MERCADO')
+        .reduce((sum, i) => sum + i.totalCurrentValue, 0);
+      expect(totalMercado).toBeCloseTo(160960.35, 1);
+    });
+
+    it('should set isLoadingGroupLiquidity to false after load', () => {
+      expect(component.isLoadingGroupLiquidity()).toBe(false);
+    });
+
+    it('filteredLiquidityMembers should return empty array when no group data', () => {
+      component.groupLiquidityData.set(null);
+      expect(component.filteredLiquidityMembers()).toEqual([]);
     });
   });
 

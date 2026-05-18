@@ -27,6 +27,9 @@ import {
   IndexerSummaryDto,
   CategoryAmountDto,
   UserDto,
+  LiquiditySummaryDto,
+  GroupLiquiditySummaryResponseDto,
+  GroupMemberLiquiditySummaryDto,
 } from '../../core/services/dashboard.service';
 import { GroupService } from '../../core/services/group.service';
 import { normalizeType } from '../../core/utils/pocket.utils';
@@ -72,6 +75,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.renderIssuerRiskChart();
         this.renderIndexerChart();
+        this.renderLiquidityChart();
       }, 0);
     }
   }
@@ -82,6 +86,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.renderGroupIssuerRiskChart();
         this.renderGroupIndexerChart();
+        this.renderGroupLiquidityChart();
       }, 0);
     }
   }
@@ -135,6 +140,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '#60a5fa', '#f472b6', '#34d399', '#fb923c',
   ];
 
+  readonly liquidityTypeLabels: Record<string, string> = {
+    DIARIA:         'Diária',
+    MERCADO:        'Mercado secundário',
+    NO_VENCIMENTO:  'No vencimento',
+    PRAZO_FIXO:     'Prazo fixo',
+    PREVIDENCIARIA: 'Previdenciária',
+  };
+
   // ════════════════════════════════════════════════════════════════════
   // INDIVIDUAL TAB
   // ════════════════════════════════════════════════════════════════════
@@ -185,18 +198,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly hasIssuerRiskData = computed(() => this.issuerRiskData().length > 0);
   readonly hasIndexerData    = computed(() => this.indexerData().length > 0);
 
+  readonly isLoadingLiquidity = signal(false);
+  readonly liquidityData      = signal<LiquiditySummaryDto[]>([]);
+  readonly hasLiquidityData   = computed(() => this.liquidityData().length > 0);
+
   // Individual canvas refs
   @ViewChild('lineChartCanvas')    lineChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('expenseChartCanvas') expenseChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('incomeChartCanvas')  incomeChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('issuerRiskCanvas')   issuerRiskCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('indexerCanvas')      indexerCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('liquidityCanvas')      liquidityCanvas!: ElementRef<HTMLCanvasElement>;
 
   private lineChart: Chart | null       = null;
   private expenseChart: Chart | null    = null;
   private incomeChart: Chart | null     = null;
   private issuerRiskChart: Chart | null = null;
   private indexerChart: Chart | null    = null;
+  private liquidityChart: Chart | null      = null;
 
   // ════════════════════════════════════════════════════════════════════
   // GROUP TAB
@@ -353,18 +372,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.filteredIndexerMembers().some(m => (m.indexerSummary?.length ?? 0) > 0)
   );
 
+  readonly isLoadingGroupLiquidity = signal(false);
+  readonly groupLiquidityData      = signal<GroupLiquiditySummaryResponseDto | null>(null);
+
+  readonly filteredLiquidityMembers = computed(() => {
+    const data = this.groupLiquidityData();
+    const ids  = this.selectedMemberIds();
+    if (!data) return [];
+    return data.members.filter(m => ids.includes(m.user.id));
+  });
+
+  readonly groupHasLiquidityData = computed(() =>
+    this.filteredLiquidityMembers().some(m => (m.liquidityTypeSummary?.length ?? 0) > 0)
+  );
+
+  readonly groupMembersNotSharingLiquidity = computed(() =>
+    this.filteredLiquidityMembers().filter(m => m.liquidityTypeSummary === null).length
+  );
+
   // Group canvas refs
   @ViewChild('groupLineChartCanvas')    groupLineChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('groupExpenseChartCanvas') groupExpenseChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('groupIncomeChartCanvas')  groupIncomeChartCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('groupIssuerRiskCanvas')   groupIssuerRiskCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('groupIndexerCanvas')      groupIndexerCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('groupLiquidityCanvas')    groupLiquidityCanvas!: ElementRef<HTMLCanvasElement>;
 
   private groupLineChart: Chart | null       = null;
   private groupExpenseChart: Chart | null    = null;
   private groupIncomeChart: Chart | null     = null;
   private groupIssuerRiskChart: Chart | null = null;
   private groupIndexerChart: Chart | null    = null;
+  private groupLiquidityChart: Chart | null = null;
 
   // ── Effects ───────────────────────────────────────────────────────
   constructor() {
@@ -387,6 +426,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.filteredIndexerMembers();
       this.renderGroupIndexerChart();
     });
+
+    effect(() => {
+      this.filteredLiquidityMembers();
+      this.renderGroupLiquidityChart();
+    });
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────
@@ -397,6 +441,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadCategoryData();
     this.loadIssuerRisk();
     this.loadIndexerSummary();
+    this.loadLiquiditySummary();
   }
 
   ngOnDestroy(): void {
@@ -410,6 +455,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.groupIncomeChart?.destroy();
     this.groupIssuerRiskChart?.destroy();
     this.groupIndexerChart?.destroy();
+    this.liquidityChart?.destroy();
+    this.groupLiquidityChart?.destroy();
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -478,6 +525,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadLiquiditySummary(): void {
+    this.isLoadingLiquidity.set(true);
+    this.dashboardService.getLiquiditySummary().subscribe({
+      next: data => {
+        this.liquidityData.set(data);
+        this.isLoadingLiquidity.set(false);
+        this.renderLiquidityChart();
+      },
+      error: () => this.isLoadingLiquidity.set(false),
+    });
+  }
+
   onLineStartDateChange(event: Event): void {
     this.lineStartDate.set((event.target as HTMLInputElement).value);
     this.loadMonthly();
@@ -519,6 +578,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.groupCategoryData.set(null);
     this.groupIssuerRiskData.set(null);
     this.groupIndexerData.set(null);
+    this.groupLiquidityData.set(null);
     this.groupErrorMessage.set(null);
 
     this.loadGroupDashboard(groupId);
@@ -526,6 +586,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadGroupCategoryData(groupId);
     this.loadGroupIssuerRisk(groupId);
     this.loadGroupIndexerSummary(groupId);
+    this.loadGroupLiquiditySummary(groupId);
   }
 
   toggleMember(id: number): void {
@@ -564,11 +625,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (groupId) this.loadGroupCategoryData(groupId);
   }
 
-onGroupCategoryEndDateChange(event: Event): void {
-  this.groupCategoryEndDate.set((event.target as HTMLInputElement).value);
-  const groupId = this.selectedGroupId();
-  if (groupId) this.loadGroupCategoryData(groupId);
-}
+  onGroupCategoryEndDateChange(event: Event): void {
+    this.groupCategoryEndDate.set((event.target as HTMLInputElement).value);
+    const groupId = this.selectedGroupId();
+    if (groupId) this.loadGroupCategoryData(groupId);
+  }
 
   private loadGroupDashboard(groupId: number): void {
     this.isLoadingGroupDashboard.set(true);
@@ -626,6 +687,17 @@ onGroupCategoryEndDateChange(event: Event): void {
         this.isLoadingGroupIndexer.set(false);
       },
       error: () => this.isLoadingGroupIndexer.set(false),
+    });
+  }
+
+  private loadGroupLiquiditySummary(groupId: number): void {
+    this.isLoadingGroupLiquidity.set(true);
+    this.dashboardService.getGroupLiquiditySummary(groupId).subscribe({
+      next: data => {
+        this.groupLiquidityData.set(data);
+        this.isLoadingGroupLiquidity.set(false);
+      },
+      error: () => this.isLoadingGroupLiquidity.set(false),
     });
   }
 
@@ -786,6 +858,36 @@ onGroupCategoryEndDateChange(event: Event): void {
       : null;
   }
 
+  private renderLiquidityChart(): void {
+    const canvas = this.liquidityCanvas?.nativeElement;
+    if (!canvas) return;
+
+    this.liquidityChart?.destroy();
+    this.liquidityChart = this.liquidityData().length > 0
+      ? new Chart(canvas, {
+          type: 'pie',
+          data: this.buildLiquidityPieData(this.liquidityData()),
+          options: this.pieChartOptions(),
+        })
+      : null;
+  }
+
+  private renderGroupLiquidityChart(): void {
+    const canvas = this.groupLiquidityCanvas?.nativeElement;
+    if (!canvas) return;
+
+    const aggregated = this.aggregateLiquiditySummary(this.filteredLiquidityMembers());
+
+    this.groupLiquidityChart?.destroy();
+    this.groupLiquidityChart = aggregated.length > 0
+      ? new Chart(canvas, {
+          type: 'pie',
+          data: this.buildLiquidityPieData(aggregated),
+          options: this.pieChartOptions(),
+        })
+      : null;
+  }
+
   // ── Dataset builders ──────────────────────────────────────────────
   private incomeDataset(data: number[]): ChartConfiguration['data']['datasets'][0] {
     return {
@@ -840,6 +942,18 @@ onGroupCategoryEndDateChange(event: Event): void {
   private buildPieData(items: IndexerSummaryDto[]): ChartConfiguration['data'] {
     return {
       labels: items.map(i => i.indexer),
+      datasets: [{
+        data: items.map(i => i.totalCurrentValue),
+        backgroundColor: items.map((_, idx) => this.pieColors[idx % this.pieColors.length] + 'cc'),
+        borderColor:     items.map((_, idx) => this.pieColors[idx % this.pieColors.length]),
+        borderWidth: 2,
+      }],
+    };
+  }
+
+  private buildLiquidityPieData(items: LiquiditySummaryDto[]): ChartConfiguration['data'] {
+    return {
+      labels: items.map(i => this.liquidityTypeLabels[i.liquidityType] ?? i.liquidityType),
       datasets: [{
         data: items.map(i => i.totalCurrentValue),
         backgroundColor: items.map((_, idx) => this.pieColors[idx % this.pieColors.length] + 'cc'),
@@ -990,6 +1104,19 @@ onGroupCategoryEndDateChange(event: Event): void {
       }
     }
     return Array.from(map.entries()).map(([indexer, totalCurrentValue]) => ({ indexer, totalCurrentValue }));
+  }
+
+  private aggregateLiquiditySummary(
+    members: { liquidityTypeSummary: LiquiditySummaryDto[] | null }[]
+  ): LiquiditySummaryDto[] {
+    const map = new Map<string, number>();
+    for (const m of members) {
+      if (m.liquidityTypeSummary === null) continue;
+      for (const item of m.liquidityTypeSummary) {
+        map.set(item.liquidityType, (map.get(item.liquidityType) ?? 0) + item.totalCurrentValue);
+      }
+    }
+    return Array.from(map.entries()).map(([liquidityType, totalCurrentValue]) => ({ liquidityType, totalCurrentValue }));
   }
 
   // ── Date helpers ──────────────────────────────────────────────────
