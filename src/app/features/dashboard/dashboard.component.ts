@@ -30,6 +30,8 @@ import {
   LiquiditySummaryDto,
   GroupLiquiditySummaryResponseDto,
   GroupMemberLiquiditySummaryDto,
+  GroupMemberNetProfitDto,
+  GroupNetProfitResponseDto,
 } from '../../core/services/dashboard.service';
 import { GroupService } from '../../core/services/group.service';
 import { normalizeType } from '../../core/utils/pocket.utils';
@@ -135,6 +137,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     PREVIDENCIA: 'Previdência',
   };
 
+  private readonly investmentSortOrder: Record<string, number> = {
+    RENDA_FIXA:  0,
+    PREVIDENCIA: 1,
+  };
+
   private readonly pieColors = [
     '#19e5a8', '#a78bfa', '#ff6b6b', '#fbbf24',
     '#60a5fa', '#f472b6', '#34d399', '#fb923c',
@@ -157,6 +164,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly isLoadingCategory   = signal(false);
   readonly isLoadingIssuerRisk = signal(false);
   readonly isLoadingIndexer    = signal(false);
+  readonly isLoadingLiquidity = signal(false);
+  readonly isLoadingNetProfit = signal(false);
   readonly errorMessage        = signal<string | null>(null);
 
   readonly dashboardData  = signal<DashboardDto | null>(null);
@@ -164,6 +173,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly categoryData   = signal<DashboardCategorySummaryDto | null>(null);
   readonly issuerRiskData = signal<IssuerRiskDto[]>([]);
   readonly indexerData    = signal<IndexerSummaryDto[]>([]);
+  readonly liquidityData      = signal<LiquiditySummaryDto[]>([]);
+  readonly netProfitData      = signal<number | null>(null);
 
   readonly lineStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
   readonly lineEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
@@ -182,10 +193,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   );
 
   readonly investmentRows = computed(() =>
-    (this.dashboardData()?.investments ?? []).map(i => ({
-      label: this.investmentLabelMap[i.category] ?? i.category,
-      total: i.total,
-    }))
+    (this.dashboardData()?.investments ?? [])
+      .slice()
+      .sort((a, b) => (this.investmentSortOrder[a.category] ?? 99) - (this.investmentSortOrder[b.category] ?? 99))
+      .map(i => ({
+        label: this.investmentLabelMap[i.category] ?? i.category,
+        total: i.total,
+      }))
   );
 
   readonly investmentTotal = computed(() =>
@@ -197,9 +211,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly hasIncomeData   = computed(() => (this.categoryData()?.incomes.length  ?? 0) > 0);
   readonly hasIssuerRiskData = computed(() => this.issuerRiskData().length > 0);
   readonly hasIndexerData    = computed(() => this.indexerData().length > 0);
-
-  readonly isLoadingLiquidity = signal(false);
-  readonly liquidityData      = signal<LiquiditySummaryDto[]>([]);
   readonly hasLiquidityData   = computed(() => this.liquidityData().length > 0);
 
   // Individual canvas refs
@@ -231,6 +242,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly isLoadingGroupCategory     = signal(false);
   readonly isLoadingGroupIssuerRisk   = signal(false);
   readonly isLoadingGroupIndexer      = signal(false);
+  readonly isLoadingGroupLiquidity = signal(false);
+  readonly isLoadingGroupNetProfit = signal(false);
   readonly groupErrorMessage          = signal<string | null>(null);
 
   readonly groupDashboardData  = signal<GroupDashboardDto | null>(null);
@@ -238,6 +251,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly groupCategoryData   = signal<GroupCategorySummaryResponseDto | null>(null);
   readonly groupIssuerRiskData = signal<GroupIssuerRiskResponseDto | null>(null);
   readonly groupIndexerData    = signal<GroupIndexerSummaryResponseDto | null>(null);
+  readonly groupLiquidityData      = signal<GroupLiquiditySummaryResponseDto | null>(null);
+  readonly groupNetProfitData      = signal<GroupNetProfitResponseDto | null>(null);
 
   readonly groupLineStartDate = signal<string>(DashboardComponent.defaultLineRange().start);
   readonly groupLineEndDate   = signal<string>(DashboardComponent.defaultLineRange().end);
@@ -313,7 +328,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         totals.set(label, (totals.get(label) ?? 0) + i.total);
       }
     }
-    return Array.from(totals.entries()).map(([label, total]) => ({ label, total }));
+    const order = Object.values(this.investmentLabelMap);
+    return Array.from(totals.entries())
+      .map(([label, total]) => ({ label, total }))
+      .sort((a, b) => (order.indexOf(a.label) ?? 99) - (order.indexOf(b.label) ?? 99));
   });
 
   readonly groupInvestmentTotal = computed(() =>
@@ -372,9 +390,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.filteredIndexerMembers().some(m => (m.indexerSummary?.length ?? 0) > 0)
   );
 
-  readonly isLoadingGroupLiquidity = signal(false);
-  readonly groupLiquidityData      = signal<GroupLiquiditySummaryResponseDto | null>(null);
-
   readonly filteredLiquidityMembers = computed(() => {
     const data = this.groupLiquidityData();
     const ids  = this.selectedMemberIds();
@@ -389,6 +404,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly groupMembersNotSharingLiquidity = computed(() =>
     this.filteredLiquidityMembers().filter(m => m.liquidityTypeSummary === null).length
   );
+
+  readonly groupNetProfit = computed(() => {
+    const data = this.groupNetProfitData();
+    const ids  = this.selectedMemberIds();
+    if (!data) return null;
+    return data.members
+      .filter(m => ids.includes(m.user.id))
+      .reduce((sum, m) => sum + (m.netProfit ?? 0), 0);
+  });
+
+  readonly groupMembersNotSharingNetProfit = computed(() => {
+    const data = this.groupNetProfitData();
+    const ids  = this.selectedMemberIds();
+    if (!data) return 0;
+    return data.members.filter(m => ids.includes(m.user.id) && m.netProfit === null).length;
+  });
 
   // Group canvas refs
   @ViewChild('groupLineChartCanvas')    groupLineChartCanvas!: ElementRef<HTMLCanvasElement>;
@@ -442,6 +473,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadIssuerRisk();
     this.loadIndexerSummary();
     this.loadLiquiditySummary();
+    this.loadNetProfit();
   }
 
   ngOnDestroy(): void {
@@ -537,6 +569,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadNetProfit(): void {
+    this.isLoadingNetProfit.set(true);
+    this.dashboardService.getNetProfit().subscribe({
+      next: data => {
+        this.netProfitData.set(data);
+        this.isLoadingNetProfit.set(false);
+      },
+      error: () => this.isLoadingNetProfit.set(false),
+    });
+  }
+
   onLineStartDateChange(event: Event): void {
     this.lineStartDate.set((event.target as HTMLInputElement).value);
     this.loadMonthly();
@@ -579,6 +622,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.groupIssuerRiskData.set(null);
     this.groupIndexerData.set(null);
     this.groupLiquidityData.set(null);
+    this.groupNetProfitData.set(null);
     this.groupErrorMessage.set(null);
 
     this.loadGroupDashboard(groupId);
@@ -587,6 +631,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadGroupIssuerRisk(groupId);
     this.loadGroupIndexerSummary(groupId);
     this.loadGroupLiquiditySummary(groupId);
+    this.loadGroupNetProfit(groupId);
   }
 
   toggleMember(id: number): void {
@@ -698,6 +743,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.isLoadingGroupLiquidity.set(false);
       },
       error: () => this.isLoadingGroupLiquidity.set(false),
+    });
+  }
+
+  private loadGroupNetProfit(groupId: number): void {
+    this.isLoadingGroupNetProfit.set(true);
+    this.dashboardService.getGroupNetProfit(groupId).subscribe({
+      next: data => {
+        this.groupNetProfitData.set(data);
+        this.isLoadingGroupNetProfit.set(false);
+      },
+      error: () => this.isLoadingGroupNetProfit.set(false),
     });
   }
 

@@ -205,6 +205,23 @@
     <!-- ── Seção: Investimentos ── -->
     <div [class.section--hidden]="individualSection() !== 'investments'">
 
+        <div class="summary-card summary-card--bills" style="margin-bottom: 1.25rem;">
+          <div class="summary-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            <span class="summary-card-title">Lucro líquido</span>
+          </div>
+          @if (isLoadingNetProfit()) {
+            <div class="chart-loading"><span class="spinner-lg"></span></div>
+          } @else {
+            <p class="bills-amount" [style.color]="(netProfitData() ?? 0) >= 0 ? 'var(--accent)' : 'var(--error)'">
+              {{ formatCurrency(netProfitData() ?? 0) }}
+            </p>
+            <p class="bills-hint">Soma do rendimento líquido de todos os investimentos resgatados</p>
+          }
+      </div>
+
       <div class="chart-card" style="margin-bottom: 1.25rem;">
         <div class="chart-card-header">
           <div>
@@ -499,6 +516,26 @@
 
       <!-- ── Seção: Investimentos (grupo) ── -->
       <div [class.section--hidden]="groupSection() !== 'investments'">
+
+          <div class="summary-card summary-card--bills" style="margin-bottom: 1.25rem;">
+            <div class="summary-card-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+              <span class="summary-card-title">Lucro líquido</span>
+            </div>
+            @if (isLoadingGroupNetProfit()) {
+              <div class="chart-loading"><span class="spinner-lg"></span></div>
+            } @else {
+              <p class="bills-amount" [style.color]="(groupNetProfit() ?? 0) >= 0 ? 'var(--accent)' : 'var(--error)'">
+                {{ formatCurrency(groupNetProfit() ?? 0) }}
+              </p>
+              <p class="bills-hint">Soma do rendimento líquido de todos os investimentos resgatados</p>
+              @if (groupMembersNotSharingNetProfit() > 0) {
+                <p class="sharing-notice">{{ groupMembersNotSharingNetProfit() }} membro(s) sem dados de lucro</p>
+              }
+            }
+        </div>
 
         <div class="chart-card" style="margin-bottom: 1.25rem;">
           <div class="chart-card-header">

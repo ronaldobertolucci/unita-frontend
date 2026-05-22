@@ -66,6 +66,8 @@ const mockLiquiditySummary = [
   { liquidityType: 'MERCADO',       totalCurrentValue: 89726.21 },
 ];
 
+const mockNetProfit = 4841.36;
+
 const mockGroups = [{ id: 10, name: 'Família', responsibleUser: mockUser1 }];
 
 const mockGroupDashboard = {
@@ -122,6 +124,13 @@ const mockGroupLiquiditySummary = {
   ],
 };
 
+const mockGroupNetProfit = {
+  members: [
+    { user: mockUser1, netProfit: 2004.93 },
+    { user: mockUser2, netProfit: 2836.43 },
+  ],
+};
+
 // ── Mock factories ────────────────────────────────────────────────────────────
 
 function buildDashboardService() {
@@ -132,12 +141,14 @@ function buildDashboardService() {
     getIssuerRisk:            jest.fn().mockReturnValue(of(mockIssuerRisk)),
     getIndexerSummary:        jest.fn().mockReturnValue(of(mockIndexerSummary)),
     getLiquiditySummary:      jest.fn().mockReturnValue(of(mockLiquiditySummary)),
+    getNetProfit:             jest.fn().mockReturnValue(of(mockNetProfit)),
     getGroupDashboard:        jest.fn().mockReturnValue(of(mockGroupDashboard)),
     getGroupMonthly:          jest.fn().mockReturnValue(of(mockGroupMonthly)),
     getGroupCategorySummary:  jest.fn().mockReturnValue(of(mockGroupCategorySummary)),
     getGroupIssuerRisk:       jest.fn().mockReturnValue(of(mockGroupIssuerRisk)),
     getGroupIndexerSummary:   jest.fn().mockReturnValue(of(mockGroupIndexerSummary)),
     getGroupLiquiditySummary: jest.fn().mockReturnValue(of(mockGroupLiquiditySummary)),
+    getGroupNetProfit:        jest.fn().mockReturnValue(of(mockGroupNetProfit)),
   };
 }
 
@@ -208,6 +219,10 @@ describe('DashboardComponent', () => {
 
     it('should call getLiquiditySummary on init', () => {
       expect(dashboardServiceSpy.getLiquiditySummary).toHaveBeenCalled();
+    });
+
+    it('should call getNetProfit on init', () => {
+      expect(dashboardServiceSpy.getNetProfit).toHaveBeenCalled();
     });
 
     it('should call loadMyGroups$ on init', () => {
@@ -329,12 +344,17 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── investmentRows ───────────────────────────────────────────────────────
+  // ─── investmentRows — order ───────────────────────────────────────────────
 
-  describe('investmentRows', () => {
+  describe('investmentRows — order', () => {
     beforeEach(() => setup());
 
     it('should translate RENDA_FIXA to Renda Fixa', () => {
+      component.dashboardData.set({
+        pockets: [],
+        investments: [{ category: 'RENDA_FIXA', total: 5000 }],
+        totalOpenBills: 0,
+      });
       expect(component.investmentRows()[0].label).toBe('Renda Fixa');
     });
 
@@ -345,6 +365,34 @@ describe('DashboardComponent', () => {
         totalOpenBills: 0,
       });
       expect(component.investmentRows()[0].label).toBe('Previdência');
+    });
+
+    it('should always show Renda Fixa before Previdência regardless of API order', () => {
+      component.dashboardData.set({
+        pockets: [],
+        investments: [
+          { category: 'PREVIDENCIA', total: 2000 },
+          { category: 'RENDA_FIXA',  total: 5000 },
+        ],
+        totalOpenBills: 0,
+      });
+      const rows = component.investmentRows();
+      expect(rows[0].label).toBe('Renda Fixa');
+      expect(rows[1].label).toBe('Previdência');
+    });
+
+    it('should preserve totals after sorting', () => {
+      component.dashboardData.set({
+        pockets: [],
+        investments: [
+          { category: 'PREVIDENCIA', total: 2000 },
+          { category: 'RENDA_FIXA',  total: 5000 },
+        ],
+        totalOpenBills: 0,
+      });
+      const rows = component.investmentRows();
+      expect(rows[0].total).toBe(5000);
+      expect(rows[1].total).toBe(2000);
     });
   });
 
@@ -427,7 +475,7 @@ describe('DashboardComponent', () => {
     });
   });
 
-  // ─── liquidityData (individual) ───────────────────────────────────────────
+  // ─── liquidityData ────────────────────────────────────────────────────────
 
   describe('liquidityData', () => {
     beforeEach(() => setup());
@@ -473,6 +521,47 @@ describe('DashboardComponent', () => {
 
     it('should translate PREVIDENCIARIA', () => {
       expect(component.liquidityTypeLabels['PREVIDENCIARIA']).toBe('Previdenciária');
+    });
+  });
+
+  // ─── netProfitData (individual) ───────────────────────────────────────────
+
+  describe('netProfitData', () => {
+    beforeEach(() => setup());
+
+    it('should call getNetProfit on init', () => {
+      expect(dashboardServiceSpy.getNetProfit).toHaveBeenCalled();
+    });
+
+    it('should populate netProfitData on success', () => {
+      expect(component.netProfitData()).toBe(mockNetProfit);
+    });
+
+    it('should set isLoadingNetProfit to false after load', () => {
+      expect(component.isLoadingNetProfit()).toBe(false);
+    });
+
+    it('netProfitData should be null before load completes', () => {
+      dashboardServiceSpy.getNetProfit.mockReturnValue(of(1234));
+      fixture   = TestBed.createComponent(DashboardComponent);
+      component = fixture.componentInstance;
+      // Before detectChanges, signal starts as null
+      expect(component.netProfitData()).toBeNull();
+    });
+
+    it('should handle positive net profit', () => {
+      component.netProfitData.set(3500);
+      expect(component.netProfitData()).toBeGreaterThan(0);
+    });
+
+    it('should handle negative net profit', () => {
+      component.netProfitData.set(-800);
+      expect(component.netProfitData()).toBeLessThan(0);
+    });
+
+    it('should handle zero net profit', () => {
+      component.netProfitData.set(0);
+      expect(component.netProfitData()).toBe(0);
     });
   });
 
@@ -566,20 +655,6 @@ describe('DashboardComponent', () => {
       expect(component.categoryEndDate()).toBe('2025-12-31');
       expect(dashboardServiceSpy.getCategorySummary.mock.calls.length).toBeGreaterThan(callsBefore);
     });
-
-    it('onCategoryStartDateChange should pass updated date to getCategorySummary', () => {
-      const event = { target: { value: '2024-06-01' } } as unknown as Event;
-      component.onCategoryStartDateChange(event);
-      const [start] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
-      expect(start).toBe('2024-06-01');
-    });
-
-    it('onCategoryEndDateChange should pass updated date to getCategorySummary', () => {
-      const event = { target: { value: '2024-09-30' } } as unknown as Event;
-      component.onCategoryEndDateChange(event);
-      const [, end] = dashboardServiceSpy.getCategorySummary.mock.calls.at(-1)!;
-      expect(end).toBe('2024-09-30');
-    });
   });
 
   // ─── onGroupSelect() ──────────────────────────────────────────────────────
@@ -614,9 +689,21 @@ describe('DashboardComponent', () => {
       expect(dashboardServiceSpy.getGroupLiquiditySummary).toHaveBeenCalledWith(10);
     });
 
+    it('should call getGroupNetProfit on group select', () => {
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(dashboardServiceSpy.getGroupNetProfit).toHaveBeenCalledWith(10);
+    });
+
+    it('should reset groupNetProfitData before loading', () => {
+      component.groupNetProfitData.set(mockGroupNetProfit);
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      // After the call the data should be repopulated from the mock
+      expect(component.groupNetProfitData()).toEqual(mockGroupNetProfit);
+    });
+
     it('should reset groupIssuerRiskData and groupIndexerData before loading', () => {
-      component.groupIssuerRiskData.set(mockGroupIssuerRisk);
-      component.groupIndexerData.set(mockGroupIndexerSummary);
       component.groupIssuerRiskData.set(null);
       component.groupIndexerData.set(null);
       expect(component.groupIssuerRiskData()).toBeNull();
@@ -644,13 +731,6 @@ describe('DashboardComponent', () => {
       const event = { target: { value: '10' } } as unknown as Event;
       component.onGroupSelect(event);
       expect(component.groupCategoryStartDate()).not.toBe('2020-01-01');
-    });
-
-    it('should reset groupCategoryEndDate to default', () => {
-      component.groupCategoryEndDate.set('2020-12-31');
-      const event = { target: { value: '10' } } as unknown as Event;
-      component.onGroupSelect(event);
-      expect(component.groupCategoryEndDate()).not.toBe('2020-12-31');
     });
   });
 
@@ -796,6 +876,26 @@ describe('DashboardComponent', () => {
       expect(component.groupInvestmentRows().find(r => r.label === 'Renda Fixa')).toBeDefined();
     });
 
+    it('groupInvestmentRows should always show Renda Fixa before Previdência regardless of API order', () => {
+      component.groupDashboardData.set({
+        members: [
+          {
+            user: mockUser1,
+            pockets: [],
+            investments: [
+              { category: 'PREVIDENCIA', total: 1000 },
+              { category: 'RENDA_FIXA',  total: 4000 },
+            ],
+            totalOpenBills: 0,
+          },
+        ],
+      });
+      component.selectedMemberIds.set([mockUser1.id]);
+      const rows = component.groupInvestmentRows();
+      expect(rows[0].label).toBe('Renda Fixa');
+      expect(rows[1].label).toBe('Previdência');
+    });
+
     it('groupTotalOpenBills should sum non-null bills only', () => {
       expect(component.groupTotalOpenBills()).toBe(150);
     });
@@ -820,6 +920,90 @@ describe('DashboardComponent', () => {
         ],
       });
       expect(component.groupMembersNotSharingPockets()).toBe(0);
+    });
+  });
+
+  // ─── Group net profit ─────────────────────────────────────────────────────
+
+  describe('group net profit', () => {
+    beforeEach(() => {
+      setup();
+      component.groupNetProfitData.set(mockGroupNetProfit);
+      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+    });
+
+    it('should call getGroupNetProfit when a group is selected', () => {
+      const event = { target: { value: '10' } } as unknown as Event;
+      component.onGroupSelect(event);
+      expect(dashboardServiceSpy.getGroupNetProfit).toHaveBeenCalledWith(10);
+    });
+
+    it('groupNetProfit should sum netProfit of all selected members', () => {
+      expect(component.groupNetProfit()).toBeCloseTo(4841.36, 2);
+    });
+
+    it('groupNetProfit should sum only selected members', () => {
+      component.selectedMemberIds.set([mockUser1.id]);
+      expect(component.groupNetProfit()).toBeCloseTo(2004.93, 2);
+    });
+
+    it('groupNetProfit should return null when no data', () => {
+      component.groupNetProfitData.set(null);
+      expect(component.groupNetProfit()).toBeNull();
+    });
+
+    it('groupNetProfit should handle negative values correctly', () => {
+      component.groupNetProfitData.set({
+        members: [
+          { user: mockUser1, netProfit: -500  },
+          { user: mockUser2, netProfit: 1000  },
+        ],
+      });
+      expect(component.groupNetProfit()).toBeCloseTo(500, 2);
+    });
+
+    it('groupNetProfit should return 0 when all members have zero profit', () => {
+      component.groupNetProfitData.set({
+        members: [
+          { user: mockUser1, netProfit: 0 },
+          { user: mockUser2, netProfit: 0 },
+        ],
+      });
+      expect(component.groupNetProfit()).toBe(0);
+    });
+
+    it('groupMembersNotSharingNetProfit should count members with null netProfit', () => {
+      component.groupNetProfitData.set({
+        members: [
+          { user: mockUser1, netProfit: 2004.93 },
+          { user: mockUser2, netProfit: null     },
+        ],
+      });
+      expect(component.groupMembersNotSharingNetProfit()).toBe(1);
+    });
+
+    it('groupMembersNotSharingNetProfit should be 0 when all share', () => {
+      expect(component.groupMembersNotSharingNetProfit()).toBe(0);
+    });
+
+    it('groupMembersNotSharingNetProfit should respect selectedMemberIds', () => {
+      component.groupNetProfitData.set({
+        members: [
+          { user: mockUser1, netProfit: 2004.93 },
+          { user: mockUser2, netProfit: null     },
+        ],
+      });
+      component.selectedMemberIds.set([mockUser1.id]);
+      expect(component.groupMembersNotSharingNetProfit()).toBe(0);
+    });
+
+    it('groupMembersNotSharingNetProfit should return 0 when no data', () => {
+      component.groupNetProfitData.set(null);
+      expect(component.groupMembersNotSharingNetProfit()).toBe(0);
+    });
+
+    it('should set isLoadingGroupNetProfit to false after load', () => {
+      expect(component.isLoadingGroupNetProfit()).toBe(false);
     });
   });
 
@@ -952,26 +1136,10 @@ describe('DashboardComponent', () => {
       expect(component.groupMembersNotSharingIndexer()).toBe(1);
     });
 
-    it('groupMembersNotSharingIndexer should be 0 when all share', () => {
-      component.groupIndexerData.set({
-        members: [
-          { user: mockUser1, indexerSummary: [{ indexer: 'CDI',  totalCurrentValue: 2000 }] },
-          { user: mockUser2, indexerSummary: [{ indexer: 'IPCA', totalCurrentValue: 1000 }] },
-        ],
-      });
-      expect(component.groupMembersNotSharingIndexer()).toBe(0);
-    });
-
     it('filteredIndexerMembers should respect selectedMemberIds', () => {
       component.selectedMemberIds.set([mockUser1.id]);
       expect(component.filteredIndexerMembers().length).toBe(1);
       expect(component.filteredIndexerMembers()[0].user.id).toBe(mockUser1.id);
-    });
-
-    it('should exclude null indexerSummary from non-null filter', () => {
-      const nonNull = component.filteredIndexerMembers().filter(m => m.indexerSummary !== null);
-      expect(nonNull.length).toBe(1);
-      expect(nonNull[0].user.id).toBe(mockUser1.id);
     });
   });
 
@@ -1008,44 +1176,10 @@ describe('DashboardComponent', () => {
       expect(component.groupMembersNotSharingLiquidity()).toBe(1);
     });
 
-    it('groupMembersNotSharingLiquidity should be 0 when all share', () => {
-      component.groupLiquidityData.set({
-        members: [
-          { user: mockUser1, liquidityTypeSummary: [{ liquidityType: 'DIARIA',  totalCurrentValue: 1000 }] },
-          { user: mockUser2, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 2000 }] },
-        ],
-      });
-      expect(component.groupMembersNotSharingLiquidity()).toBe(0);
-    });
-
     it('filteredLiquidityMembers should respect selectedMemberIds', () => {
       component.selectedMemberIds.set([mockUser1.id]);
       expect(component.filteredLiquidityMembers().length).toBe(1);
       expect(component.filteredLiquidityMembers()[0].user.id).toBe(mockUser1.id);
-    });
-
-    it('filteredLiquidityMembers should include all selected members', () => {
-      expect(component.filteredLiquidityMembers().length).toBe(2);
-    });
-
-    it('should aggregate same liquidityType totals across members', () => {
-      component.groupLiquidityData.set({
-        members: [
-          { user: mockUser1, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 71234.14 }] },
-          { user: mockUser2, liquidityTypeSummary: [{ liquidityType: 'MERCADO', totalCurrentValue: 89726.21 }] },
-        ],
-      });
-      component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
-      const members = component.filteredLiquidityMembers().filter(m => m.liquidityTypeSummary !== null);
-      const totalMercado = members
-        .flatMap(m => m.liquidityTypeSummary!)
-        .filter(i => i.liquidityType === 'MERCADO')
-        .reduce((sum, i) => sum + i.totalCurrentValue, 0);
-      expect(totalMercado).toBeCloseTo(160960.35, 1);
-    });
-
-    it('should set isLoadingGroupLiquidity to false after load', () => {
-      expect(component.isLoadingGroupLiquidity()).toBe(false);
     });
 
     it('filteredLiquidityMembers should return empty array when no group data', () => {

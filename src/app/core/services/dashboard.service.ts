@@ -120,6 +120,15 @@ export interface GroupLiquiditySummaryResponseDto {
   members: GroupMemberLiquiditySummaryDto[];
 }
 
+export interface GroupMemberNetProfitDto {
+  user: UserDto;
+  netProfit: number | null;
+}
+
+export interface GroupNetProfitResponseDto {
+  members: GroupMemberNetProfitDto[];
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -183,5 +192,13 @@ export class DashboardService {
 
   getGroupLiquiditySummary(groupId: number): Observable<GroupLiquiditySummaryResponseDto> {
     return this.http.get<GroupLiquiditySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/liquidity-summary`);
+  }
+
+  getNetProfit(): Observable<number> {
+    return this.http.get<number>(`${this.baseUrl}/dashboard/net-profit`);
+  }
+
+  getGroupNetProfit(groupId: number): Observable<GroupNetProfitResponseDto> {
+    return this.http.get<GroupNetProfitResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/net-profit`);
   }
 }
