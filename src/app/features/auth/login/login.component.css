@@ -323,7 +323,6 @@ form {
 @media (max-width: 480px) {
   :host {
     padding: 1.5rem 1rem;
-    align-items: flex-start;
   }
 
   .card {
