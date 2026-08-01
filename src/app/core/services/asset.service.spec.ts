@@ -101,8 +101,8 @@ describe('AssetService', () => {
   describe('loadAssets()', () => {
     it('should GET /assets and set signal', () => {
       service.loadAssets();
-      http.expectOne(base).flush([mockSummary, mockSummary2]);
-      expect(service.assets()).toEqual([mockSummary, mockSummary2]);
+      http.expectOne(base).flush([mockSummary2, mockSummary]);
+      expect(service.assets()).toEqual([mockSummary2, mockSummary]);
     });
 
     it('should set isLoading to false after success', () => {
