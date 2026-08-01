@@ -149,17 +149,6 @@
 
       <form [formGroup]="refundForm" (ngSubmit)="submitRefund()" novalidate>
 
-        <div class="field" [class.field--invalid]="refDescription.invalid && refDescription.touched">
-          <label for="refDesc">Descrição</label>
-          <input id="refDesc" type="text" formControlName="description" placeholder="Ex: Estorno de compra..." autocomplete="off" />
-          @if (refDescription.invalid && refDescription.touched) {
-            <span class="field-error">
-              @if (refDescription.hasError('required')) { Descrição é obrigatória }
-              @else { Máximo de 255 caracteres }
-            </span>
-          }
-        </div>
-
         <div class="field-row">
           <div class="field" [class.field--invalid]="refAmount.invalid && refAmount.touched">
             <label for="refAmt">Valor (R$)</label>
@@ -178,6 +167,17 @@
               <span class="field-error">Data é obrigatória</span>
             }
           </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="refDescription.invalid && refDescription.touched">
+          <label for="refDesc">Descrição</label>
+          <input id="refDesc" type="text" formControlName="description" placeholder="Ex: Estorno de compra..." autocomplete="off" />
+          @if (refDescription.invalid && refDescription.touched) {
+            <span class="field-error">
+              @if (refDescription.hasError('required')) { Descrição é obrigatória }
+              @else { Máximo de 255 caracteres }
+            </span>
+          }
         </div>
 
         <div class="field">

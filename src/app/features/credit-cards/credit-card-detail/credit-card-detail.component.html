@@ -176,17 +176,6 @@
 
       <form [formGroup]="purchaseStep1Form" (ngSubmit)="submitPurchaseStep1()" novalidate>
 
-        <div class="field" [class.field--invalid]="s1Description.invalid && s1Description.touched">
-          <label for="s1Desc">Descrição</label>
-          <input id="s1Desc" type="text" formControlName="description" placeholder="Ex: Geladeira, Notebook..." autocomplete="off" />
-          @if (s1Description.invalid && s1Description.touched) {
-            <span class="field-error">
-              @if (s1Description.hasError('required')) { Descrição é obrigatória }
-              @else { Máximo de 255 caracteres }
-            </span>
-          }
-        </div>
-
         <div class="field-row">
           <div class="field" [class.field--invalid]="s1TotalValue.invalid && s1TotalValue.touched">
             <label for="s1Value">Valor total (R$)</label>
@@ -208,6 +197,17 @@
               </span>
             }
           </div>
+        </div>
+
+        <div class="field" [class.field--invalid]="s1Description.invalid && s1Description.touched">
+          <label for="s1Desc">Descrição</label>
+          <input id="s1Desc" type="text" formControlName="description" placeholder="Ex: Geladeira, Notebook..." autocomplete="off" />
+          @if (s1Description.invalid && s1Description.touched) {
+            <span class="field-error">
+              @if (s1Description.hasError('required')) { Descrição é obrigatória }
+              @else { Máximo de 255 caracteres }
+            </span>
+          }
         </div>
 
         <div class="field" [class.field--invalid]="s1PurchaseDate.invalid && s1PurchaseDate.touched">
