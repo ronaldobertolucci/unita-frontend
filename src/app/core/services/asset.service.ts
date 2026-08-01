@@ -28,6 +28,19 @@ export class AssetService {
     this.isLoading.set(true);
     this.http.get<AssetSummaryDto[]>(this.base).subscribe({
       next: (data) => {
+        // Ordena o array recebido
+        const sortedData = data.sort((a, b) => {
+          // Ordena primeiro pela propriedade "category"
+          if (a.category < b.category) return -1;
+          if (a.category > b.category) return 1;
+
+          // Depois, desempata pela propriedade "name"
+          if (a.name < b.name) return -1;
+          if (a.name > b.name) return 1;
+
+          return 0;
+        });
+
         this.assets.set(data);
         this.isLoading.set(false);
       },
