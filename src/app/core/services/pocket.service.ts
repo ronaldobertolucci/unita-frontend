@@ -55,6 +55,17 @@ export class PocketService {
         ...p,
         type: normalizeType(p.type),
       }))),
+      map(list => list.sort((a, b) => {
+        // Ordena primeiro pela propriedade "type"
+        if (a.type < b.type) return -1;
+        if (a.type > b.type) return 1;
+
+        // Depois ordena pela propriedade "label"
+        if (a.label < b.label) return -1;
+        if (a.label > b.label) return 1;
+
+        return 0; 
+      })),
       tap(list => this._pockets.set(list))
     );
   }
