@@ -1,21 +1,5 @@
 <div class="page">
 
-  <!-- Cabeçalho -->
-  <div class="page-header">
-    <div class="page-header-text">
-      <h2>Investimentos</h2>
-      <p>Acompanhe seus ativos de renda fixa e previdência</p>
-    </div>
-    <button class="btn-primary btn-primary--sm" (click)="openModal()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-        stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
-      </svg>
-      Novo ativo
-    </button>
-  </div>
-
   <!-- Loading -->
   @if (assetService.isLoading()) {
   <div class="loading-state">
@@ -54,12 +38,6 @@
     </select>
   </div>
   }
-
-  <!-- Total consolidado -->
-  <div class="balance-card">
-    <span class="balance-label">Total consolidado</span>
-    <span class="balance-value">{{ totalConsolidated() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
-  </div>
 
   <!-- Ativos -->
   <div class="assets-list">

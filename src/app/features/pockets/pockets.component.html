@@ -1,20 +1,5 @@
 <div class="page">
 
-  <!-- ─── Cabeçalho ─── -->
-  <div class="page-header">
-    <div class="page-header-text">
-      <h2>Meus Pockets</h2>
-      <p>Gerencie suas contas, carteiras e vínculos financeiros</p>
-    </div>
-    <button class="btn-primary btn-primary--sm" (click)="openCreateModal()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      Novo pocket
-    </button>
-  </div>
-
   <!-- ─── Loading ─── -->
   @if (isLoading()) {
     <div class="loading-state">
@@ -39,12 +24,6 @@
 
   <!-- ─── Conteúdo ─── -->
   @else {
-
-    <!-- Saldo total -->
-    <div class="balance-card">
-      <span class="balance-label">Saldo total consolidado</span>
-      <span class="balance-value">{{ formatCurrency(totalBalance()) }}</span>
-    </div>
 
     <!-- Grid de pockets -->
     <div class="pockets-grid">

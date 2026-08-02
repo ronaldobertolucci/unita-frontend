@@ -94,9 +94,32 @@
     <!-- TOP BAR -->
     <header class="top-bar">
 
-      <h1 class="page-title">{{ pageTitle() }}</h1>
+      <!-- Esquerda: título + subtítulo -->
+      <div class="top-bar-left">
+        <h1 class="page-title">{{ pageTitle() }}</h1>
+        @if (pageContextService.pageSubtitle()) {
+          <p class="top-bar-subtitle">{{ pageContextService.pageSubtitle() }}</p>
+        }
+      </div>
 
       <div class="top-bar-actions">
+
+        <!-- Total consolidado (desktop) -->
+        @if (pageContextService.summaryDisplay()) {
+          <span class="top-bar-summary">{{ pageContextService.summaryDisplay() }}</span>
+          <span class="top-bar-separator" aria-hidden="true"></span>
+        }
+
+        <!-- Botão de ação da página (desktop: completo / mobile: só ícone) -->
+        @if (pageContextService.ctaCallback()) {
+          <button class="top-bar-btn" (click)="triggerCta()" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span class="top-bar-cta-label">{{ pageContextService.ctaLabel() }}</span>
+          </button>
+        }
 
         <!-- Notificações (topbar — visível apenas no mobile) -->
         <button
@@ -148,6 +171,14 @@
 
       </div>
     </header>
+
+    <!-- MOBILE SUMMARY BAR -->
+    @if (pageContextService.summaryDisplay()) {
+      <div class="mobile-summary-bar">
+        <span class="mobile-summary-bar-label">Total consolidado</span>
+        <span class="mobile-summary-bar-value">{{ pageContextService.summaryDisplay() }}</span>
+      </div>
+    }
 
     <!-- CONTEÚDO -->
     <main class="content">

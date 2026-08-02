@@ -37,6 +37,7 @@ import { GroupService } from '../../core/services/group.service';
 import { normalizeType } from '../../core/utils/pocket.utils';
 import { translateApiError } from '../../core/utils/api-error.util';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import { PageContextService } from '../../core/services/page-context.service';
 
 Chart.register(
   CategoryScale, LinearScale,
@@ -61,6 +62,7 @@ type DashboardSection = 'summary' | 'income-expense' | 'investments';
 export class DashboardComponent implements OnInit, OnDestroy {
   private readonly dashboardService = inject(DashboardService);
   private readonly groupService     = inject(GroupService);
+  private pageContextService = inject(PageContextService);
 
   // ── Tabs & Sections ───────────────────────────────────────────────
   readonly activeTab         = signal<DashboardTab>('individual');
@@ -474,6 +476,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadIndexerSummary();
     this.loadLiquiditySummary();
     this.loadNetProfit();
+    this.pageContextService.pageSubtitle.set('Visão geral das suas finanças');
   }
 
   ngOnDestroy(): void {
@@ -489,6 +492,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.groupIndexerChart?.destroy();
     this.liquidityChart?.destroy();
     this.groupLiquidityChart?.destroy();
+    this.pageContextService.clear();
   }
 
   // ════════════════════════════════════════════════════════════════════

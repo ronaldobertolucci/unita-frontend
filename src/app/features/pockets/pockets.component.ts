@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PocketService, BANK_ACCOUNT_TYPES, BENEFIT_TYPES } from '../../core/services/pocket.service';
@@ -14,6 +14,7 @@ import {
   LegalEntityEmployerDto,
 } from '../../core/models/pocket.model';
 import { RouterLink } from '@angular/router';
+import { PageContextService } from '../../core/services/page-context.service';
 
 type ModalType =
   | 'create-type-select'
@@ -28,6 +29,13 @@ type ModalType =
   | 'confirm-delete'
   | null;
 
+const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 @Component({
   selector: 'app-pockets',
   standalone: true,
@@ -35,9 +43,10 @@ type ModalType =
   templateUrl: './pockets.component.html',
   styleUrl: './pockets.component.css',
 })
-export class PocketsComponent implements OnInit {
+export class PocketsComponent implements OnInit, OnDestroy {
   private readonly pocketService = inject(PocketService);
   private readonly fb = inject(FormBuilder);
+  private pageContextService = inject(PageContextService);
 
   // ─── Estado da página ────────────────────────────────────────────────────
 
@@ -132,6 +141,19 @@ export class PocketsComponent implements OnInit {
   get fgtsEmployerId() { return this.fgtsForm.get('employerId')!; }
   get fgtsAdmissionDate() { return this.fgtsForm.get('admissionDate')!; }
 
+  // ── Construtor: sincroniza total com o contexto de página ─────────────────
+  constructor() {
+    effect(() => {
+      const loading = this.isLoading();
+      const hasPockets = this.pocketService.pockets().length > 0;
+      const total = this.totalBalance();
+
+      this.pageContextService.summaryDisplay.set(
+        !loading && hasPockets ? CURRENCY_FORMATTER.format(total) : null
+      );
+    }, { allowSignalWrites: true });
+  }
+
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
@@ -139,6 +161,14 @@ export class PocketsComponent implements OnInit {
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
+
+    this.pageContextService.pageSubtitle.set('Gerencie suas contas, carteiras e vínculos financeiros');
+    this.pageContextService.ctaLabel.set('Novo pocket');
+    this.pageContextService.ctaCallback.set(() => this.openCreateModal());
+  }
+
+  ngOnDestroy(): void {
+    this.pageContextService.clear();
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────

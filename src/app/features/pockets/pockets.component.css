@@ -4,28 +4,6 @@
   margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.page-header-text h2 {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-  letter-spacing: -0.2px;
-}
-
-.page-header-text p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
 /* ─── Loading ─── */
 .loading-state {
   display: flex;
@@ -86,34 +64,6 @@
   max-width: 340px;
   line-height: 1.6;
   margin-bottom: 0.5rem;
-}
-
-/* ─── Card de saldo total ─── */
-.balance-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 1.4rem 1.6rem;
-  background: linear-gradient(135deg, rgba(25, 229, 168, 0.08) 0%, rgba(79, 70, 229, 0.08) 100%);
-  border: 1px solid var(--accent-glow);
-  border-radius: 20px;
-  margin-bottom: 1.5rem;
-}
-
-.balance-label {
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.balance-value {
-  font-family: var(--font-display);
-  font-size: 1.9rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
 }
 
 /* ─── Grid de pockets ─── */
@@ -259,12 +209,6 @@
 .btn-primary svg { width: 16px; height: 16px; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
 .btn-primary:disabled { opacity: 0.65; cursor: not-allowed; }
-
-.btn-primary--sm {
-  height: 36px;
-  font-size: 0.825rem;
-  padding: 0 0.9rem;
-}
 
 .btn-secondary {
   display: inline-flex;
@@ -755,16 +699,6 @@
 
 /* ─── Responsividade ─── */
 @media (max-width: 480px) {
-  .page-header {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .btn-primary--sm {
-    width: 100%;
-    justify-content: center;
-  }
-
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
@@ -800,10 +734,6 @@
 
   .detail-item:last-child:nth-child(odd) {
     grid-column: auto;
-  }
-
-  .balance-value {
-    font-size: 1.5rem;
   }
 
   .modal-actions--between {

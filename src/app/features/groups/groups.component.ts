@@ -1,8 +1,9 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { GroupService } from '../../core/services/group.service';
 import { GroupDto } from '../../core/models/group.model';
+import { PageContextService } from '../../core/services/page-context.service';
 
 @Component({
   selector: 'app-groups',
@@ -11,10 +12,11 @@ import { GroupDto } from '../../core/models/group.model';
   templateUrl: './groups.component.html',
   styleUrl: './groups.component.css',
 })
-export class GroupsComponent implements OnInit {
+export class GroupsComponent implements OnInit, OnDestroy {
   private readonly groupService = inject(GroupService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private pageContextService = inject(PageContextService);
 
   readonly groups = this.groupService.myGroups;
   readonly isLoading = this.groupService.loading;
@@ -33,6 +35,13 @@ export class GroupsComponent implements OnInit {
 
   ngOnInit(): void {
     this.groupService.loadMyGroups();
+    this.pageContextService.pageSubtitle.set('Gerencie seus grupos e colabore com sua família');
+    this.pageContextService.ctaLabel.set('Novo grupo');
+    this.pageContextService.ctaCallback.set(() => this.openModal());
+  }
+
+  ngOnDestroy(): void {
+    this.pageContextService.clear();
   }
 
   openModal(): void {

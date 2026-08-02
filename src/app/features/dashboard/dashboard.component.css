@@ -4,28 +4,6 @@
   margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.page-header-text h2 {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-  letter-spacing: -0.2px;
-}
-
-.page-header-text p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
 /* ─── Abas ─── */
 .tabs { margin-bottom: 1.5rem; }
 
@@ -513,8 +491,4 @@
   .chart-filter { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
   .chart-filter--dates .date-fields { flex-direction: column; align-items: flex-start; }
   .member-filter { flex-direction: column; align-items: flex-start; }
-}
-
-@media (max-width: 480px) {
-  .page-header { flex-direction: column; gap: 0.75rem; }
 }

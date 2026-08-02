@@ -270,12 +270,14 @@
    TOP BAR
 ───────────────────────────────────────────────────────── */
 .top-bar {
-  height: 60px;
+  min-height: 60px;
+  height: auto;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.5rem;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(8, 15, 33, 0.6);
   backdrop-filter: blur(12px);
@@ -284,19 +286,97 @@
   z-index: 10;
 }
 
+/* Esquerda: título + subtítulo */
+.top-bar-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
 .page-title {
   font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.2px;
+  line-height: 1.2;
 }
 
+.top-bar-subtitle {
+  font-size: 0.775rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+/* Direita: ações */
 .top-bar-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   position: relative;
+  flex-shrink: 0;
+}
+
+/* Total consolidado (desktop) */
+.top-bar-summary {
+  font-family: var(--font-display);
+  font-size: 0.975rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
+/* Separador vertical entre total e botão */
+.top-bar-separator {
+  display: block;
+  width: 1px;
+  height: 18px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* Botão de ação de página */
+.top-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 0.9rem;
+  background: var(--accent);
+  color: #060b17;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+
+.top-bar-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.top-bar-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+/* Rótulo do botão: visível apenas no desktop */
+.top-bar-cta-label {
+  /* visível por padrão; escondido via media query no mobile */
 }
 
 /* Botão ícone no topbar (só visível no mobile — no desktop é a sidebar que mostra) */
@@ -304,7 +384,7 @@
   position: relative;
   width: 36px;
   height: 36px;
-  display: none; /* mostrado via media query */
+  display: none;
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.04);
@@ -333,12 +413,19 @@
   padding: 0;
   border-radius: 50%;
   line-height: 0;
-  display: none; /* mostrado via media query */
+  display: none;
   transition: opacity 0.15s ease;
 }
 
 .avatar-btn:hover {
   opacity: 0.85;
+}
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE SUMMARY BAR
+───────────────────────────────────────────────────────── */
+.mobile-summary-bar {
+  display: none;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -369,7 +456,7 @@
    BOTTOM NAVBAR
 ───────────────────────────────────────────────────────── */
 .bottom-nav {
-  display: none; /* mostrado via media query */
+  display: none;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -443,7 +530,6 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Sidebar: painel posicionado à direita da sidebar */
 .notif-panel--sidebar {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -453,7 +539,6 @@
   z-index: 50;
 }
 
-/* Topbar: painel posicionado abaixo do botão */
 .notif-panel--topbar {
   position: absolute;
   top: calc(100% + 12px);
@@ -461,7 +546,6 @@
   z-index: 50;
 }
 
-/* Mobile: painel posicionado acima da bottom nav */
 .notif-panel--mobile {
   position: fixed;
   bottom: 72px;
@@ -495,7 +579,6 @@
   border-radius: 99px;
 }
 
-/* Loading */
 .notif-loading {
   display: flex;
   justify-content: center;
@@ -514,7 +597,6 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Empty state */
 .notif-empty {
   display: flex;
   flex-direction: column;
@@ -534,7 +616,6 @@
   font-size: 0.85rem;
 }
 
-/* Lista */
 .notif-list {
   list-style: none;
   max-height: 360px;
@@ -733,11 +814,64 @@
 
   .content {
     padding: 1.25rem 1rem;
-    padding-bottom: calc(64px + 1.25rem); /* espaço para bottom nav */
+    padding-bottom: calc(64px + 1.25rem);
   }
 
   .top-bar {
+    min-height: 60px;
+    height: 60px;
     padding: 0 1rem;
+  }
+
+  /* Barra de total consolidado: filho direto do flex column, sem gap */
+  .mobile-summary-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 0.7rem 1rem;
+    background: linear-gradient(135deg, rgba(25, 229, 168, 0.08) 0%, rgba(79, 70, 229, 0.08) 100%);
+    border-bottom: 1px solid var(--accent-glow);
+  }
+
+  .mobile-summary-bar-label {
+    font-size: 0.73rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .mobile-summary-bar-value {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+  }
+
+  /* No mobile, a top-bar volta a ser linha única: oculta subtítulo e total */
+  .top-bar-subtitle {
+    display: none;
+  }
+
+  .top-bar-summary,
+  .top-bar-separator {
+    display: none;
+  }
+
+  /* Botão CTA: compacto (só ícone) */
+  .top-bar-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    box-shadow: none;
+    border-radius: 10px;
+  }
+
+  .top-bar-cta-label {
+    display: none;
   }
 }
 

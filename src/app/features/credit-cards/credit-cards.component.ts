@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,6 +8,7 @@ import { LegalEntityService } from '../../core/services/legal-entity.service';
 import { translateApiError } from '../../core/utils/api-error.util';
 import { CreditCardDto, CardBrandDto } from '../../core/models/credit-card.model';
 import { LegalEntityDto } from '../../core/models/legal-entity.model';
+import { PageContextService } from '../../core/services/page-context.service';
 
 type ModalType = 'create' | 'detail' | 'confirm-update' | 'confirm-delete' | null;
 
@@ -18,10 +19,11 @@ type ModalType = 'create' | 'detail' | 'confirm-update' | 'confirm-delete' | nul
   templateUrl: './credit-cards.component.html',
   styleUrl: './credit-cards.component.css',
 })
-export class CreditCardsComponent implements OnInit {
+export class CreditCardsComponent implements OnInit, OnDestroy {
   private readonly creditCardService = inject(CreditCardService);
   private readonly legalEntityService = inject(LegalEntityService);
   private readonly fb = inject(FormBuilder);
+  private pageContextService = inject(PageContextService);
 
   // ─── Estado da página ────────────────────────────────────────────────────
 
@@ -75,6 +77,14 @@ export class CreditCardsComponent implements OnInit {
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
+
+    this.pageContextService.pageSubtitle.set('Gerencie seus cartões, faturas e compras');
+    this.pageContextService.ctaLabel.set('Novo cartão');
+    this.pageContextService.ctaCallback.set(() => this.openCreateModal());
+  }
+
+  ngOnDestroy(): void {
+    this.pageContextService.clear();
   }
 
   // ─── Abertura de modais ───────────────────────────────────────────────────

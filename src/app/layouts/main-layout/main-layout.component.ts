@@ -13,6 +13,7 @@ import { filter, map } from 'rxjs/operators';
 import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { PageContextService } from '../../core/services/page-context.service';
 
 export interface NavItem {
   label: string;
@@ -99,6 +100,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly router              = inject(Router);
   private readonly elementRef          = inject(ElementRef);
 
+  readonly pageContextService = inject(PageContextService);
+
   readonly navItems         = NAV_ITEMS;
   readonly primaryNavItems  = NAV_ITEMS.filter(i =>  PRIMARY_NAV_PATHS.has(i.path));
   readonly overflowNavItems = NAV_ITEMS.filter(i => !PRIMARY_NAV_PATHS.has(i.path));
@@ -147,6 +150,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     while (current.firstChild) current = current.firstChild;
     const title = current.snapshot.data?.['title'];
     if (title) this.pageTitle.set(title);
+  }
+
+  triggerCta(): void {
+    this.pageContextService.ctaCallback()?.();
   }
 
   toggleNotifications(source: 'sidebar' | 'topbar' | 'mobile'): void {

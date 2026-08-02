@@ -20,11 +20,6 @@ describe('RegistriesComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should render the page title', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h2')?.textContent).toContain('Cadastros');
-  });
-
   it('should render the three sub-nav links', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     const links = compiled.querySelectorAll('a.sub-nav-item');

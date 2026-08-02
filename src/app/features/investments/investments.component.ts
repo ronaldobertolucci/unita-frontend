@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, computed, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import {
@@ -11,10 +11,18 @@ import {
 
 import { AssetService } from '../../core/services/asset.service';
 import { LegalEntityService } from '../../core/services/legal-entity.service';
+import { PageContextService } from '../../core/services/page-context.service';
 import { AssetSummaryDto, AssetCategory } from '../../core/models/asset.model';
 import { translateApiError } from '../../core/utils/api-error.util';
 
 type AssetTab = 'fixed-income' | 'pension';
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 @Component({
   selector: 'app-investments',
@@ -23,9 +31,10 @@ type AssetTab = 'fixed-income' | 'pension';
   templateUrl: './investments.component.html',
   styleUrl: './investments.component.css',
 })
-export class InvestmentsComponent implements OnInit {
+export class InvestmentsComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private pageContextService = inject(PageContextService);
 
   readonly assetService = inject(AssetService);
   readonly legalEntityService = inject(LegalEntityService);
@@ -100,11 +109,32 @@ export class InvestmentsComponent implements OnInit {
     this.activeAssets().reduce((sum, a) => sum + a.currentValue, 0)
   );
 
+  // ── Construtor: sincroniza total com o contexto de página ─────────────────
+  constructor() {
+    effect(() => {
+      const loading  = this.assetService.isLoading();
+      const hasAssets = this.assetService.assets().length > 0;
+      const total    = this.totalConsolidated();
+
+      this.pageContextService.summaryDisplay.set(
+        !loading && hasAssets ? CURRENCY_FORMATTER.format(total) : null
+      );
+    }, { allowSignalWrites: true });
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.assetService.loadAssets();
     this.legalEntityService.loadLegalEntities().subscribe();
     this.buildForms();
+
+    this.pageContextService.pageSubtitle.set('Acompanhe seus ativos de renda fixa e previdência');
+    this.pageContextService.ctaLabel.set('Novo ativo');
+    this.pageContextService.ctaCallback.set(() => this.openModal());
+  }
+
+  ngOnDestroy(): void {
+    this.pageContextService.clear();
   }
 
   // ── Helpers de exibição ───────────────────────────────────────────────────
@@ -179,7 +209,7 @@ export class InvestmentsComponent implements OnInit {
         indexer,
         annualRate: Number(annualRate),
         maturityDate,
-        liquidityType,   // ← novo
+        liquidityType,
         taxFree: !!taxFree,
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
@@ -235,7 +265,7 @@ export class InvestmentsComponent implements OnInit {
       indexer:                ['', Validators.required],
       annualRate:             ['', [Validators.required, Validators.min(0)]],
       maturityDate:           ['', Validators.required],
-      liquidityType:          ['', Validators.required],  // ← novo
+      liquidityType:          ['', Validators.required],
       taxFree:                [false],
       custodianLegalEntityId: [null],
     });

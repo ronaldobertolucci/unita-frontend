@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TransferService } from '../../core/services/transfer.service';
@@ -7,6 +7,7 @@ import { GroupService } from '../../core/services/group.service';
 import { AuthService } from '../../core/services/auth.service';
 import { translateApiError } from '../../core/utils/api-error.util';
 import { GroupPocketDto } from '../../core/services/transfer.service';
+import { PageContextService } from '../../core/services/page-context.service';
 
 type TransferTab = 'own' | 'group' | 'fgts';
 
@@ -17,12 +18,13 @@ type TransferTab = 'own' | 'group' | 'fgts';
   templateUrl: './transfers.component.html',
   styleUrl: './transfers.component.css',
 })
-export class TransfersComponent implements OnInit {
+export class TransfersComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly transferService = inject(TransferService);
   private readonly pocketService = inject(PocketService);
   private readonly groupService = inject(GroupService);
   private readonly authService = inject(AuthService);
+  private pageContextService = inject(PageContextService);
 
   // ── Estado ──────────────────────────────────────────────────────
   readonly activeTab = signal<TransferTab>('own');
@@ -125,6 +127,12 @@ export class TransfersComponent implements OnInit {
     this.ownForm.get('sourcePocketId')!.valueChanges.subscribe(val => {
       this.selectedSourceId.set(Number(val));
     });
+
+    this.pageContextService.pageSubtitle.set('Mova valores entre seus pockets ou para membros de um grupo');
+  }
+
+  ngOnDestroy(): void {
+    this.pageContextService.clear();
   }
 
   // ── Ações ────────────────────────────────────────────────────────
