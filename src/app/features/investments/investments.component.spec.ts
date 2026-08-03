@@ -2,9 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, LOCALE_ID } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
-import { of, throwError } from 'rxjs';
+import { of, throwError, BehaviorSubject } from 'rxjs';
 import { RouterTestingModule } from '@angular/router/testing';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 
 registerLocaleData(localePt, 'pt-BR');
 
@@ -107,10 +107,12 @@ describe('InvestmentsComponent', () => {
   let assetServiceSpy: ReturnType<typeof buildAssetService>;
   let legalEntityServiceSpy: ReturnType<typeof buildLegalEntityService>;
   let router: Router;
+  let queryParamsSubject: BehaviorSubject<any>;
 
   function setup(assets: AssetSummaryDto[] = [], entities: LegalEntityDto[] = []) {
     assetServiceSpy = buildAssetService(assets);
     legalEntityServiceSpy = buildLegalEntityService(entities);
+    queryParamsSubject = new BehaviorSubject(convertToParamMap({}));
 
     TestBed.configureTestingModule({
       imports: [InvestmentsComponent, RouterTestingModule],
@@ -118,6 +120,12 @@ describe('InvestmentsComponent', () => {
         { provide: AssetService, useValue: assetServiceSpy },
         { provide: LegalEntityService, useValue: legalEntityServiceSpy },
         { provide: LOCALE_ID, useValue: 'pt-BR' },
+        { 
+          provide: ActivatedRoute, 
+          useValue: { 
+            queryParamMap: queryParamsSubject.asObservable() 
+          } 
+        }
       ],
     });
 
@@ -183,7 +191,8 @@ describe('InvestmentsComponent', () => {
 
     it('should filter by selectedCustodianName', () => {
       setup([mockAsset, mockAssetMatured, mockAssetRedeemed]);
-      component.selectedCustodianName.set('Custodiante A');
+      queryParamsSubject.next(convertToParamMap({ custodian: 'Custodiante A' }));
+      
       // mockAsset has custodianA, mockAssetMatured has custodianB
       const result = component.activeAssets();
       expect(result.length).toBe(1);
@@ -192,8 +201,9 @@ describe('InvestmentsComponent', () => {
 
     it('should show all active assets when custodian filter is reset to null', () => {
       setup([mockAsset, mockAssetMatured]);
-      component.selectedCustodianName.set('Custodiante A');
-      component.selectedCustodianName.set(null);
+      queryParamsSubject.next(convertToParamMap({ custodian: 'Custodiante A' }));
+      queryParamsSubject.next(convertToParamMap({ custodian: null }));
+      
       expect(component.activeAssets().length).toBe(2);
     });
   });
@@ -219,7 +229,8 @@ describe('InvestmentsComponent', () => {
         custodianLegalEntityName: 'Custodiante B',
       };
       setup([mockAssetRedeemed, redeemedB]);
-      component.selectedCustodianName.set('Custodiante A');
+      queryParamsSubject.next(convertToParamMap({ custodian: 'Custodiante A' }));
+      
       expect(component.redeemedAssets().length).toBe(1);
       expect(component.redeemedAssets()[0].custodianLegalEntityName).toBe('Custodiante A');
     });
@@ -284,7 +295,8 @@ describe('InvestmentsComponent', () => {
     });
 
     it('should filter both active and redeemed sections simultaneously', () => {
-      component.selectedCustodianName.set('Custodiante A');
+      queryParamsSubject.next(convertToParamMap({ custodian: 'Custodiante A' }));
+      
       // active: only mockAsset (Custodiante A), not mockAssetMatured (Custodiante B)
       expect(component.activeAssets().length).toBe(1);
       // redeemed: mockAssetRedeemed (Custodiante A)
@@ -292,7 +304,8 @@ describe('InvestmentsComponent', () => {
     });
 
     it('should return empty sections when custodian has no matching assets', () => {
-      component.selectedCustodianName.set('Custodiante Inexistente');
+      queryParamsSubject.next(convertToParamMap({ custodian: 'Custodiante Inexistente' }));
+      
       expect(component.activeAssets()).toEqual([]);
       expect(component.redeemedAssets()).toEqual([]);
     });
@@ -370,7 +383,10 @@ describe('InvestmentsComponent', () => {
     it('should navigate to /investments/:id', () => {
       const spy = jest.spyOn(router, 'navigate');
       component.openDetail(1);
-      expect(spy).toHaveBeenCalledWith(['/investments', 1]);
+      
+      expect(spy).toHaveBeenCalledWith(['/investments', 1], {
+        queryParams: { custodian: null }
+      });
     });
   });
 

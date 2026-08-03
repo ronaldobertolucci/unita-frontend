@@ -29,11 +29,10 @@
   <!-- Filtro de custodiante -->
   @if (availableCustodians().length > 0) {
   <div class="custodian-filter">
-    <select class="custodian-select" [value]="selectedCustodianName() ?? ''"
-      (change)="selectedCustodianName.set($any($event.target).value || null)">
-      <option value="">Todas as custodiantes</option>
+    <select class="custodian-select" (change)="setCustodian($any($event.target).value || null)">
+      <option value="" [selected]="!selectedCustodianName()">Todas as custodiantes</option>
       @for (name of availableCustodians(); track name) {
-      <option [value]="name">{{ name }}</option>
+        <option [value]="name" [selected]="selectedCustodianName() === name">{{ name }}</option>
       }
     </select>
   </div>

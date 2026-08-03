@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy, signal, inject, computed, effect } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import {
   ReactiveFormsModule,
@@ -34,6 +36,7 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
 export class InvestmentsComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private pageContextService = inject(PageContextService);
 
   readonly assetService = inject(AssetService);
@@ -75,7 +78,10 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
   };
 
   // ── Filtro de custodiante ─────────────────────────────────────────────────
-  readonly selectedCustodianName = signal<string | null>(null);
+  readonly selectedCustodianName = toSignal(
+    this.route.queryParamMap.pipe(map(params => params.get('custodian'))),
+    { initialValue: null }
+  );
 
   readonly availableCustodians = computed(() => {
     const names = new Set<string>();
@@ -163,7 +169,17 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
 
   // ── Navegação ─────────────────────────────────────────────────────────────
   openDetail(id: number): void {
-    this.router.navigate(['/investments', id]);
+    this.router.navigate(['/investments', id], {
+      queryParams: { custodian: this.selectedCustodianName() || null },
+    });
+  }
+
+  setCustodian(name: string | null): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { custodian: name || null },
+      queryParamsHandling: 'merge',
+    });
   }
 
   // ── Modal ─────────────────────────────────────────────────────────────────

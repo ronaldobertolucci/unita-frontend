@@ -52,6 +52,11 @@ export class InvestmentDetailComponent implements OnInit {
   readonly categoryService = inject(CategoryService);
   readonly pocketService = inject(PocketService);
 
+  // ── Parâmetros de retorno ─────────────────────────────────────────────────
+  readonly backQueryParams = {
+    custodian: this.route.snapshot.queryParamMap.get('custodian'),
+  };
+
   // ── State ─────────────────────────────────────────────────────────────────
   readonly asset = signal<AssetDetailDto | null>(null);
   readonly transactions = signal<InvestmentTransactionDto[]>([]);
@@ -72,21 +77,18 @@ export class InvestmentDetailComponent implements OnInit {
     return ((reference - a.position.totalInvested) / a.position.totalInvested) * 100;
   });
 
-  // FIX 2: valor de referência correto para o card de posição
   readonly displayCurrentValue = computed(() => {
     const a = this.asset();
     if (!a) return 0;
     return a.status === 'REDEEMED' ? a.position.redeemedValue : a.position.currentValue;
   });
 
-  // FIX 3: pockets elegíveis
   readonly eligiblePockets = computed(() =>
     this.pocketService
       .pockets()
       .filter((p) => p.type === 'BANK_ACCOUNT' || p.type === 'CASH'),
   );
 
-  // FIX 4: categorias de sistema pré-definidas por tipo de transação
   private readonly categoryBuy = computed(() =>
     this.categoryService.categories().find((c) => c.name === CATEGORY_BUY),
   );
@@ -109,7 +111,6 @@ export class InvestmentDetailComponent implements OnInit {
     this.assetId = Number(this.route.snapshot.paramMap.get('id'));
     this.loadAll();
 
-    // FIX 1 & 3: sempre recarrega para garantir disponibilidade nos modais
     this.legalEntityService.loadLegalEntities().subscribe();
     this.categoryService.loadCategories().subscribe();
     this.pocketService.loadPockets().subscribe();
@@ -125,7 +126,8 @@ export class InvestmentDetailComponent implements OnInit {
       },
       error: () => {
         this.isLoading.set(false);
-        this.router.navigate(['/investments']);
+        // Retorna para a listagem preservando o filtro
+        this.router.navigate(['/investments'], { queryParams: this.backQueryParams });
       },
     });
   }
@@ -389,7 +391,8 @@ export class InvestmentDetailComponent implements OnInit {
     this.assetService.deleteAsset(this.assetId).subscribe({
       next: () => {
         this.isSaving.set(false);
-        this.router.navigate(['/investments']);
+        // Retorna para a listagem preservando o filtro
+        this.router.navigate(['/investments'], { queryParams: this.backQueryParams });
       },
       error: (err) => {
         this.isSaving.set(false);
@@ -420,7 +423,6 @@ export class InvestmentDetailComponent implements OnInit {
     });
   }
 
-  // FIX 4: categoria pré-definida e desabilitada
   private buildBuyForm(): void {
     const cat = this.categoryBuy();
     this.buyForm = this.fb.group({
@@ -470,7 +472,6 @@ export class InvestmentDetailComponent implements OnInit {
     return form.controls[name];
   }
 
-  // FIX 4: label da categoria pré-definida para exibição no campo desabilitado
   categoryNameFor(type: 'buy' | 'yield' | 'sell'): string {
     if (type === 'buy') return this.categoryBuy()?.name ?? CATEGORY_BUY;
     if (type === 'yield') return this.categoryYield()?.name ?? CATEGORY_YIELD;

@@ -152,7 +152,16 @@ describe('InvestmentDetailComponent', () => {
         { provide: CategoryService,    useValue: categoryServiceSpy    },
         { provide: PocketService,      useValue: pocketServiceSpy      },
         { provide: LegalEntityService, useValue: legalEntityServiceSpy },
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '1' } } } },
+        // ─── MOCK CORRIGIDO AQUI ───
+        { 
+          provide: ActivatedRoute, 
+          useValue: { 
+            snapshot: { 
+              paramMap: { get: () => '1' },
+              queryParamMap: { get: () => null } // Simula a ausência do 'custodian' por padrão
+            } 
+          } 
+        },
         { provide: LOCALE_ID, useValue: 'pt-BR' },
       ],
     });
@@ -192,7 +201,9 @@ describe('InvestmentDetailComponent', () => {
       const spy = jest.spyOn(router, 'navigate');
       fixture = TestBed.createComponent(InvestmentDetailComponent);
       fixture.detectChanges();
-      expect(spy).toHaveBeenCalledWith(['/investments']);
+      
+      // ─── ASSERT CORRIGIDO AQUI ───
+      expect(spy).toHaveBeenCalledWith(['/investments'], { queryParams: { custodian: null } });
     });
   });
 
@@ -548,7 +559,9 @@ describe('InvestmentDetailComponent', () => {
       const spy = jest.spyOn(router, 'navigate');
       component.onDelete();
       expect(assetServiceSpy.deleteAsset).toHaveBeenCalledWith(1);
-      expect(spy).toHaveBeenCalledWith(['/investments']);
+
+      // ─── ASSERT CORRIGIDO AQUI ───
+      expect(spy).toHaveBeenCalledWith(['/investments'], { queryParams: { custodian: null } });
     });
 
     it('should set errorMessage on failure', () => {
