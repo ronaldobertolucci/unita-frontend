@@ -25,10 +25,23 @@
   <!-- ─── Conteúdo ─── -->
   @else {
 
+    <!-- Filtro de tipo -->
+    @if (availableTypes().length > 1) {
+      <div class="type-filter">
+        <select class="type-select" (change)="setType($any($event.target).value || null)">
+          <option value="" [selected]="!selectedType()">Todos os tipos</option>
+          <option value="BANK_ACCOUNT"          [selected]="selectedType() === 'BANK_ACCOUNT'">Conta Bancária</option>
+          <option value="BENEFIT_ACCOUNT"       [selected]="selectedType() === 'BENEFIT_ACCOUNT'">Conta de Benefício</option>
+          <option value="FGTS_EMPLOYER_ACCOUNT" [selected]="selectedType() === 'FGTS_EMPLOYER_ACCOUNT'">FGTS</option>
+          <option value="CASH"                  [selected]="selectedType() === 'CASH'">Carteira</option>
+        </select>
+      </div>
+    }
+
     <!-- Grid de pockets -->
     <div class="pockets-grid">
       @for (pocket of activePockets(); track pocket.id) {
-        <a class="pocket-card" [routerLink]="['/pockets', pocket.id]">
+        <a class="pocket-card" [routerLink]="['/pockets', pocket.id]" [queryParams]="{ type: selectedType() }">
           <div class="pocket-card-icon pocket-card-icon--{{ pocket.type | lowercase }}">
             @if (pocket.type === 'BANK_ACCOUNT') {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -136,11 +149,11 @@
                 </button>
               </div>
             </a>
+          }
+          </div>
+        }
       }
-        </div>
-      }
-    }
-  </div>
+    </div>
   }
 </div>
 

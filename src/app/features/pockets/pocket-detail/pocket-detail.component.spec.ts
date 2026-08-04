@@ -84,7 +84,15 @@ describe('PocketDetailComponent', () => {
         { provide: PocketService, useValue: pocketServiceSpy },
         { provide: TransactionService, useValue: transactionServiceSpy },
         { provide: CategoryService, useValue: categoryServiceSpy },
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => routeId } } } },
+        { 
+          provide: ActivatedRoute, 
+          useValue: { 
+            snapshot: { 
+              paramMap: { get: () => '1' },
+              queryParamMap: { get: () => null } 
+            } 
+          } 
+        }, 
       ],
     });
 
@@ -117,7 +125,7 @@ describe('PocketDetailComponent', () => {
 
     it('should navigate to /pockets if pocket not found', () => {
       setup([{ id: 99, type: 'CASH', label: 'Outro', balance: 0 }], [], '1');
-      expect(routerSpy.navigate).toHaveBeenCalledWith(['/pockets']);
+      expect(routerSpy.navigate).toHaveBeenCalledWith(['/pockets'], { queryParams: { type: null }});
     });
 
     it('should call loadPockets if signal is empty', () => {
@@ -132,7 +140,15 @@ describe('PocketDetailComponent', () => {
           { provide: TransactionService, useValue: buildTransactionService() },
           { provide: CategoryService, useValue: buildCategoryService() },
           { provide: Router, useValue: { navigate: jest.fn() } },
-          { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '1' } } } },
+          { 
+            provide: ActivatedRoute, 
+            useValue: { 
+              snapshot: { 
+                paramMap: { get: () => '1' },
+                queryParamMap: { get: () => null }
+              } 
+            } 
+          },
         ],
       });
       fixture = TestBed.createComponent(PocketDetailComponent);

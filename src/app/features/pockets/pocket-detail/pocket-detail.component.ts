@@ -28,6 +28,12 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
 
   private pocketId!: number;
 
+  // ─── Parâmetros de retorno ────────────────────────────────────────
+  // Preserva o filtro de tipo que veio da listagem via query param.
+  readonly backQueryParams = {
+    type: this.route.snapshot.queryParamMap.get('type'),
+  };
+
   // ─── State ───────────────────────────────────────────────────────
   readonly pocket = signal<PocketSummaryDto | null>(null);
   readonly isLoading = signal(true);
@@ -78,18 +84,18 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       .map(([date, items]) => ({ date, items }));
   });
 
-readonly availableCategories = computed(() => {
-  const excluded = this.createDirection() === 'EXPENSE'
-    ? this.EXPENSE_EXCLUDED
-    : this.INCOME_EXCLUDED;
+  readonly availableCategories = computed(() => {
+    const excluded = this.createDirection() === 'EXPENSE'
+      ? this.EXPENSE_EXCLUDED
+      : this.INCOME_EXCLUDED;
 
-  return this.categoryService.categories()
-    .filter(c =>
-      (c.type === this.createDirection() || c.type === 'NEUTRAL') &&
-      !excluded.has(c.name)
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-});
+    return this.categoryService.categories()
+      .filter(c =>
+        (c.type === this.createDirection() || c.type === 'NEUTRAL') &&
+        !excluded.has(c.name)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  });
 
   // ─── Lifecycle ───────────────────────────────────────────────────
   ngOnInit(): void {
@@ -107,13 +113,19 @@ readonly availableCategories = computed(() => {
 
     const afterPockets = () => {
       const found = this.pocketService.pockets().find(p => p.id === this.pocketId);
-      if (!found) { this.router.navigate(['/pockets']); return; }
+      if (!found) {
+        this.router.navigate(['/pockets'], { queryParams: this.backQueryParams });
+        return;
+      }
       this.pocket.set(found);
 
       if (this.categoryService.categories().length === 0) {
         this.categoryService.loadCategories().subscribe({
           next: () => { this.isLoading.set(false); this.fetchTransactions(); },
-          error: () => { this.isLoading.set(false); this.router.navigate(['/pockets']); }
+          error: () => {
+            this.isLoading.set(false);
+            this.router.navigate(['/pockets'], { queryParams: this.backQueryParams });
+          }
         });
       } else {
         this.isLoading.set(false);
@@ -124,7 +136,10 @@ readonly availableCategories = computed(() => {
     if (this.pocketService.pockets().length === 0) {
       this.pocketService.loadPockets().subscribe({
         next: () => afterPockets(),
-        error: () => { this.isLoading.set(false); this.router.navigate(['/pockets']); }
+        error: () => {
+          this.isLoading.set(false);
+          this.router.navigate(['/pockets'], { queryParams: this.backQueryParams });
+        }
       });
     } else {
       afterPockets();
@@ -277,10 +292,10 @@ readonly availableCategories = computed(() => {
 
   getPocketTypeLabel(type: string | undefined): string {
     const labels: Record<string, string> = {
-      BANK_ACCOUNT: 'Conta Bancária',
-      BENEFIT_ACCOUNT: 'Conta de Benefício',
-      FGTS_EMPLOYER_ACCOUNT: 'FGTS',
-      CASH: 'Carteira'
+      BANK_ACCOUNT:           'Conta Bancária',
+      BENEFIT_ACCOUNT:        'Conta de Benefício',
+      FGTS_EMPLOYER_ACCOUNT:  'FGTS',
+      CASH:                   'Carteira'
     };
     return labels[type ?? ''] ?? '';
   }
@@ -290,8 +305,8 @@ readonly availableCategories = computed(() => {
     return labels[type];
   }
 
-  get amountControl() { return this.createForm.get('amount')!; }
+  get amountControl()      { return this.createForm.get('amount')!; }
   get descriptionControl() { return this.createForm.get('description')!; }
-  get categoryControl() { return this.createForm.get('categoryId')!; }
-  get dateControl() { return this.createForm.get('transactionDate')!; }
+  get categoryControl()    { return this.createForm.get('categoryId')!; }
+  get dateControl()        { return this.createForm.get('transactionDate')!; }
 }

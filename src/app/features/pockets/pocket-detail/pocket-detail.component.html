@@ -11,7 +11,7 @@
 
     <!-- ─── Cabeçalho do pocket ─── -->
     <div class="pocket-header">
-      <a routerLink="/pockets" class="back-link">
+      <a routerLink="/pockets" [queryParams]="backQueryParams" class="back-link">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 12L6 8l4-4"/>
         </svg>

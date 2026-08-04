@@ -1,6 +1,9 @@
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { PocketService, BANK_ACCOUNT_TYPES, BENEFIT_TYPES } from '../../core/services/pocket.service';
 import { translateApiError } from '../../core/utils/api-error.util';
 import {
@@ -13,7 +16,6 @@ import {
   IndividualEmployerDto,
   LegalEntityEmployerDto,
 } from '../../core/models/pocket.model';
-import { RouterLink } from '@angular/router';
 import { PageContextService } from '../../core/services/page-context.service';
 
 type ModalType =
@@ -36,6 +38,13 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 2,
 });
 
+const TYPE_LABELS: Record<PocketType, string> = {
+  BANK_ACCOUNT:           'Conta Bancária',
+  BENEFIT_ACCOUNT:        'Conta de Benefício',
+  FGTS_EMPLOYER_ACCOUNT:  'FGTS',
+  CASH:                   'Carteira',
+};
+
 @Component({
   selector: 'app-pockets',
   standalone: true,
@@ -44,37 +53,67 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
   styleUrl: './pockets.component.css',
 })
 export class PocketsComponent implements OnInit, OnDestroy {
-  private readonly pocketService = inject(PocketService);
-  private readonly fb = inject(FormBuilder);
-  private pageContextService = inject(PageContextService);
+  private readonly pocketService    = inject(PocketService);
+  private readonly fb               = inject(FormBuilder);
+  private readonly route            = inject(ActivatedRoute);
+  private readonly router           = inject(Router);
+  private readonly pageContextService = inject(PageContextService);
+
+  // ─── Filtro de tipo via URL ───────────────────────────────────────────────
+
+  readonly selectedType = toSignal(
+    this.route.queryParamMap.pipe(map(params => params.get('type') as PocketType | null)),
+    { initialValue: null }
+  );
+
+  readonly availableTypes = computed(() => {
+    const types = new Set<PocketType>();
+    for (const p of this.pocketService.pockets()) types.add(p.type);
+    return [...types] as PocketType[];
+  });
+
+  setType(type: string | null): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { type: type || null },
+      queryParamsHandling: 'merge',
+    });
+  }
 
   // ─── Estado da página ────────────────────────────────────────────────────
 
-  readonly isLoading = signal(true);
-  readonly activeModal = signal<ModalType>(null);
-  readonly isSaving = signal(false);
+  readonly isLoading       = signal(true);
+  readonly activeModal     = signal<ModalType>(null);
+  readonly isSaving        = signal(false);
   readonly isLoadingDetail = signal(false);
-  readonly errorMessage = signal<string | null>(null);
+  readonly errorMessage    = signal<string | null>(null);
 
   // ─── Dados de referência ─────────────────────────────────────────────────
 
-  readonly bankAccountTypes = BANK_ACCOUNT_TYPES;
-  readonly benefitTypes = BENEFIT_TYPES;
-  readonly legalEntities = signal<LegalEntityDto[]>([]);
-  readonly individualEmployers = signal<IndividualEmployerDto[]>([]);
-  readonly legalEntityEmployers = signal<LegalEntityEmployerDto[]>([]);
-  readonly isLoadingRef = signal(false);
+  readonly bankAccountTypes      = BANK_ACCOUNT_TYPES;
+  readonly benefitTypes          = BENEFIT_TYPES;
+  readonly legalEntities         = signal<LegalEntityDto[]>([]);
+  readonly individualEmployers   = signal<IndividualEmployerDto[]>([]);
+  readonly legalEntityEmployers  = signal<LegalEntityEmployerDto[]>([]);
+  readonly isLoadingRef          = signal(false);
 
   // ─── Pockets ──────────────────────────────────────────────────────────────
 
   readonly pockets = this.pocketService.pockets;
-  readonly activePockets = computed(() =>
-    this.pockets().filter(p => p.active)
-  );
 
-  readonly inactivePockets = computed(() =>
-    this.pockets().filter(p => !p.active)
-  );
+  readonly activePockets = computed(() => {
+    const type = this.selectedType();
+    return this.pockets()
+      .filter(p => p.active)
+      .filter(p => !type || p.type === type);
+  });
+
+  readonly inactivePockets = computed(() => {
+    const type = this.selectedType();
+    return this.pockets()
+      .filter(p => !p.active)
+      .filter(p => !type || p.type === type);
+  });
 
   readonly inactivePocketsVisible = signal(false);
 
@@ -88,17 +127,17 @@ export class PocketsComponent implements OnInit, OnDestroy {
 
   // ─── Detalhes do pocket selecionado ──────────────────────────────────────
 
-  readonly selectedPocket = signal<PocketSummaryDto | null>(null);
-  readonly bankAccountDetail = signal<BankAccountDto | null>(null);
+  readonly selectedPocket       = signal<PocketSummaryDto | null>(null);
+  readonly bankAccountDetail    = signal<BankAccountDto | null>(null);
   readonly benefitAccountDetail = signal<BenefitAccountDto | null>(null);
-  readonly fgtsDetail = signal<FgtsEmployerAccountDto | null>(null);
+  readonly fgtsDetail           = signal<FgtsEmployerAccountDto | null>(null);
 
   // ─── Formulários ─────────────────────────────────────────────────────────
 
   readonly bankAccountForm = this.fb.group({
-    legalEntityId: [null as number | null, Validators.required],
-    number: ['', [Validators.required, Validators.maxLength(20)]],
-    agency: ['', [Validators.required, Validators.maxLength(10)]],
+    legalEntityId:     [null as number | null, Validators.required],
+    number:            ['', [Validators.required, Validators.maxLength(20)]],
+    agency:            ['', [Validators.required, Validators.maxLength(10)]],
     bankAccountTypeId: [null as number | null, Validators.required],
   });
 
@@ -108,8 +147,8 @@ export class PocketsComponent implements OnInit, OnDestroy {
   });
 
   readonly fgtsForm = this.fb.group({
-    employerType: ['individual' as 'individual' | 'legal-entity'],
-    employerId: [null as number | null, Validators.required],
+    employerType:  ['individual' as 'individual' | 'legal-entity'],
+    employerId:    [null as number | null, Validators.required],
     admissionDate: ['', Validators.required],
     dismissalDate: [''],
   });
@@ -124,29 +163,29 @@ export class PocketsComponent implements OnInit, OnDestroy {
 
   readonly editFgtsForm = this.fb.group({
     dismissalDate: [''],
-    status: ['ACTIVE' as string, Validators.required],
+    status:        ['ACTIVE' as string, Validators.required],
   });
 
   // ─── Getters de controles ─────────────────────────────────────────────────
 
-  get baLegalEntityId() { return this.bankAccountForm.get('legalEntityId')!; }
-  get baNumber() { return this.bankAccountForm.get('number')!; }
-  get baAgency() { return this.bankAccountForm.get('agency')!; }
+  get baLegalEntityId()   { return this.bankAccountForm.get('legalEntityId')!; }
+  get baNumber()          { return this.bankAccountForm.get('number')!; }
+  get baAgency()          { return this.bankAccountForm.get('agency')!; }
   get baBankAccountTypeId() { return this.bankAccountForm.get('bankAccountTypeId')!; }
 
-  get bfLegalEntityId() { return this.benefitAccountForm.get('legalEntityId')!; }
-  get bfBenefitTypeId() { return this.benefitAccountForm.get('benefitTypeId')!; }
+  get bfLegalEntityId()  { return this.benefitAccountForm.get('legalEntityId')!; }
+  get bfBenefitTypeId()  { return this.benefitAccountForm.get('benefitTypeId')!; }
 
   get fgtsEmployerType() { return this.fgtsForm.get('employerType')!; }
-  get fgtsEmployerId() { return this.fgtsForm.get('employerId')!; }
+  get fgtsEmployerId()   { return this.fgtsForm.get('employerId')!; }
   get fgtsAdmissionDate() { return this.fgtsForm.get('admissionDate')!; }
 
-  // ── Construtor: sincroniza total com o contexto de página ─────────────────
+  // ── Construtor: sincroniza total filtrado com o contexto de página ─────────
   constructor() {
     effect(() => {
-      const loading = this.isLoading();
+      const loading   = this.isLoading();
       const hasPockets = this.pocketService.pockets().length > 0;
-      const total = this.totalBalance();
+      const total     = this.totalBalance();
 
       this.pageContextService.summaryDisplay.set(
         !loading && hasPockets ? CURRENCY_FORMATTER.format(total) : null
@@ -183,20 +222,14 @@ export class PocketsComponent implements OnInit, OnDestroy {
   }
 
   getPocketTypeLabel(type: PocketType): string {
-    const labels: Record<PocketType, string> = {
-      BANK_ACCOUNT: 'Conta Bancária',
-      BENEFIT_ACCOUNT: 'Conta de Benefício',
-      FGTS_EMPLOYER_ACCOUNT: 'FGTS',
-      CASH: 'Carteira',
-    };
-    return labels[type];
+    return TYPE_LABELS[type];
   }
 
   getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
-      ACTIVE: 'Ativa',
+      ACTIVE:   'Ativa',
       INACTIVE: 'Inativa',
-      BLOCKED: 'Bloqueada',
+      BLOCKED:  'Bloqueada',
     };
     return labels[status] ?? status;
   }
@@ -315,9 +348,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
       error: () => done(),
     });
     this.pocketService.getLegalEntityEmployers().subscribe({
-      next: list => {
-        this.legalEntityEmployers.set(list); done();
-      },
+      next: list => { this.legalEntityEmployers.set(list); done(); },
       error: () => done(),
     });
   }
@@ -338,20 +369,17 @@ export class PocketsComponent implements OnInit, OnDestroy {
   // ─── Criação ─────────────────────────────────────────────────────────────
 
   createBankAccount(): void {
-    if (this.bankAccountForm.invalid) {
-      this.bankAccountForm.markAllAsTouched();
-      return;
-    }
+    if (this.bankAccountForm.invalid) { this.bankAccountForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
     const v = this.bankAccountForm.value;
     this.pocketService.createBankAccount({
-      legalEntityId: v.legalEntityId!,
-      number: v.number!,
-      agency: v.agency!,
+      legalEntityId:     v.legalEntityId!,
+      number:            v.number!,
+      agency:            v.agency!,
       bankAccountTypeId: v.bankAccountTypeId!,
     }).subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta bancária.'));
@@ -360,10 +388,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   }
 
   createBenefitAccount(): void {
-    if (this.benefitAccountForm.invalid) {
-      this.benefitAccountForm.markAllAsTouched();
-      return;
-    }
+    if (this.benefitAccountForm.invalid) { this.benefitAccountForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
     const v = this.benefitAccountForm.value;
@@ -371,7 +396,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
       legalEntityId: v.legalEntityId!,
       benefitTypeId: v.benefitTypeId!,
     }).subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta de benefício.'));
@@ -380,20 +405,14 @@ export class PocketsComponent implements OnInit, OnDestroy {
   }
 
   createFgts(): void {
-    if (this.fgtsForm.invalid) {
-      this.fgtsForm.markAllAsTouched();
-      return;
-    }
+    if (this.fgtsForm.invalid) { this.fgtsForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
     const v = this.fgtsForm.value;
-    const payload: any = {
-      employerId: v.employerId!,
-      admissionDate: v.admissionDate!,
-    };
+    const payload: any = { employerId: v.employerId!, admissionDate: v.admissionDate! };
     if (v.dismissalDate) payload.dismissalDate = v.dismissalDate;
     this.pocketService.createFgts(payload).subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar vínculo FGTS.'));
@@ -405,7 +424,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
     this.errorMessage.set(null);
     this.pocketService.createCash().subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar carteira.'));
@@ -423,11 +442,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.pocketService.updateBankAccount(id, {
       status: this.editBankAccountForm.value.status as any,
     }).subscribe({
-      next: detail => {
-        this.bankAccountDetail.set(detail);
-        this.isSaving.set(false);
-        this.closeModal();
-      },
+      next: detail => { this.bankAccountDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao atualizar conta.'));
@@ -443,11 +458,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.pocketService.updateBenefitAccount(id, {
       status: this.editBenefitAccountForm.value.status as any,
     }).subscribe({
-      next: detail => {
-        this.benefitAccountDetail.set(detail);
-        this.isSaving.set(false);
-        this.closeModal();
-      },
+      next: detail => { this.benefitAccountDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao atualizar conta.'));
@@ -462,14 +473,10 @@ export class PocketsComponent implements OnInit, OnDestroy {
     const id = this.selectedPocket()!.id;
     const v = this.editFgtsForm.value;
     this.pocketService.updateFgts(id, {
-      status: v.status as any,
+      status:        v.status as any,
       dismissalDate: v.dismissalDate || null,
     }).subscribe({
-      next: detail => {
-        this.fgtsDetail.set(detail);
-        this.isSaving.set(false);
-        this.closeModal();
-      },
+      next: detail => { this.fgtsDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao atualizar FGTS.'));
@@ -486,13 +493,12 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.errorMessage.set(null);
 
     let delete$;
-    if (pocket.type === 'BANK_ACCOUNT') delete$ = this.pocketService.deleteBankAccount(pocket.id);
-    else if (pocket.type === 'BENEFIT_ACCOUNT') delete$ = this.pocketService.deleteBenefitAccount(pocket.id);
-    else delete$ = this.pocketService.deleteFgts(pocket.id);
-    // cash não pode ser deletado
+    if (pocket.type === 'BANK_ACCOUNT')          delete$ = this.pocketService.deleteBankAccount(pocket.id);
+    else if (pocket.type === 'BENEFIT_ACCOUNT')  delete$ = this.pocketService.deleteBenefitAccount(pocket.id);
+    else                                         delete$ = this.pocketService.deleteFgts(pocket.id);
 
     delete$.subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao excluir. Verifique se não há transações vinculadas.'));
