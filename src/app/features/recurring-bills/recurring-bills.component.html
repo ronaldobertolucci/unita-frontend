@@ -1,0 +1,117 @@
+<div class="recurring-page">
+  <p class="intro">Organize compromissos mensais e anuais. Valores e vencimentos são previsões.</p>
+  @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+  @if (success()) { <p class="notice success" role="status">{{ success() }}</p> }
+
+  @if (recovery()?.kind === 'create') {
+    <section class="notice" aria-label="Revisão de cadastro">
+      <p>O cadastro pode ter sido concluído. Consulte todas as páginas da lista e confira se ele já existe antes de cadastrar novamente. Descrições iguais são permitidas.</p>
+      <div class="actions">
+        <button type="button" (click)="checkRecovery()" [disabled]="loadingList()">Consultar cadastros</button>
+        <button type="button" (click)="confirmCreationReview()" [disabled]="!creationChecked() || loadingList()">Revisei a lista</button>
+      </div>
+    </section>
+  }
+
+  <section class="panel" aria-labelledby="upcoming-title">
+    <div class="section-header">
+      <div><h2 id="upcoming-title">Previsões do mês</h2><p>Somente recorrências ativas, com ou sem e-mail.</p></div>
+      <div class="actions">
+        <label for="month">Mês <input id="month" type="month" min="1900-01" max="9998-12" [value]="month()" (change)="changeMonth($any($event.target).value)"></label>
+        <button type="button" (click)="loadUpcoming()" [disabled]="loadingUpcoming()">Atualizar previsões</button>
+      </div>
+    </div>
+    @if (upcomingError()) { <p class="notice error" role="alert">{{ upcomingError() }}</p> }
+    @else if (loadingUpcoming()) { <p role="status" class="empty">Consultando previsões…</p> }
+    @else if (!occurrences().length) { <p class="empty">Nenhum vencimento previsto neste mês.</p> }
+    @else {
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Descrição</th><th scope="col">Vencimento previsto</th><th scope="col">Valor previsto</th></tr></thead>
+        <tbody>@for (item of occurrences(); track item.recurringBillId) {
+          <tr><td>{{ item.description }}</td><td>{{ dateLabel(item.dueDate) }}</td><td>{{ amountLabel(item.expectedAmount) }}</td></tr>
+        }</tbody>
+      </table></div>
+    }
+  </section>
+
+  <section class="panel" aria-labelledby="bills-title">
+    <div class="section-header">
+      <div><h2 id="bills-title">Meus cadastros</h2><p>Uma recorrência pausada continua disponível para edição.</p></div>
+      <div class="actions">
+        <label for="active-filter">Mostrar <select id="active-filter" [value]="filter()" (change)="changeFilter($any($event.target).value)">
+          <option value="all">Todos</option><option value="active">Ativos</option><option value="paused">Pausados</option>
+        </select></label>
+        <button type="button" (click)="loadList(page()?.page ?? 0)" [disabled]="loadingList()">Atualizar lista</button>
+        <button class="primary" type="button" (click)="openCreate()" [disabled]="busy() || !!recovery()">Nova recorrência</button>
+      </div>
+    </div>
+    @if (listError()) { <p class="notice error" role="alert">{{ listError() }}</p> }
+    @else if (loadingList()) { <p role="status" class="empty">Consultando cadastros…</p> }
+    @else if (!page()?.content?.length) { <p class="empty">Nenhum cadastro para este filtro.</p> }
+    @else {
+      <div class="table-wrap"><table>
+        <thead><tr><th scope="col">Descrição</th><th scope="col">Frequência / âncora</th><th scope="col">Valor previsto</th><th scope="col">Recorrência / e-mail</th><th scope="col">Ações</th></tr></thead>
+        <tbody>@for (bill of page()!.content; track bill.id) {
+          <tr><td>{{ bill.description }}</td><td>{{ bill.frequency === 'MONTHLY' ? 'Mensal' : 'Anual' }}<small>{{ dateLabel(bill.firstDueDate) }}</small></td>
+            <td>{{ amountLabel(bill.expectedAmount) }}</td><td><span class="badge" [class.paused]="!bill.active">{{ bill.active ? 'Ativa' : 'Pausada' }}</span><small>E-mail {{ bill.emailEnabled ? 'ligado' : 'desligado' }}</small></td>
+            <td><button type="button" (click)="edit(bill.id)" [disabled]="busy() || !!recovery()" [attr.aria-label]="'Editar ' + bill.description">Editar</button></td></tr>
+        }</tbody>
+      </table></div>
+    }
+    @if (page(); as result) {
+      <nav class="pagination" aria-label="Páginas de recorrentes">
+        <span>{{ result.totalElements }} cadastro(s) · Página {{ result.page + 1 }} de {{ result.totalPages || 1 }}</span>
+        <button type="button" [disabled]="loadingList() || result.page === 0" (click)="loadList(result.page - 1)">Anterior</button>
+        <button type="button" [disabled]="loadingList() || result.page + 1 >= result.totalPages" (click)="loadList(result.page + 1)">Próxima</button>
+      </nav>
+    }
+  </section>
+
+  @if (editorOpen()) {
+    <section class="panel editor" aria-labelledby="editor-title">
+      <h2 id="editor-title">{{ editing() || reviewing() ? 'Editar recorrência' : 'Nova recorrência' }}</h2>
+      <p class="hint">A âncora mantém o dia original. Meses sem esse dia usam o último dia do mês. Datas passadas são permitidas.</p>
+      @if (reviewing()) {
+        <div class="notice" role="status">
+          <p>Revise o resultado da consulta. Nenhuma alteração será reenviada automaticamente.</p>
+          @if (latest(); as current) {
+            <p>Versão atual: {{ current.version }}. Atualização: {{ current.updatedAt }}.</p>
+            <div class="table-wrap"><table>
+              <thead><tr><th scope="col">Campo</th><th scope="col">Suas alterações</th><th scope="col">Cadastro atual</th></tr></thead>
+              <tbody>@for (field of fields; track field) {
+                <tr><th scope="row">{{ labels[field] }}</th><td>{{ display(field, payload()) }}</td><td>{{ display(field, current) }}</td></tr>
+              }</tbody>
+            </table></div>
+            @if (frequencyLocked()) { <p>A frequência atual será preservada; as demais alterações podem ser revisadas.</p> }
+            <div class="actions">
+              <button type="button" (click)="useLatest()" [disabled]="busy()">Usar cadastro atual</button>
+              <button type="button" (click)="keepDraft()" [disabled]="busy()">Revisar minhas alterações com esta versão</button>
+            </div>
+          } @else {
+            <button type="button" (click)="checkRecovery()" [disabled]="busy()">{{ busy() ? 'Consultando…' : 'Consultar detalhe novamente' }}</button>
+          }
+        </div>
+      }
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <fieldset [disabled]="busy() || reviewing()">
+          <div class="form-grid">
+            <div class="field wide"><label for="description">Descrição *</label><input id="description" formControlName="description" maxlength="255" [attr.aria-invalid]="!!fieldError('description')" aria-describedby="description-error"><p id="description-error" class="field-error">{{ fieldError('description') }}</p></div>
+            <div class="field"><label for="expectedAmount">Valor previsto (R$)</label><input id="expectedAmount" type="text" inputmode="decimal" formControlName="expectedAmount" placeholder="não informado" [attr.aria-invalid]="!!fieldError('expectedAmount')" aria-describedby="amount-help expectedAmount-error"><small id="amount-help">Opcional. Até 9999999999999,99; no máximo 2 decimais.</small><p id="expectedAmount-error" class="field-error">{{ fieldError('expectedAmount') }}</p></div>
+            <div class="field"><label for="frequency">Frequência *</label>@if (frequencyLocked()) { <input id="frequency" readonly [value]="form.controls.frequency.value === 'MONTHLY' ? 'Mensal' : 'Anual'"> } @else { <select id="frequency" formControlName="frequency"><option value="MONTHLY">Mensal</option><option value="YEARLY">Anual</option></select> }<p class="field-error">{{ fieldError('frequency') }}</p>@if (frequencyLocked()) { <small>A frequência está bloqueada após tentativa de envio.</small> }</div>
+            <div class="field"><label for="firstDueDate">Primeiro vencimento / âncora *</label><input id="firstDueDate" type="date" min="1900-01-01" max="9998-12-31" formControlName="firstDueDate" [attr.aria-invalid]="!!fieldError('firstDueDate')" aria-describedby="firstDueDate-error"><p id="firstDueDate-error" class="field-error">{{ fieldError('firstDueDate') }}</p></div>
+            <div class="field"><label for="reminderDaysBefore">Lembrar quantos dias antes? *</label><input id="reminderDaysBefore" type="number" min="0" max="30" step="1" formControlName="reminderDaysBefore" [attr.aria-invalid]="!!fieldError('reminderDaysBefore')" aria-describedby="reminderDaysBefore-error"><p id="reminderDaysBefore-error" class="field-error">{{ fieldError('reminderDaysBefore') }}</p></div>
+            <div class="field wide"><label for="notes">Notas</label><textarea id="notes" rows="3" maxlength="2000" formControlName="notes" [attr.aria-invalid]="!!fieldError('notes')" aria-describedby="notes-help notes-error"></textarea><small id="notes-help">Até 2000 caracteres. Não incluídas no e-mail.</small><p id="notes-error" class="field-error">{{ fieldError('notes') }}</p></div>
+            <label class="checkbox"><input type="checkbox" formControlName="active"> Recorrência ativa</label>
+            <label class="checkbox"><input type="checkbox" formControlName="emailEnabled"> Lembretes por e-mail</label>
+          </div>
+        </fieldset>
+        <p class="hint">Desmarque “Recorrência ativa” para pausar. Desligar o e-mail mantém as previsões quando a recorrência está ativa.</p>
+        <p class="hint">Lembretes usam seu e-mail atual confirmado, a partir das 08h em America/Sao_Paulo. O cadastro não dispara um envio imediato. Uma comunicação já em envio pode chegar após pausar ou desligar os lembretes.</p>
+        <div class="actions">
+          <button class="primary" type="submit" [disabled]="busy() || !!recovery() || reviewing()">{{ busy() ? 'Aguarde…' : 'Salvar recorrência' }}</button>
+          <button type="button" (click)="closeEditor()" [disabled]="busy() || !!recovery()">Fechar</button>
+        </div>
+      </form>
+    </section>
+  }
+</div>

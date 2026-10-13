@@ -18,6 +18,9 @@ const PUBLIC_ROUTES: readonly Route[] = [
 // Methods and paths checked against the local Unita controllers (H02).
 // Unknown routes require contract review before they can receive credentials.
 export const AUTH_PROTECTED_ROUTES: readonly Route[] = [
+  [['GET', 'POST'], '/recurring-bills'],
+  [['GET'], '/recurring-bills/upcoming'],
+  [['GET', 'PATCH'], '/recurring-bills/{id}'],
   [['GET'], '/auth/me'],
   [['GET'], '/dashboard'],
   [['GET'], '/dashboard/{summary}'],

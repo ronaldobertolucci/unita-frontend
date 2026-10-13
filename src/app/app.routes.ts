@@ -66,6 +66,12 @@ export const routes: Routes = [
         data: { title: 'Dashboard' },
       },
       {
+        path: 'recurring-bills',
+        loadComponent: () => import('./features/recurring-bills/recurring-bills.component')
+          .then(m => m.RecurringBillsComponent),
+        data: { title: 'Recorrentes' },
+      },
+      {
         path: 'groups',
         loadComponent: () =>
           import('./features/groups/groups.component').then(
