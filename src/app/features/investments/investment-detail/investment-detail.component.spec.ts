@@ -77,9 +77,9 @@ const mockCategoryBuy: CategoryDto  = { id: 11, name: 'Aporte em Investimento', 
 const mockCategoryYield: CategoryDto = { id: 12, name: 'Rendimento de Investimento', type: 'INCOME', global: true };
 const mockCategorySell: CategoryDto  = { id: 13, name: 'Resgate de Investimento',    type: 'EXPENSE', global: true };
 
-const mockPocket: PocketSummaryDto      = { id: 5, type: 'BANK_ACCOUNT',   label: 'Banco X – Corrente', balance: 1000 };
-const mockPocketCash: PocketSummaryDto  = { id: 6, type: 'CASH',           label: 'Carteira',           balance: 200  };
-const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA Empresa',       balance: 500  };
+const mockPocket: PocketSummaryDto      = { id: 5, type: 'BANK_ACCOUNT',   label: 'Banco X – Corrente', active: true, balance: 1000 };
+const mockPocketCash: PocketSummaryDto  = { id: 6, type: 'CASH',           label: 'Carteira',           active: true, balance: 200  };
+const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA Empresa',       active: true, balance: 500  };
 
 const mockLegalEntity: LegalEntityDto = {
   id: 1, cnpj: '12345678000190', corporateName: 'Banco X', tradeName: null, stateRegistration: null,

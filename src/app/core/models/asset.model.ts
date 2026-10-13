@@ -58,7 +58,7 @@ export interface AssetDetailDto {
     corporateName: string;
     tradeName: string | null;
     stateRegistration: string | null;
-  };
+  } | null;
   position: AssetPositionDto;
   fixedIncomeDetails: FixedIncomeDetailsDto | null;
   pensionDetails: PensionDetailsDto | null;

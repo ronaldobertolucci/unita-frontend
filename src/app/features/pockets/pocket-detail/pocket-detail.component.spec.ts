@@ -10,7 +10,7 @@ import { PocketSummaryDto } from '../../../core/models/pocket.model';
 import { TransactionDto } from '../../../core/models/transaction.model';
 import { RouterTestingModule } from '@angular/router/testing';
 
-const mockPocket: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 1500 };
+const mockPocket: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', active: true, balance: 1500 };
 
 const mockTransaction: TransactionDto = {
   id: 10,
@@ -124,7 +124,7 @@ describe('PocketDetailComponent', () => {
     });
 
     it('should navigate to /pockets if pocket not found', () => {
-      setup([{ id: 99, type: 'CASH', label: 'Outro', balance: 0 }], [], '1');
+      setup([{ id: 99, type: 'CASH', label: 'Outro', active: true, balance: 0 }], [], '1');
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/pockets'], { queryParams: { type: null }});
     });
 

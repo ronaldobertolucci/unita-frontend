@@ -17,6 +17,7 @@ const mockSummary: AssetSummaryDto = {
   category: 'RENDA_FIXA',
   status: 'ACTIVE',
   legalEntityName: 'Banco X',
+  custodianLegalEntityName: null,
   currentValue: 10500,
   totalInvested: 10000,
   redeemedValue: 0,
@@ -28,6 +29,7 @@ const mockSummary2: AssetSummaryDto = {
   category: 'PREVIDENCIA',
   status: 'ACTIVE',
   legalEntityName: 'Banco Y',
+  custodianLegalEntityName: null,
   currentValue: 5200,
   totalInvested: 5000,
   redeemedValue: 0,
@@ -45,6 +47,7 @@ const mockDetail: AssetDetailDto = {
     tradeName: 'Banco X',
     stateRegistration: null,
   },
+  custodianLegalEntity: null,
   position: {
     quantity: 1,
     averagePrice: 10000,
@@ -141,6 +144,8 @@ describe('AssetService', () => {
         annualRate: 0.12,
         maturityDate: '2027-01-15',
         taxFree: false,
+        liquidityType: 'DIARIA',
+        custodianLegalEntityId: null,
       }).subscribe();
       http.expectOne(`${base}/fixed-income`).flush(mockDetail);
       expect(service.assets().length).toBe(2);
@@ -152,6 +157,7 @@ describe('AssetService', () => {
       service.createFixedIncome({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
         annualRate: 0.12, maturityDate: '2027-01-15', taxFree: false,
+        liquidityType: 'DIARIA', custodianLegalEntityId: null,
       }).subscribe();
       http.expectOne(`${base}/fixed-income`).flush(mockDetail);
       expect(service.assets()[0].legalEntityName).toBe('Banco X');
@@ -166,6 +172,7 @@ describe('AssetService', () => {
       service.createFixedIncome({
         name: 'CDB Banco X', legalEntityId: 1, indexer: 'CDI',
         annualRate: 0.12, maturityDate: '2027-01-15', taxFree: false,
+        liquidityType: 'DIARIA', custodianLegalEntityId: null,
       }).subscribe();
       http.expectOne(`${base}/fixed-income`).flush(detailNoTrade);
       expect(service.assets()[0].legalEntityName).toBe('Banco X LTDA');
@@ -188,6 +195,7 @@ describe('AssetService', () => {
       service.createPension({
         name: 'PGBL Banco Y', legalEntityId: 1,
         pensionType: 'PGBL', taxRegime: 'PROGRESSIVO',
+        custodianLegalEntityId: null,
       }).subscribe();
       http.expectOne(`${base}/pension`).flush(pensionDetail);
       expect(service.assets().length).toBe(2);
@@ -201,7 +209,7 @@ describe('AssetService', () => {
     it('should PATCH /assets/:id and replace summary in signal', () => {
       service.assets.set([mockSummary]);
       const updated: AssetDetailDto = { ...mockDetail, name: 'CDB Banco X Atualizado' };
-      service.updateAsset(1, { name: 'CDB Banco X Atualizado' }).subscribe();
+      service.updateAsset(1, { name: 'CDB Banco X Atualizado', custodianLegalEntityId: null }).subscribe();
       http.expectOne(`${base}/1`).flush(updated);
       expect(service.assets()[0].name).toBe('CDB Banco X Atualizado');
     });

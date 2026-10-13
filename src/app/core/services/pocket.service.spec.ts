@@ -13,8 +13,8 @@ import { environment } from '../../../environments/environment';
 
 const base = environment.apiUrl;
 
-const mockSummaryBank: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 1500 };
-const mockSummaryCash: PocketSummaryDto = { id: 2, type: 'CASH', label: 'Carteira', balance: 200 };
+const mockSummaryBank: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', active: true, balance: 1500 };
+const mockSummaryCash: PocketSummaryDto = { id: 2, type: 'CASH', label: 'Carteira', active: true, balance: 200 };
 
 const mockBankAccount: BankAccountDto = {
   id: 1,
@@ -135,7 +135,7 @@ describe('PocketService', () => {
 
   describe('deleteBenefitAccount()', () => {
     it('should DELETE and remove pocket from signal locally', () => {
-      service['_pockets'].set([mockSummaryBank, { id: 3, type: 'BENEFIT_ACCOUNT', label: 'VA', balance: 300 }]);
+      service['_pockets'].set([mockSummaryBank, { id: 3, type: 'BENEFIT_ACCOUNT', label: 'VA', active: true, balance: 300 }]);
       service.deleteBenefitAccount(3).subscribe();
       http.expectOne(`${base}/pockets/benefit-accounts/3`).flush(null);
       expect(service.pockets().find(p => p.id === 3)).toBeUndefined();
@@ -165,7 +165,7 @@ describe('PocketService', () => {
 
   describe('deleteFgts()', () => {
     it('should DELETE and remove pocket from signal locally', () => {
-      service['_pockets'].set([mockSummaryBank, { id: 4, type: 'FGTS_EMPLOYER_ACCOUNT', label: 'FGTS', balance: 5000 }]);
+      service['_pockets'].set([mockSummaryBank, { id: 4, type: 'FGTS_EMPLOYER_ACCOUNT', label: 'FGTS', active: true, balance: 5000 }]);
       service.deleteFgts(4).subscribe();
       http.expectOne(`${base}/pockets/fgts/4`).flush(null);
       expect(service.pockets().find(p => p.id === 4)).toBeUndefined();

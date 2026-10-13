@@ -32,9 +32,9 @@ const mockBillPaid: CreditCardBillDto = {
   status: 'PAID', totalInstallments: 200, totalRefunds: 0, totalAmount: 200,
 };
 
-const mockPocketBank: PocketSummaryDto = { id: 5, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', balance: 2000 };
-const mockPocketCash: PocketSummaryDto = { id: 6, type: 'CASH', label: 'Carteira', balance: 100 };
-const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA', balance: 300 };
+const mockPocketBank: PocketSummaryDto = { id: 5, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', active: true, balance: 2000 };
+const mockPocketCash: PocketSummaryDto = { id: 6, type: 'CASH', label: 'Carteira', active: true, balance: 100 };
+const mockPocketBenefit: PocketSummaryDto = { id: 7, type: 'BENEFIT_ACCOUNT', label: 'VA', active: true, balance: 300 };
 
 const mockCategory: CategoryDto = { id: 1, name: 'Alimentação', type: 'EXPENSE', global: false };
 
