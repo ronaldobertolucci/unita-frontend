@@ -1,3 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { SessionService } from '../../core/services/session.service';
+import { RegistrationRecoveryService } from '../../core/services/registration-recovery.service';
+import { isUnavailableRegistration, isUncertainCreation, REGISTRATION_UNAVAILABLE, registrationErrorMessage } from '../../core/utils/registration-error.util';
 import { Component, inject, OnInit, OnDestroy, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -22,6 +26,8 @@ type ModalType = 'create' | 'detail' | 'confirm-update' | 'confirm-delete' | nul
 })
 export class CreditCardsComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly session = inject(SessionService);
+  readonly recovery = inject(RegistrationRecoveryService);
   private readonly creditCardService = inject(CreditCardService);
   private readonly legalEntityService = inject(LegalEntityService);
   private readonly fb = inject(FormBuilder);
@@ -71,6 +77,17 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   get editCreditLimit() { return this.editForm.get('creditLimit')!; }
   get editClosingDay() { return this.editForm.get('closingDay')!; }
   get editDueDay() { return this.editForm.get('dueDay')!; }
+
+  constructor() {
+    this.session.registerCleanup(() => {
+      this.legalEntities.set([]);
+      this.createForm.reset();
+      this.editForm.reset();
+      this.isSaving.set(false);
+      this.isLoadingRef.set(false);
+      this.closeModal();
+    }, this.destroyRef);
+  }
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -123,11 +140,11 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   // ─── Carregamento de referências ──────────────────────────────────────────
 
   private loadLegalEntities(): void {
-    if (this.legalEntities().length > 0) return;
+    this.legalEntities.set([]);
     this.isLoadingRef.set(true);
     this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.legalEntities.set(this.legalEntityService.legalEntities());
+      next: list => {
+        this.legalEntities.set(list);
         this.isLoadingRef.set(false);
       },
       error: () => this.isLoadingRef.set(false),
@@ -137,6 +154,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   // ─── Criação ─────────────────────────────────────────────────────────────
 
   createCreditCard(): void {
+    if (this.isSaving() || this.isLoadingRef() || this.recovery.cards() !== 'clear') return;
     if (this.createForm.invalid) {
       this.createForm.markAllAsTouched();
       return;
@@ -153,12 +171,32 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
       closingDay: v.closingDay!,
       dueDay: v.dueDay!,
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.isSaving.set(false); this.closeModal(); },
+      next: () => {
+        this.isSaving.set(false);
+        this.closeModal();
+        this.creditCardService.loadCreditCards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {
+          this.errorMessage.set('Cartão criado. Não foi possível atualizar a lista. Atualize a página.');
+        } });
+      },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar cartão.'));
+        if (isUnavailableRegistration(err, 'legalEntity')) {
+          this.errorMessage.set(REGISTRATION_UNAVAILABLE);
+          this.createForm.patchValue({ legalEntityId: null });
+          this.loadLegalEntities();
+        } else if (isUncertainCreation(err)) {
+          this.recovery.mark('cards');
+          this.closeModal();
+          this.checkCreationResult();
+        } else {
+          this.errorMessage.set(registrationErrorMessage(err, 'Erro ao criar cartão.'));
+        }
       },
     });
+  }
+
+  checkCreationResult(): void {
+    this.recovery.check('cards', () => this.creditCardService.loadCreditCards());
   }
 
   // ─── Edição ───────────────────────────────────────────────────────────────

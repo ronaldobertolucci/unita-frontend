@@ -121,10 +121,10 @@ describe('CreditCardsComponent', () => {
       expect(legalEntityServiceSpy.loadLegalEntities).toHaveBeenCalled();
     });
 
-    it('should not reload legal entities if already cached', () => {
+    it('should refresh personal legal entities even if already cached', () => {
       component.legalEntities.set([mockLegalEntity]);
       component.openCreateModal();
-      expect(legalEntityServiceSpy.loadLegalEntities).not.toHaveBeenCalled();
+      expect(legalEntityServiceSpy.loadLegalEntities).toHaveBeenCalledTimes(1);
     });
   });
 

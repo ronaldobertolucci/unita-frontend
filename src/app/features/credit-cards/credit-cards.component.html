@@ -1,4 +1,15 @@
 <div class="page">
+  @if (recovery.cards() !== 'clear') {
+    <div class="creation-recovery" role="alert">
+      <p>Não foi possível confirmar a criação. Confira a lista antes de tentar novamente para evitar duplicidade.</p>
+      @if (recovery.cards() === 'review') {
+        <button type="button" class="btn-secondary" (click)="recovery.confirm('cards')">Conferi a lista</button>
+      } @else {
+        <button type="button" class="btn-secondary" [disabled]="recovery.cards() === 'checking'" (click)="checkCreationResult()">Consultar resultado</button>
+        @if (recovery.cards() === 'pending') { <p>A consulta não foi concluída. Tente consultar novamente; se persistir, procure suporte.</p> }
+      }
+    </div>
+  }
 
   <!-- ─── Loading ─── -->
   @if (isLoading()) {
@@ -197,7 +208,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || isLoadingRef() || recovery.cards() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Criar }
           </button>
         </div>

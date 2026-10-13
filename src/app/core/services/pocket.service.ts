@@ -100,7 +100,7 @@ export class PocketService {
 
   createBankAccount(payload: CreateBankAccountPayload): Observable<BankAccountDto> {
     return this.session.scoped(() => this.http.post<BankAccountDto>(`${this.base}/pockets/bank-accounts`, payload)).pipe(
-      tap(() => this.loadPockets().subscribe())
+      tap(() => this.loadPockets().subscribe({ error: () => {} }))
     );
   }
 
@@ -124,7 +124,7 @@ export class PocketService {
 
   createBenefitAccount(payload: CreateBenefitAccountPayload): Observable<BenefitAccountDto> {
     return this.session.scoped(() => this.http.post<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts`, payload)).pipe(
-      tap(() => this.loadPockets().subscribe())
+      tap(() => this.loadPockets().subscribe({ error: () => {} }))
     );
   }
 
@@ -148,7 +148,7 @@ export class PocketService {
 
   createFgts(payload: CreateFgtsPayload): Observable<FgtsEmployerAccountDto> {
     return this.session.scoped(() => this.http.post<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts`, payload)).pipe(
-      tap(() => this.loadPockets().subscribe())
+      tap(() => this.loadPockets().subscribe({ error: () => {} }))
     );
   }
 

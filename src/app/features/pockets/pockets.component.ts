@@ -1,3 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { SessionService } from '../../core/services/session.service';
+import { RegistrationRecoveryService } from '../../core/services/registration-recovery.service';
+import { isUnavailableRegistration, isUncertainCreation, REGISTRATION_UNAVAILABLE, registrationErrorMessage } from '../../core/utils/registration-error.util';
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -55,6 +59,8 @@ const TYPE_LABELS: Record<PocketType, string> = {
 })
 export class PocketsComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly session = inject(SessionService);
+  readonly recovery = inject(RegistrationRecoveryService);
   private readonly pocketService    = inject(PocketService);
   private readonly fb               = inject(FormBuilder);
   private readonly route            = inject(ActivatedRoute);
@@ -184,6 +190,17 @@ export class PocketsComponent implements OnInit, OnDestroy {
 
   // ── Construtor: sincroniza total filtrado com o contexto de página ─────────
   constructor() {
+    this.session.registerCleanup(() => {
+      this.legalEntities.set([]);
+      this.individualEmployers.set([]);
+      this.legalEntityEmployers.set([]);
+      this.bankAccountForm.reset();
+      this.benefitAccountForm.reset();
+      this.fgtsForm.reset({ employerType: 'individual' });
+      this.isSaving.set(false);
+      this.isLoadingRef.set(false);
+      this.closeModal();
+    }, this.destroyRef);
     effect(() => {
       const loading   = this.isLoading();
       const hasPockets = this.pocketService.pockets().length > 0;
@@ -332,7 +349,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   // ─── Carregamento de referências ──────────────────────────────────────────
 
   private loadLegalEntities(): void {
-    if (this.legalEntities().length > 0) return;
+    this.legalEntities.set([]);
     this.isLoadingRef.set(true);
     this.pocketService.getLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: list => { this.legalEntities.set(list); this.isLoadingRef.set(false); },
@@ -341,6 +358,8 @@ export class PocketsComponent implements OnInit, OnDestroy {
   }
 
   private loadEmployers(): void {
+    this.individualEmployers.set([]);
+    this.legalEntityEmployers.set([]);
     this.isLoadingRef.set(true);
     let pending = 2;
     const done = () => { if (--pending === 0) this.isLoadingRef.set(false); };
@@ -371,6 +390,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   // ─── Criação ─────────────────────────────────────────────────────────────
 
   createBankAccount(): void {
+    if (this.isSaving() || this.isLoadingRef() || this.recovery.pockets() !== 'clear') return;
     if (this.bankAccountForm.invalid) { this.bankAccountForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
@@ -383,13 +403,13 @@ export class PocketsComponent implements OnInit, OnDestroy {
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
-        this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta bancária.'));
+        this.handleCreationError(err, 'legalEntity', 'Erro ao criar conta bancária.');
       },
     });
   }
 
   createBenefitAccount(): void {
+    if (this.isSaving() || this.isLoadingRef() || this.recovery.pockets() !== 'clear') return;
     if (this.benefitAccountForm.invalid) { this.benefitAccountForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
@@ -400,13 +420,13 @@ export class PocketsComponent implements OnInit, OnDestroy {
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
-        this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta de benefício.'));
+        this.handleCreationError(err, 'legalEntity', 'Erro ao criar conta de benefício.');
       },
     });
   }
 
   createFgts(): void {
+    if (this.isSaving() || this.isLoadingRef() || this.recovery.pockets() !== 'clear') return;
     if (this.fgtsForm.invalid) { this.fgtsForm.markAllAsTouched(); return; }
     this.isSaving.set(true);
     this.errorMessage.set(null);
@@ -416,8 +436,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.pocketService.createFgts(payload).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
-        this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar vínculo FGTS.'));
+        this.handleCreationError(err, 'employer', 'Erro ao criar vínculo FGTS.');
       },
     });
   }
@@ -432,6 +451,31 @@ export class PocketsComponent implements OnInit, OnDestroy {
         this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar carteira.'));
       },
     });
+  }
+
+  checkCreationResult(): void {
+    this.recovery.check('pockets', () => this.pocketService.loadPockets());
+  }
+
+  private handleCreationError(error: HttpErrorResponse, field: 'legalEntity' | 'employer', fallback: string): void {
+    this.isSaving.set(false);
+    if (isUnavailableRegistration(error, field)) {
+      this.errorMessage.set(REGISTRATION_UNAVAILABLE);
+      if (field === 'employer') {
+        this.fgtsForm.patchValue({ employerId: null });
+        this.loadEmployers();
+      } else {
+        this.bankAccountForm.patchValue({ legalEntityId: null });
+        this.benefitAccountForm.patchValue({ legalEntityId: null });
+        this.loadLegalEntities();
+      }
+    } else if (isUncertainCreation(error)) {
+      this.recovery.mark('pockets');
+      this.closeModal();
+      this.checkCreationResult();
+    } else {
+      this.errorMessage.set(registrationErrorMessage(error, fallback));
+    }
   }
 
   // ─── Edição ───────────────────────────────────────────────────────────────
