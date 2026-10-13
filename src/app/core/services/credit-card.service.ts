@@ -1,4 +1,5 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -33,6 +34,9 @@ export const CARD_BRANDS: CardBrandDto[] = [
 
 @Injectable({ providedIn: 'root' })
 export class CreditCardService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this._creditCards.set([]); }, inject(DestroyRef));
+
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
@@ -42,23 +46,23 @@ export class CreditCardService {
   // ─── Cartões ─────────────────────────────────────────────────────────────
 
   loadCreditCards(): Observable<CreditCardDto[]> {
-    return this.http.get<CreditCardDto[]>(`${this.base}/credit-cards/my`).pipe(
+    return this.session.scoped(() => this.http.get<CreditCardDto[]>(`${this.base}/credit-cards/my`)).pipe(
       tap(list => this._creditCards.set(this.sort(list)))
     );
   }
 
   getCreditCard(id: number): Observable<CreditCardDto> {
-    return this.http.get<CreditCardDto>(`${this.base}/credit-cards/${id}`);
+    return this.session.scoped(() => this.http.get<CreditCardDto>(`${this.base}/credit-cards/${id}`));
   }
 
   createCreditCard(payload: CreateCreditCardPayload): Observable<CreditCardDto> {
-    return this.http.post<CreditCardDto>(`${this.base}/credit-cards`, payload).pipe(
+    return this.session.scoped(() => this.http.post<CreditCardDto>(`${this.base}/credit-cards`, payload)).pipe(
       tap(card => this._creditCards.update(list => this.sort([...list, card])))
     );
   }
 
   updateCreditCard(id: number, payload: UpdateCreditCardPayload): Observable<CreditCardDto> {
-    return this.http.patch<CreditCardDto>(`${this.base}/credit-cards/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<CreditCardDto>(`${this.base}/credit-cards/${id}`, payload)).pipe(
       tap(updated => this._creditCards.update(list =>
         this.sort(list.map(c => c.id === id ? updated : c))
       ))
@@ -66,7 +70,7 @@ export class CreditCardService {
   }
 
   deleteCreditCard(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/credit-cards/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/credit-cards/${id}`)).pipe(
       tap(() => this._creditCards.update(list => list.filter(c => c.id !== id)))
     );
   }
@@ -78,67 +82,67 @@ export class CreditCardService {
   // ─── Faturas ─────────────────────────────────────────────────────────────
 
   getBills(cardId: number): Observable<CreditCardBillDto[]> {
-    return this.http.get<CreditCardBillDto[]>(`${this.base}/credit-cards/${cardId}/bills`);
+    return this.session.scoped(() => this.http.get<CreditCardBillDto[]>(`${this.base}/credit-cards/${cardId}/bills`));
   }
 
   getBill(cardId: number, billId: number): Observable<CreditCardBillDto> {
-    return this.http.get<CreditCardBillDto>(`${this.base}/credit-cards/${cardId}/bills/${billId}`);
+    return this.session.scoped(() => this.http.get<CreditCardBillDto>(`${this.base}/credit-cards/${cardId}/bills/${billId}`));
   }
 
   getBillStatement(cardId: number, billId: number): Observable<BillStatementDto> {
-    return this.http.get<BillStatementDto>(
+    return this.session.scoped(() => this.http.get<BillStatementDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/installments`
-    );
+    ));
   }
 
   closeBill(cardId: number, billId: number): Observable<CreditCardBillDto> {
-    return this.http.put<CreditCardBillDto>(
+    return this.session.scoped(() => this.http.put<CreditCardBillDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/close`,
       {}
-    );
+    ));
   }
 
   reopenBill(cardId: number, billId: number): Observable<CreditCardBillDto> {
-    return this.http.put<CreditCardBillDto>(
+    return this.session.scoped(() => this.http.put<CreditCardBillDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/reopen`,
       {}
-    );
+    ));
   }
 
   payBill(cardId: number, billId: number, payload: PayBillPayload): Observable<CreditCardBillDto> {
-    return this.http.put<CreditCardBillDto>(
+    return this.session.scoped(() => this.http.put<CreditCardBillDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/pay`,
       payload
-    );
+    ));
   }
 
   // ─── Compras ─────────────────────────────────────────────────────────────
 
   getPurchases(cardId: number): Observable<CreditCardPurchaseDto[]> {
-    return this.http.get<CreditCardPurchaseDto[]>(
+    return this.session.scoped(() => this.http.get<CreditCardPurchaseDto[]>(
       `${this.base}/credit-cards/${cardId}/purchases`
-    );
+    ));
   }
 
   createPurchase(cardId: number, payload: CreatePurchasePayload): Observable<CreditCardPurchaseDto> {
-    return this.http.post<CreditCardPurchaseDto>(
+    return this.session.scoped(() => this.http.post<CreditCardPurchaseDto>(
       `${this.base}/credit-cards/${cardId}/purchases`,
       payload
-    );
+    ));
   }
 
   deletePurchase(cardId: number, purchaseId: number): Observable<void> {
-    return this.http.delete<void>(
+    return this.session.scoped(() => this.http.delete<void>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}`
-    );
+    ));
   }
 
   // ─── Parcelas ────────────────────────────────────────────────────────────
 
   getInstallments(cardId: number, purchaseId: number): Observable<CreditCardInstallmentDto[]> {
-    return this.http.get<CreditCardInstallmentDto[]>(
+    return this.session.scoped(() => this.http.get<CreditCardInstallmentDto[]>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments`
-    );
+    ));
   }
 
   createInstallment(
@@ -146,10 +150,10 @@ export class CreditCardService {
     purchaseId: number,
     payload: CreateInstallmentPayload
   ): Observable<CreditCardInstallmentDto> {
-    return this.http.post<CreditCardInstallmentDto>(
+    return this.session.scoped(() => this.http.post<CreditCardInstallmentDto>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments`,
       payload
-    );
+    ));
   }
 
   updateInstallment(
@@ -158,10 +162,10 @@ export class CreditCardService {
     installmentId: number,
     payload: UpdateInstallmentPayload
   ): Observable<CreditCardInstallmentDto> {
-    return this.http.put<CreditCardInstallmentDto>(
+    return this.session.scoped(() => this.http.put<CreditCardInstallmentDto>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments/${installmentId}`,
       payload
-    );
+    ));
   }
 
   deleteInstallment(
@@ -169,17 +173,17 @@ export class CreditCardService {
     purchaseId: number,
     installmentId: number
   ): Observable<void> {
-    return this.http.delete<void>(
+    return this.session.scoped(() => this.http.delete<void>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments/${installmentId}`
-    );
+    ));
   }
 
   // ─── Estornos ────────────────────────────────────────────────────────────
 
   getRefunds(cardId: number, billId: number): Observable<CreditCardRefundDto[]> {
-    return this.http.get<CreditCardRefundDto[]>(
+    return this.session.scoped(() => this.http.get<CreditCardRefundDto[]>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/refunds`
-    );
+    ));
   }
 
   createRefund(
@@ -187,15 +191,15 @@ export class CreditCardService {
     billId: number,
     payload: CreateRefundPayload
   ): Observable<CreditCardRefundDto> {
-    return this.http.post<CreditCardRefundDto>(
+    return this.session.scoped(() => this.http.post<CreditCardRefundDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/refunds`,
       payload
-    );
+    ));
   }
 
   deleteRefund(cardId: number, billId: number, refundId: number): Observable<void> {
-    return this.http.delete<void>(
+    return this.session.scoped(() => this.http.delete<void>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/refunds/${refundId}`
-    );
+    ));
   }
 }

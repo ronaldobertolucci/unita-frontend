@@ -49,6 +49,7 @@ function buildNotificationService(invitations: GroupInvitation[] = []) {
     loading:              signal(false),
     respondError:         signal(null),
     sseToast:             signal<SseInvitationToast | null>(null),
+    streamStatus: signal('stopped'),
     loadInvitations:      jest.fn(),
     respondToInvitation:  jest.fn(),
     connectSSE:           jest.fn(),

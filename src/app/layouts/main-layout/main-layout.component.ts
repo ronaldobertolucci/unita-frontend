@@ -7,6 +7,7 @@ import {
   OnDestroy,
   HostListener,
   ElementRef,
+  DestroyRef,
 } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter, map } from 'rxjs/operators';
@@ -14,6 +15,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { PageContextService } from '../../core/services/page-context.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 export interface NavItem {
   label: string;
@@ -95,6 +97,7 @@ type UserMenuSource     = 'sidebar' | 'topbar' | null;
   styleUrl: './main-layout.component.css',
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly authService         = inject(AuthService);
   private readonly notificationService = inject(NotificationService);
   private readonly router              = inject(Router);
@@ -107,6 +110,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly overflowNavItems = NAV_ITEMS.filter(i => !PRIMARY_NAV_PATHS.has(i.path));
 
   readonly currentUser  = this.authService.currentUser;
+  readonly isAuthenticated = this.authService.isAuthenticated;
   readonly userInitials = computed(() => {
     const user = this.currentUser();
     if (!user) return '?';
@@ -118,6 +122,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly notificationsLoading = this.notificationService.loading;
   readonly respondError         = this.notificationService.respondError;
   readonly sseToast             = this.notificationService.sseToast;
+  readonly streamStatus = this.notificationService.streamStatus;
 
   readonly notificationSource = signal<NotificationSource>(null);
   readonly userMenuSource     = signal<UserMenuSource>(null);
@@ -139,7 +144,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.router.events
       .pipe(
         filter(e => e instanceof NavigationEnd),
-        map(e => (e as NavigationEnd).urlAfterRedirects)
+        map(e => (e as NavigationEnd).urlAfterRedirects),
+        takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(url => this.updateTitleFromUrl(url));
   }
@@ -151,6 +157,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const title = current.snapshot.data?.['title'];
     if (title) this.pageTitle.set(title);
   }
+
+  refreshNotifications(): void { this.notificationService.loadInvitations(); }
 
   triggerCta(): void {
     this.pageContextService.ctaCallback()?.();

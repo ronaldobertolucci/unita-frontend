@@ -1,4 +1,5 @@
-import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, computed, effect, inject, OnDestroy, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -53,6 +54,7 @@ const TYPE_LABELS: Record<PocketType, string> = {
   styleUrl: './pockets.component.css',
 })
 export class PocketsComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly pocketService    = inject(PocketService);
   private readonly fb               = inject(FormBuilder);
   private readonly route            = inject(ActivatedRoute);
@@ -196,7 +198,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.pocketService.loadPockets().subscribe({
+    this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -276,7 +278,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
 
     if (pocket.type === 'BANK_ACCOUNT') {
       this.activeModal.set('detail-bank-account');
-      this.pocketService.getBankAccount(pocket.id).subscribe({
+      this.pocketService.getBankAccount(pocket.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: detail => {
           this.bankAccountDetail.set(detail);
           this.editBankAccountForm.patchValue({ status: detail.status });
@@ -286,7 +288,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
       });
     } else if (pocket.type === 'BENEFIT_ACCOUNT') {
       this.activeModal.set('detail-benefit-account');
-      this.pocketService.getBenefitAccount(pocket.id).subscribe({
+      this.pocketService.getBenefitAccount(pocket.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: detail => {
           this.benefitAccountDetail.set(detail);
           this.editBenefitAccountForm.patchValue({ status: detail.status });
@@ -296,7 +298,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
       });
     } else if (pocket.type === 'FGTS_EMPLOYER_ACCOUNT') {
       this.activeModal.set('detail-fgts');
-      this.pocketService.getFgts(pocket.id).subscribe({
+      this.pocketService.getFgts(pocket.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: detail => {
           this.fgtsDetail.set(detail);
           this.editFgtsForm.patchValue({
@@ -332,7 +334,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   private loadLegalEntities(): void {
     if (this.legalEntities().length > 0) return;
     this.isLoadingRef.set(true);
-    this.pocketService.getLegalEntities().subscribe({
+    this.pocketService.getLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: list => { this.legalEntities.set(list); this.isLoadingRef.set(false); },
       error: () => this.isLoadingRef.set(false),
     });
@@ -343,11 +345,11 @@ export class PocketsComponent implements OnInit, OnDestroy {
     let pending = 2;
     const done = () => { if (--pending === 0) this.isLoadingRef.set(false); };
 
-    this.pocketService.getIndividualEmployers().subscribe({
+    this.pocketService.getIndividualEmployers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: list => { this.individualEmployers.set(list); done(); },
       error: () => done(),
     });
-    this.pocketService.getLegalEntityEmployers().subscribe({
+    this.pocketService.getLegalEntityEmployers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: list => { this.legalEntityEmployers.set(list); done(); },
       error: () => done(),
     });
@@ -378,7 +380,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
       number:            v.number!,
       agency:            v.agency!,
       bankAccountTypeId: v.bankAccountTypeId!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -395,7 +397,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.pocketService.createBenefitAccount({
       legalEntityId: v.legalEntityId!,
       benefitTypeId: v.benefitTypeId!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -411,7 +413,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     const v = this.fgtsForm.value;
     const payload: any = { employerId: v.employerId!, admissionDate: v.admissionDate! };
     if (v.dismissalDate) payload.dismissalDate = v.dismissalDate;
-    this.pocketService.createFgts(payload).subscribe({
+    this.pocketService.createFgts(payload).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -423,7 +425,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   createCash(): void {
     this.isSaving.set(true);
     this.errorMessage.set(null);
-    this.pocketService.createCash().subscribe({
+    this.pocketService.createCash().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -441,7 +443,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     const id = this.selectedPocket()!.id;
     this.pocketService.updateBankAccount(id, {
       status: this.editBankAccountForm.value.status as any,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: detail => { this.bankAccountDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -457,7 +459,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     const id = this.selectedPocket()!.id;
     this.pocketService.updateBenefitAccount(id, {
       status: this.editBenefitAccountForm.value.status as any,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: detail => { this.benefitAccountDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -475,7 +477,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     this.pocketService.updateFgts(id, {
       status:        v.status as any,
       dismissalDate: v.dismissalDate || null,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: detail => { this.fgtsDetail.set(detail); this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -497,7 +499,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
     else if (pocket.type === 'BENEFIT_ACCOUNT')  delete$ = this.pocketService.deleteBenefitAccount(pocket.id);
     else                                         delete$ = this.pocketService.deleteFgts(pocket.id);
 
-    delete$.subscribe({
+    delete$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

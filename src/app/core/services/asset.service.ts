@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -17,6 +18,9 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class AssetService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this.assets.set([]); this.isLoading.set(false); }, inject(DestroyRef));
+
   private readonly base = `${environment.apiUrl}/assets`;
 
   readonly assets = signal<AssetSummaryDto[]>([]);
@@ -26,7 +30,7 @@ export class AssetService {
 
   loadAssets(): void {
     this.isLoading.set(true);
-    this.http.get<AssetSummaryDto[]>(this.base).subscribe({
+    this.session.scoped(() => this.http.get<AssetSummaryDto[]>(this.base)).subscribe({
       next: (data) => {
         // Ordena o array recebido
         const sortedData = data.sort((a, b) => {
@@ -49,23 +53,23 @@ export class AssetService {
   }
 
   getAsset(id: number): Observable<AssetDetailDto> {
-    return this.http.get<AssetDetailDto>(`${this.base}/${id}`);
+    return this.session.scoped(() => this.http.get<AssetDetailDto>(`${this.base}/${id}`));
   }
 
   createFixedIncome(payload: CreateFixedIncomePayload): Observable<AssetDetailDto> {
-    return this.http.post<AssetDetailDto>(`${this.base}/fixed-income`, payload).pipe(
+    return this.session.scoped(() => this.http.post<AssetDetailDto>(`${this.base}/fixed-income`, payload)).pipe(
       tap((created) => this.assets.update((list) => [...list, this.toSummary(created)])),
     );
   }
 
   createPension(payload: CreatePensionPayload): Observable<AssetDetailDto> {
-    return this.http.post<AssetDetailDto>(`${this.base}/pension`, payload).pipe(
+    return this.session.scoped(() => this.http.post<AssetDetailDto>(`${this.base}/pension`, payload)).pipe(
       tap((created) => this.assets.update((list) => [...list, this.toSummary(created)])),
     );
   }
 
   updateAsset(id: number, payload: UpdateAssetPayload): Observable<AssetDetailDto> {
-    return this.http.put<AssetDetailDto>(`${this.base}/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.put<AssetDetailDto>(`${this.base}/${id}`, payload)).pipe(
       tap((updated) =>
         this.assets.update((list) =>
           list.map((a) => (a.id === id ? this.toSummary(updated) : a)),
@@ -75,13 +79,13 @@ export class AssetService {
   }
 
   deleteAsset(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/${id}`)).pipe(
       tap(() => this.assets.update((list) => list.filter((a) => a.id !== id))),
     );
   }
 
   updatePosition(id: number, payload: UpdatePositionPayload): Observable<AssetDetailDto> {
-    return this.http.patch<AssetDetailDto>(`${this.base}/${id}/position`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<AssetDetailDto>(`${this.base}/${id}/position`, payload)).pipe(
       tap((updated) =>
         this.assets.update((list) =>
           list.map((a) => (a.id === id ? this.toSummary(updated) : a)),
@@ -91,28 +95,28 @@ export class AssetService {
   }
 
   getTransactions(id: number): Observable<InvestmentTransactionDto[]> {
-    return this.http.get<InvestmentTransactionDto[]>(`${this.base}/${id}/transactions`);
+    return this.session.scoped(() => this.http.get<InvestmentTransactionDto[]>(`${this.base}/${id}/transactions`));
   }
 
   buy(id: number, payload: BuyPayload): Observable<InvestmentTransactionDto> {
-    return this.http.post<InvestmentTransactionDto>(
+    return this.session.scoped(() => this.http.post<InvestmentTransactionDto>(
       `${this.base}/${id}/transactions/buy`,
       payload,
-    );
+    ));
   }
 
   recordYield(id: number, payload: YieldPayload): Observable<InvestmentTransactionDto> {
-    return this.http.post<InvestmentTransactionDto>(
+    return this.session.scoped(() => this.http.post<InvestmentTransactionDto>(
       `${this.base}/${id}/transactions/yield`,
       payload,
-    );
+    ));
   }
 
   sell(id: number, payload: SellPayload): Observable<InvestmentTransactionDto[]> {
-    return this.http.post<InvestmentTransactionDto[]>(
+    return this.session.scoped(() => this.http.post<InvestmentTransactionDto[]>(
       `${this.base}/${id}/transactions/sell`,
       payload,
-    );
+    ));
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

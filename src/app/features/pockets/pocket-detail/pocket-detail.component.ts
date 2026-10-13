@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
@@ -19,6 +20,7 @@ type ModalType = 'create' | 'confirm-delete' | null;
   styleUrl: './pocket-detail.component.css'
 })
 export class PocketDetailComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -120,7 +122,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       this.pocket.set(found);
 
       if (this.categoryService.categories().length === 0) {
-        this.categoryService.loadCategories().subscribe({
+        this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
           next: () => { this.isLoading.set(false); this.fetchTransactions(); },
           error: () => {
             this.isLoading.set(false);
@@ -134,7 +136,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
     };
 
     if (this.pocketService.pockets().length === 0) {
-      this.pocketService.loadPockets().subscribe({
+      this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => afterPockets(),
         error: () => {
           this.isLoading.set(false);
@@ -154,7 +156,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       this.pocketId,
       startDate || undefined,
       endDate || undefined
-    ).subscribe({
+    ).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoadingTx.set(false),
       error: () => this.isLoadingTx.set(false)
     });
@@ -223,7 +225,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       transactionDate: transactionDate!,
       description: description!,
       categoryId: categoryId!
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.fetchTransactions();
         this.refreshPocketBalance();
@@ -244,7 +246,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.transactionService.deleteTransaction(this.pocketId, tx.id).subscribe({
+    this.transactionService.deleteTransaction(this.pocketId, tx.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.refreshPocketBalance();
         this.isSaving.set(false);
@@ -258,7 +260,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
   }
 
   private refreshPocketBalance(): void {
-    this.pocketService.loadPockets().subscribe({
+    this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const updated = this.pocketService.pockets().find(p => p.id === this.pocketId);
         if (updated) this.pocket.set(updated);

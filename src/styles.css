@@ -56,3 +56,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+/* Authentication forms: visible keyboard focus and readable narrow layouts. */
+main[authAccessibility] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  --text-secondary: #91a7be;
+  --text-muted: #91a7be;
+}
+main[authAccessibility] input { min-width: 0; }
+main[authAccessibility] :is(button, a, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+main[authAccessibility] button.link-secondary {
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+main[authAccessibility] :is(h1, h2):focus { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  main[authAccessibility], main[authAccessibility] * { animation: none !important; transition: none !important; }
+}

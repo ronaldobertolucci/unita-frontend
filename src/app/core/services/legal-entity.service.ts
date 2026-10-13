@@ -1,4 +1,5 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -10,6 +11,9 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class LegalEntityService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this._legalEntities.set([]); }, inject(DestroyRef));
+
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
@@ -19,7 +23,7 @@ export class LegalEntityService {
   // ─── Listagem ─────────────────────────────────────────────────────────────
 
   loadLegalEntities(): Observable<LegalEntityDto[]> {
-    return this.http.get<LegalEntityDto[]>(`${this.base}/legal-entities`).pipe(
+    return this.session.scoped(() => this.http.get<LegalEntityDto[]>(`${this.base}/legal-entities`)).pipe(
       tap(list => this._legalEntities.set(this.sort(list)))
     );
   }
@@ -27,13 +31,13 @@ export class LegalEntityService {
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   create(payload: CreateLegalEntityPayload): Observable<LegalEntityDto> {
-    return this.http.post<LegalEntityDto>(`${this.base}/legal-entities`, payload).pipe(
+    return this.session.scoped(() => this.http.post<LegalEntityDto>(`${this.base}/legal-entities`, payload)).pipe(
       tap(entity => this._legalEntities.update(list => this.sort([...list, entity])))
     );
   }
 
   update(id: number, payload: UpdateLegalEntityPayload): Observable<LegalEntityDto> {
-    return this.http.patch<LegalEntityDto>(`${this.base}/legal-entities/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<LegalEntityDto>(`${this.base}/legal-entities/${id}`, payload)).pipe(
       tap(updated => this._legalEntities.update(list =>
         this.sort(list.map(e => e.id === updated.id ? updated : e))
       ))
@@ -41,7 +45,7 @@ export class LegalEntityService {
   }
 
   delete(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/legal-entities/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/legal-entities/${id}`)).pipe(
       tap(() => this._legalEntities.update(list => list.filter(e => e.id !== id)))
     );
   }

@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -133,72 +134,73 @@ export interface GroupNetProfitResponseDto {
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
+  private readonly session = inject(SessionService);
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiUrl;
 
   // Individual
   getDashboard(): Observable<DashboardDto> {
-    return this.http.get<DashboardDto>(`${this.baseUrl}/dashboard`);
+    return this.session.scoped(() => this.http.get<DashboardDto>(`${this.baseUrl}/dashboard`));
   }
 
   getMonthly(startDate: string, endDate: string): Observable<MonthlyDataDto[]> {
-    return this.http.get<MonthlyDataDto[]>(`${this.baseUrl}/dashboard/monthly`, {
+    return this.session.scoped(() => this.http.get<MonthlyDataDto[]>(`${this.baseUrl}/dashboard/monthly`, {
       params: { startDate, endDate },
-    });
+    }));
   }
 
   getCategorySummary(startDate: string, endDate: string): Observable<DashboardCategorySummaryDto> {
-    return this.http.get<DashboardCategorySummaryDto>(`${this.baseUrl}/dashboard/summary`, {
+    return this.session.scoped(() => this.http.get<DashboardCategorySummaryDto>(`${this.baseUrl}/dashboard/summary`, {
       params: { startDate, endDate },
-    });
+    }));
   }
 
   getIssuerRisk(): Observable<IssuerRiskDto[]> {
-    return this.http.get<IssuerRiskDto[]>(`${this.baseUrl}/dashboard/issuer-risk`);
+    return this.session.scoped(() => this.http.get<IssuerRiskDto[]>(`${this.baseUrl}/dashboard/issuer-risk`));
   }
 
   getIndexerSummary(): Observable<IndexerSummaryDto[]> {
-    return this.http.get<IndexerSummaryDto[]>(`${this.baseUrl}/dashboard/indexer-summary`);
+    return this.session.scoped(() => this.http.get<IndexerSummaryDto[]>(`${this.baseUrl}/dashboard/indexer-summary`));
   }
 
   // Group
   getGroupDashboard(groupId: number): Observable<GroupDashboardDto> {
-    return this.http.get<GroupDashboardDto>(`${this.baseUrl}/groups/${groupId}/dashboard`);
+    return this.session.scoped(() => this.http.get<GroupDashboardDto>(`${this.baseUrl}/groups/${groupId}/dashboard`));
   }
 
   getGroupMonthly(groupId: number, startDate: string, endDate: string): Observable<GroupMonthlyResponseDto> {
-    return this.http.get<GroupMonthlyResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/monthly`, {
+    return this.session.scoped(() => this.http.get<GroupMonthlyResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/monthly`, {
       params: { startDate, endDate },
-    });
+    }));
   }
 
   getGroupCategorySummary(groupId: number, startDate: string, endDate: string): Observable<GroupCategorySummaryResponseDto> {
-    return this.http.get<GroupCategorySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/summary`, {
+    return this.session.scoped(() => this.http.get<GroupCategorySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/summary`, {
       params: { startDate, endDate },
-    });
+    }));
   }
 
   getGroupIssuerRisk(groupId: number): Observable<GroupIssuerRiskResponseDto> {
-    return this.http.get<GroupIssuerRiskResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/issuer-risk`);
+    return this.session.scoped(() => this.http.get<GroupIssuerRiskResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/issuer-risk`));
   }
 
   getGroupIndexerSummary(groupId: number): Observable<GroupIndexerSummaryResponseDto> {
-    return this.http.get<GroupIndexerSummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/indexer-summary`);
+    return this.session.scoped(() => this.http.get<GroupIndexerSummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/indexer-summary`));
   }
 
   getLiquiditySummary(): Observable<LiquiditySummaryDto[]> {
-    return this.http.get<LiquiditySummaryDto[]>(`${this.baseUrl}/dashboard/liquidity-summary`);
+    return this.session.scoped(() => this.http.get<LiquiditySummaryDto[]>(`${this.baseUrl}/dashboard/liquidity-summary`));
   }
 
   getGroupLiquiditySummary(groupId: number): Observable<GroupLiquiditySummaryResponseDto> {
-    return this.http.get<GroupLiquiditySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/liquidity-summary`);
+    return this.session.scoped(() => this.http.get<GroupLiquiditySummaryResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/liquidity-summary`));
   }
 
   getNetProfit(): Observable<number> {
-    return this.http.get<number>(`${this.baseUrl}/dashboard/net-profit`);
+    return this.session.scoped(() => this.http.get<number>(`${this.baseUrl}/dashboard/net-profit`));
   }
 
   getGroupNetProfit(groupId: number): Observable<GroupNetProfitResponseDto> {
-    return this.http.get<GroupNetProfitResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/net-profit`);
+    return this.session.scoped(() => this.http.get<GroupNetProfitResponseDto>(`${this.baseUrl}/groups/${groupId}/dashboard/net-profit`));
   }
 }

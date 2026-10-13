@@ -1,4 +1,5 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -13,6 +14,9 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class EmployerService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this._individualEmployers.set([]); this._legalEntityEmployers.set([]); }, inject(DestroyRef));
+
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
@@ -25,19 +29,19 @@ export class EmployerService {
   // ─── Empregador PF ────────────────────────────────────────────────────────
 
   loadIndividualEmployers(): Observable<IndividualEmployerDto[]> {
-    return this.http.get<IndividualEmployerDto[]>(`${this.base}/employers/individual`).pipe(
+    return this.session.scoped(() => this.http.get<IndividualEmployerDto[]>(`${this.base}/employers/individual`)).pipe(
       tap(list => this._individualEmployers.set(this.individualSort(list)))
     );
   }
 
   createIndividual(payload: CreateIndividualEmployerPayload): Observable<IndividualEmployerDto> {
-    return this.http.post<IndividualEmployerDto>(`${this.base}/employers/individual`, payload).pipe(
+    return this.session.scoped(() => this.http.post<IndividualEmployerDto>(`${this.base}/employers/individual`, payload)).pipe(
       tap(created => this._individualEmployers.update(list => this.individualSort([...list, created])))
     );
   }
 
   updateIndividual(id: number, payload: UpdateIndividualEmployerPayload): Observable<IndividualEmployerDto> {
-    return this.http.patch<IndividualEmployerDto>(`${this.base}/employers/individual/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<IndividualEmployerDto>(`${this.base}/employers/individual/${id}`, payload)).pipe(
       tap(updated => this._individualEmployers.update(list =>
         this.individualSort(list.map(e => e.id === id ? updated : e))
       ))
@@ -45,7 +49,7 @@ export class EmployerService {
   }
 
   deleteIndividual(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/employers/individual/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/employers/individual/${id}`)).pipe(
       tap(() => this._individualEmployers.update(list => list.filter(e => e.id !== id)))
     );
   }
@@ -57,19 +61,19 @@ export class EmployerService {
   // ─── Empregador PJ ────────────────────────────────────────────────────────
 
   loadLegalEntityEmployers(): Observable<LegalEntityEmployerDto[]> {
-    return this.http.get<LegalEntityEmployerDto[]>(`${this.base}/employers/legal-entity`).pipe(
+    return this.session.scoped(() => this.http.get<LegalEntityEmployerDto[]>(`${this.base}/employers/legal-entity`)).pipe(
       tap(list => this._legalEntityEmployers.set(this.legalEntitySort(list)))
     );
   }
 
   createLegalEntity(payload: CreateLegalEntityEmployerPayload): Observable<LegalEntityEmployerDto> {
-    return this.http.post<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity`, payload).pipe(
+    return this.session.scoped(() => this.http.post<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity`, payload)).pipe(
       tap(created => this._legalEntityEmployers.update(list => this.legalEntitySort([...list, created])))
     );
   }
 
   updateLegalEntity(id: number, payload: UpdateLegalEntityEmployerPayload): Observable<LegalEntityEmployerDto> {
-    return this.http.patch<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<LegalEntityEmployerDto>(`${this.base}/employers/legal-entity/${id}`, payload)).pipe(
       tap(updated => this._legalEntityEmployers.update(list =>
         this.legalEntitySort(list.map(e => e.id === id ? updated : e))
       ))
@@ -77,7 +81,7 @@ export class EmployerService {
   }
 
   deleteLegalEntity(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/employers/legal-entity/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/employers/legal-entity/${id}`)).pipe(
       tap(() => this._legalEntityEmployers.update(list => list.filter(e => e.id !== id)))
     );
   }

@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LegalEntityService } from '../../../core/services/legal-entity.service';
@@ -15,6 +16,7 @@ type ModalType = 'create' | 'edit' | 'confirm-delete' | null;
   styleUrl: './legal-entities.component.css',
 })
 export class LegalEntitiesComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly legalEntityService = inject(LegalEntityService);
   private readonly fb = inject(FormBuilder);
 
@@ -44,7 +46,7 @@ export class LegalEntitiesComponent implements OnInit {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.legalEntityService.loadLegalEntities().subscribe({
+    this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -111,7 +113,7 @@ export class LegalEntitiesComponent implements OnInit {
       ? this.legalEntityService.update(this.selectedEntity()!.id, payload)
       : this.legalEntityService.create(payload);
 
-    request$.subscribe({
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -126,7 +128,7 @@ export class LegalEntitiesComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.legalEntityService.delete(entity.id).subscribe({
+    this.legalEntityService.delete(entity.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

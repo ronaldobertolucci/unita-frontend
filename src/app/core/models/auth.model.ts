@@ -1,4 +1,4 @@
-import { User } from './user.model';
+import { UserDto } from './user.model';
 
 export interface LoginRequest {
   email: string;
@@ -7,7 +7,18 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
-  user: User;
+  type: 'Bearer';
+  expiresIn: number;
+  user: UserDto;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+export interface PasswordResetRequest {
+  token: string;
+  newPassword: string;
 }
 
 export interface RegisterRequest {

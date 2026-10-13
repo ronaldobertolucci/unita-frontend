@@ -1,0 +1,21 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>H01 — recursos do navegador</title><h1>H01 — recursos do navegador</h1><pre id="result">Verificando...</pre><script>
+(async () => {
+ const result={origin:location.origin,secureContext:isSecureContext,webLocks:!!navigator.locks,broadcastChannel:typeof BroadcastChannel==='function',indexedDB:typeof indexedDB!=='undefined'};
+ const name='unita-h01-probe-'+Date.now();
+ if(result.webLocks) { await navigator.locks.request(name,()=>{result.lockAcquired=true;}); }
+ if(result.broadcastChannel) {
+  const sender=new BroadcastChannel(name), receiver=new BroadcastChannel(name);
+  result.channelDelivered=await new Promise(resolve=>{const timer=setTimeout(()=>resolve(false),3000);receiver.onmessage=event=>{clearTimeout(timer);resolve(event.data==='synthetic-probe');};sender.postMessage('synthetic-probe');});
+  sender.close();receiver.close();
+ }
+ if(result.indexedDB) {
+  try {
+   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore('coordination');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+   const attempt=owner=>new Promise((resolve,reject)=>{const tx=db.transaction('coordination','readwrite'),store=tx.objectStore('coordination');let acquired=false;const request=store.get('operation');request.onsuccess=()=>{if(request.result===undefined){store.put(owner,'operation');acquired=true;}};tx.oncomplete=()=>resolve(acquired);tx.onerror=()=>reject(tx.error);});
+   const outcomes=await Promise.all([attempt('A'),attempt('B')]);result.atomicAcquisitions=outcomes.filter(Boolean).length;
+   db.close();await new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase(name);r.onsuccess=resolve;r.onerror=()=>reject(r.error);});result.probeDatabaseRemoved=true;
+  } catch(error) {result.indexedDBError=error.name;}
+ }
+ document.getElementById('result').textContent=JSON.stringify(result,null,2);
+})();
+</script></html>

@@ -1,4 +1,5 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -41,6 +42,9 @@ export const BENEFIT_TYPES: BenefitTypeDto[] = [
 
 @Injectable({ providedIn: 'root' })
 export class PocketService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this._pockets.set([]); }, inject(DestroyRef));
+
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
@@ -50,7 +54,7 @@ export class PocketService {
   // ─── Listagem ─────────────────────────────────────────────────────────────
 
   loadPockets(): Observable<PocketSummaryDto[]> {
-    return this.http.get<any[]>(`${this.base}/pockets/my`).pipe(
+    return this.session.scoped(() => this.http.get<any[]>(`${this.base}/pockets/my`)).pipe(
       map(list => list.map(p => ({
         ...p,
         type: normalizeType(p.type),
@@ -73,37 +77,37 @@ export class PocketService {
   // ─── Dados de referência (carregados sob demanda) ─────────────────────────
 
   getLegalEntities(): Observable<LegalEntityDto[]> {
-    return this.http.get<LegalEntityDto[]>(`${this.base}/legal-entities`);
+    return this.session.scoped(() => this.http.get<LegalEntityDto[]>(`${this.base}/legal-entities`));
   }
 
   getIndividualEmployers(): Observable<IndividualEmployerDto[]> {
-    return this.http.get<IndividualEmployerDto[]>(`${this.base}/employers/individual`);
+    return this.session.scoped(() => this.http.get<IndividualEmployerDto[]>(`${this.base}/employers/individual`));
   }
 
   getLegalEntityEmployers(): Observable<LegalEntityEmployerDto[]> {
-    return this.http.get<LegalEntityEmployerDto[]>(`${this.base}/employers/legal-entity`);
+    return this.session.scoped(() => this.http.get<LegalEntityEmployerDto[]>(`${this.base}/employers/legal-entity`));
   }
 
   // ─── Conta Bancária ───────────────────────────────────────────────────────
 
   getBankAccount(id: number): Observable<BankAccountDto> {
-    return this.http.get<BankAccountDto>(`${this.base}/pockets/bank-accounts/${id}`);
+    return this.session.scoped(() => this.http.get<BankAccountDto>(`${this.base}/pockets/bank-accounts/${id}`));
   }
 
   createBankAccount(payload: CreateBankAccountPayload): Observable<BankAccountDto> {
-    return this.http.post<BankAccountDto>(`${this.base}/pockets/bank-accounts`, payload).pipe(
+    return this.session.scoped(() => this.http.post<BankAccountDto>(`${this.base}/pockets/bank-accounts`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   updateBankAccount(id: number, payload: UpdateBankAccountPayload): Observable<BankAccountDto> {
-    return this.http.put<BankAccountDto>(`${this.base}/pockets/bank-accounts/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.put<BankAccountDto>(`${this.base}/pockets/bank-accounts/${id}`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   deleteBankAccount(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/pockets/bank-accounts/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/pockets/bank-accounts/${id}`)).pipe(
       tap(() => this._pockets.update(list => list.filter(p => p.id !== id)))
     );
   }
@@ -111,23 +115,23 @@ export class PocketService {
   // ─── Conta de Benefício ───────────────────────────────────────────────────
 
   getBenefitAccount(id: number): Observable<BenefitAccountDto> {
-    return this.http.get<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts/${id}`);
+    return this.session.scoped(() => this.http.get<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts/${id}`));
   }
 
   createBenefitAccount(payload: CreateBenefitAccountPayload): Observable<BenefitAccountDto> {
-    return this.http.post<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts`, payload).pipe(
+    return this.session.scoped(() => this.http.post<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   updateBenefitAccount(id: number, payload: UpdateBenefitAccountPayload): Observable<BenefitAccountDto> {
-    return this.http.put<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.put<BenefitAccountDto>(`${this.base}/pockets/benefit-accounts/${id}`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   deleteBenefitAccount(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/pockets/benefit-accounts/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/pockets/benefit-accounts/${id}`)).pipe(
       tap(() => this._pockets.update(list => list.filter(p => p.id !== id)))
     );
   }
@@ -135,23 +139,23 @@ export class PocketService {
   // ─── FGTS ─────────────────────────────────────────────────────────────────
 
   getFgts(id: number): Observable<FgtsEmployerAccountDto> {
-    return this.http.get<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts/${id}`);
+    return this.session.scoped(() => this.http.get<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts/${id}`));
   }
 
   createFgts(payload: CreateFgtsPayload): Observable<FgtsEmployerAccountDto> {
-    return this.http.post<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts`, payload).pipe(
+    return this.session.scoped(() => this.http.post<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   updateFgts(id: number, payload: UpdateFgtsPayload): Observable<FgtsEmployerAccountDto> {
-    return this.http.put<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.put<FgtsEmployerAccountDto>(`${this.base}/pockets/fgts/${id}`, payload)).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }
 
   deleteFgts(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/pockets/fgts/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/pockets/fgts/${id}`)).pipe(
       tap(() => this._pockets.update(list => list.filter(p => p.id !== id)))
     );
   }
@@ -159,11 +163,11 @@ export class PocketService {
   // ─── Carteira (Cash) ──────────────────────────────────────────────────────
 
   getCash(): Observable<CashDto> {
-    return this.http.get<CashDto>(`${this.base}/pockets/cash`);
+    return this.session.scoped(() => this.http.get<CashDto>(`${this.base}/pockets/cash`));
   }
 
   createCash(): Observable<CashDto> {
-    return this.http.post<CashDto>(`${this.base}/pockets/cash`, {}).pipe(
+    return this.session.scoped(() => this.http.post<CashDto>(`${this.base}/pockets/cash`, {})).pipe(
       tap(() => this.loadPockets().subscribe())
     );
   }

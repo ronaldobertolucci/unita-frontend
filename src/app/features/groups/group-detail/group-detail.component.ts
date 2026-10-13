@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -28,6 +29,7 @@ type ModalType =
   styleUrl: './group-detail.component.css',
 })
 export class GroupDetailComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -80,7 +82,7 @@ export class GroupDetailComponent implements OnInit {
   private loadAll(): void {
     this.isLoading.set(true);
 
-    this.groupService.getGroup(this.groupId).subscribe({
+    this.groupService.getGroup(this.groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: group => {
         this.group.set(group);
         this.isLoading.set(false);
@@ -91,11 +93,11 @@ export class GroupDetailComponent implements OnInit {
       },
     });
 
-    this.groupService.getMembers(this.groupId).subscribe({
+    this.groupService.getMembers(this.groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: members => this.members.set(members),
     });
 
-    this.invitationService.getGroupInvitations(this.groupId).subscribe({
+    this.invitationService.getGroupInvitations(this.groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: invitations =>
         this.invitations.set(invitations.filter(i => i.status === 'PENDING')),
     });
@@ -139,7 +141,7 @@ export class GroupDetailComponent implements OnInit {
 
     this.groupService
       .updateGroup(this.groupId, { name: this.editNameControl.value! })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: updated => {
           this.group.set(updated);
           this.isSaving.set(false);
@@ -163,7 +165,7 @@ export class GroupDetailComponent implements OnInit {
 
     this.invitationService
       .createInvitation(this.groupId, this.emailControl.value!)
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: invitation => {
           this.invitations.update(list => [...list, invitation]);
           this.isSaving.set(false);
@@ -177,7 +179,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   cancelInvitation(id: number): void {
-    this.invitationService.cancelInvitation(id).subscribe({
+    this.invitationService.cancelInvitation(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () =>
         this.invitations.update(list => list.filter(i => i.id !== id)),
     });
@@ -192,7 +194,7 @@ export class GroupDetailComponent implements OnInit {
 
     this.groupService
       .transferResponsibility(this.groupId, { newResponsibleUserId: memberId })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: updated => {
           this.group.set(updated);
           this.isSaving.set(false);
@@ -207,7 +209,7 @@ export class GroupDetailComponent implements OnInit {
 
   leaveGroup(): void {
     this.isSaving.set(true);
-    this.groupService.leaveGroup(this.groupId).subscribe({
+    this.groupService.leaveGroup(this.groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.router.navigate(['/groups']),
       error: err => {
         this.isSaving.set(false);
@@ -218,7 +220,7 @@ export class GroupDetailComponent implements OnInit {
 
   deleteGroup(): void {
     this.isSaving.set(true);
-    this.groupService.deleteGroup(this.groupId).subscribe({
+    this.groupService.deleteGroup(this.groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.router.navigate(['/groups']),
       error: err => {
         this.isSaving.set(false);

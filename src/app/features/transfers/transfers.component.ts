@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TransferService } from '../../core/services/transfer.service';
@@ -19,6 +20,7 @@ type TransferTab = 'own' | 'group' | 'fgts';
   styleUrl: './transfers.component.css',
 })
 export class TransfersComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
   private readonly transferService = inject(TransferService);
   private readonly pocketService = inject(PocketService);
@@ -121,10 +123,10 @@ export class TransfersComponent implements OnInit, OnDestroy {
 
   // ── Lifecycle ────────────────────────────────────────────────────
   ngOnInit(): void {
-    this.pocketService.loadPockets().subscribe();
-    this.groupService.loadMyGroups$().subscribe();
+    this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    this.groupService.loadMyGroups$().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
 
-    this.ownForm.get('sourcePocketId')!.valueChanges.subscribe(val => {
+    this.ownForm.get('sourcePocketId')!.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(val => {
       this.selectedSourceId.set(Number(val));
     });
 
@@ -153,7 +155,7 @@ export class TransfersComponent implements OnInit, OnDestroy {
     if (!groupId) return;
 
     this.isLoadingGroupPockets.set(true);
-    this.transferService.getGroupPockets(groupId).subscribe({
+    this.transferService.getGroupPockets(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: pockets => {
         this.groupPockets.set(pockets);
         this.isLoadingGroupPockets.set(false);
@@ -183,9 +185,9 @@ export class TransfersComponent implements OnInit, OnDestroy {
       targetPocketId: targetPocketId!,
       amount: amount!,
       description: description!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.pocketService.loadPockets().subscribe();
+        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
         this.ownForm.reset();
         this.successMessage.set('Transferência realizada com sucesso!');
         this.isSaving.set(false);
@@ -211,9 +213,9 @@ export class TransfersComponent implements OnInit, OnDestroy {
       targetPocketId: targetPocketId!,
       amount: amount!,
       description: description!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.pocketService.loadPockets().subscribe();
+        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
         this.groupForm.reset();
         this.groupPockets.set([]);
         this.successMessage.set('Transferência realizada com sucesso!');
@@ -240,9 +242,9 @@ export class TransfersComponent implements OnInit, OnDestroy {
       targetPocketId: targetPocketId!,
       amount: amount!,
       description: description!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.pocketService.loadPockets().subscribe();
+        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
         this.fgtsForm.reset();
         this.successMessage.set('Saque de FGTS realizado com sucesso!');
         this.isSaving.set(false);

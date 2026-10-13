@@ -1,4 +1,5 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { GroupService } from '../../core/services/group.service';
@@ -13,6 +14,7 @@ import { PageContextService } from '../../core/services/page-context.service';
   styleUrl: './groups.component.css',
 })
 export class GroupsComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly groupService = inject(GroupService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -65,7 +67,7 @@ export class GroupsComponent implements OnInit, OnDestroy {
 
     this.groupService
       .createGroup({ name: this.nameControl.value! })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: (group: GroupDto) => {
           this.isSaving.set(false);
           this.closeModal();

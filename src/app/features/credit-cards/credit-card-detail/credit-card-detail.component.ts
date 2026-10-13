@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -25,6 +26,7 @@ type ModalType =
   styleUrl: './credit-card-detail.component.css',
 })
 export class CreditCardDetailComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -124,7 +126,7 @@ readonly expenseCategories = computed(() =>
   private loadPageData(): void {
     this.isLoading.set(true);
 
-    this.creditCardService.getCreditCard(this.cardId).subscribe({
+    this.creditCardService.getCreditCard(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: card => {
         this.card.set(card);
         this.loadBills();
@@ -133,16 +135,16 @@ readonly expenseCategories = computed(() =>
     });
 
     if (this.pocketService.pockets().length === 0) {
-      this.pocketService.loadPockets().subscribe();
+      this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     }
 
     if (this.categoryService.categories().length === 0) {
-      this.categoryService.loadCategories().subscribe();
+      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     }
   }
 
   private loadBills(): void {
-    this.creditCardService.getBills(this.cardId).subscribe({
+    this.creditCardService.getBills(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: bills => {
         this.bills.set(bills);
         this.isLoading.set(false);
@@ -155,7 +157,7 @@ readonly expenseCategories = computed(() =>
 
   closeBill(bill: CreditCardBillDto): void {
     this.inlineError.set(null);
-    this.creditCardService.closeBill(this.cardId, bill.id).subscribe({
+    this.creditCardService.closeBill(this.cardId, bill.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => this.replaceBill(updated),
       error: err => this.inlineError.set({
         billId: bill.id,
@@ -166,7 +168,7 @@ readonly expenseCategories = computed(() =>
 
   reopenBill(bill: CreditCardBillDto): void {
     this.inlineError.set(null);
-    this.creditCardService.reopenBill(this.cardId, bill.id).subscribe({
+    this.creditCardService.reopenBill(this.cardId, bill.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => this.replaceBill(updated),
       error: err => this.inlineError.set({
         billId: bill.id,
@@ -193,7 +195,7 @@ readonly expenseCategories = computed(() =>
 
     this.creditCardService.payBill(this.cardId, bill.id, {
       pocketId: this.payForm.value.pocketId!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => {
         this.replaceBill(updated);
         this.isSaving.set(false);
@@ -228,7 +230,7 @@ readonly expenseCategories = computed(() =>
       totalValue: v.totalValue!,
       purchaseDate: v.purchaseDate!,
       installmentsCount: v.installmentsCount!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: purchase => {
         this.currentPurchase.set(purchase);
         this.currentInstallmentIndex.set(1);
@@ -259,7 +261,7 @@ readonly expenseCategories = computed(() =>
       installmentNumber: index,
       amount: v.amount!,
       categoryId: v.categoryId!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.isSaving.set(false);
         const isLast = index === purchase.installmentsCount;
@@ -301,7 +303,7 @@ readonly expenseCategories = computed(() =>
     const purchase = this.currentPurchase();
     if (!purchase) return;
     this.isSaving.set(true);
-    this.creditCardService.deletePurchase(this.cardId, purchase.id).subscribe({
+    this.creditCardService.deletePurchase(this.cardId, purchase.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.loadBills();
         this.currentPurchase.set(null);

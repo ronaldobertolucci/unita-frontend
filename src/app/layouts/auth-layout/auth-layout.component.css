@@ -2,6 +2,7 @@
   min-height: 100vh;
   background: var(--bg-primary);
   position: relative;
+  overflow-x: clip;
 }
 
 /* Blobs decorativos de fundo — fixed para não interferir no scroll */

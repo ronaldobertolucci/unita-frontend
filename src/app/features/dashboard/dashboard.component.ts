@@ -1,7 +1,5 @@
-import {
-  Component, inject, signal, computed,
-  OnInit, OnDestroy, ViewChild, ElementRef, effect,
-} from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild, ElementRef, effect, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import {
   Chart,
@@ -60,6 +58,7 @@ type DashboardSection = 'summary' | 'income-expense' | 'investments';
   styleUrl: './dashboard.component.css',
 })
 export class DashboardComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dashboardService = inject(DashboardService);
   private readonly groupService     = inject(GroupService);
   private pageContextService = inject(PageContextService);
@@ -468,7 +467,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   // ── Lifecycle ─────────────────────────────────────────────────────
   ngOnInit(): void {
-    this.groupService.loadMyGroups$().subscribe();
+    this.groupService.loadMyGroups$().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     this.loadDashboard();
     this.loadMonthly();
     this.loadCategoryData();
@@ -501,7 +500,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadDashboard(): void {
     this.isLoadingDashboard.set(true);
-    this.dashboardService.getDashboard().subscribe({
+    this.dashboardService.getDashboard().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.dashboardData.set(data);
         this.isLoadingDashboard.set(false);
@@ -515,7 +514,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadMonthly(): void {
     this.isLoadingMonthly.set(true);
-    this.dashboardService.getMonthly(this.lineStartDate(), this.lineEndDate()).subscribe({
+    this.dashboardService.getMonthly(this.lineStartDate(), this.lineEndDate()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.monthlyData.set(data);
         this.isLoadingMonthly.set(false);
@@ -527,7 +526,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadCategoryData(): void {
     this.isLoadingCategory.set(true);
-    this.dashboardService.getCategorySummary(this.categoryStartDate(), this.categoryEndDate()).subscribe({
+    this.dashboardService.getCategorySummary(this.categoryStartDate(), this.categoryEndDate()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.categoryData.set(data);
         this.isLoadingCategory.set(false);
@@ -539,7 +538,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadIssuerRisk(): void {
     this.isLoadingIssuerRisk.set(true);
-    this.dashboardService.getIssuerRisk().subscribe({
+    this.dashboardService.getIssuerRisk().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.issuerRiskData.set(data);
         this.isLoadingIssuerRisk.set(false);
@@ -551,7 +550,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadIndexerSummary(): void {
     this.isLoadingIndexer.set(true);
-    this.dashboardService.getIndexerSummary().subscribe({
+    this.dashboardService.getIndexerSummary().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.indexerData.set(data);
         this.isLoadingIndexer.set(false);
@@ -563,7 +562,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadLiquiditySummary(): void {
     this.isLoadingLiquidity.set(true);
-    this.dashboardService.getLiquiditySummary().subscribe({
+    this.dashboardService.getLiquiditySummary().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.liquidityData.set(data);
         this.isLoadingLiquidity.set(false);
@@ -575,7 +574,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadNetProfit(): void {
     this.isLoadingNetProfit.set(true);
-    this.dashboardService.getNetProfit().subscribe({
+    this.dashboardService.getNetProfit().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.netProfitData.set(data);
         this.isLoadingNetProfit.set(false);
@@ -682,7 +681,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadGroupDashboard(groupId: number): void {
     this.isLoadingGroupDashboard.set(true);
-    this.dashboardService.getGroupDashboard(groupId).subscribe({
+    this.dashboardService.getGroupDashboard(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupDashboardData.set(data);
         this.selectedMemberIds.set(data.members.map(m => m.user.id));
@@ -697,7 +696,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadGroupMonthly(groupId: number): void {
     this.isLoadingGroupMonthly.set(true);
-    this.dashboardService.getGroupMonthly(groupId, this.groupLineStartDate(), this.groupLineEndDate()).subscribe({
+    this.dashboardService.getGroupMonthly(groupId, this.groupLineStartDate(), this.groupLineEndDate()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupMonthlyData.set(data);
         this.isLoadingGroupMonthly.set(false);
@@ -708,7 +707,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   loadGroupCategoryData(groupId: number): void {
     this.isLoadingGroupCategory.set(true);
-    this.dashboardService.getGroupCategorySummary(groupId, this.groupCategoryStartDate(), this.groupCategoryEndDate()).subscribe({
+    this.dashboardService.getGroupCategorySummary(groupId, this.groupCategoryStartDate(), this.groupCategoryEndDate()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupCategoryData.set(data);
         this.isLoadingGroupCategory.set(false);
@@ -719,7 +718,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadGroupIssuerRisk(groupId: number): void {
     this.isLoadingGroupIssuerRisk.set(true);
-    this.dashboardService.getGroupIssuerRisk(groupId).subscribe({
+    this.dashboardService.getGroupIssuerRisk(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupIssuerRiskData.set(data);
         this.isLoadingGroupIssuerRisk.set(false);
@@ -730,7 +729,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadGroupIndexerSummary(groupId: number): void {
     this.isLoadingGroupIndexer.set(true);
-    this.dashboardService.getGroupIndexerSummary(groupId).subscribe({
+    this.dashboardService.getGroupIndexerSummary(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupIndexerData.set(data);
         this.isLoadingGroupIndexer.set(false);
@@ -741,7 +740,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadGroupLiquiditySummary(groupId: number): void {
     this.isLoadingGroupLiquidity.set(true);
-    this.dashboardService.getGroupLiquiditySummary(groupId).subscribe({
+    this.dashboardService.getGroupLiquiditySummary(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupLiquidityData.set(data);
         this.isLoadingGroupLiquidity.set(false);
@@ -752,7 +751,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadGroupNetProfit(groupId: number): void {
     this.isLoadingGroupNetProfit.set(true);
-    this.dashboardService.getGroupNetProfit(groupId).subscribe({
+    this.dashboardService.getGroupNetProfit(groupId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         this.groupNetProfitData.set(data);
         this.isLoadingGroupNetProfit.set(false);

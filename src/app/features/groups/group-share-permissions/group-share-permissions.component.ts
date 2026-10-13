@@ -1,4 +1,5 @@
-import { Component, inject, signal, input, output, OnInit } from '@angular/core';
+import { Component, inject, signal, input, output, OnInit, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { GroupService, SharePermissionDto, ShareType } from '../../../core/services/group.service';
 import { translateApiError } from '../../../core/utils/api-error.util';
@@ -18,6 +19,7 @@ interface PermissionRow {
   styleUrl: './group-share-permissions.component.css',
 })
 export class GroupSharePermissionsComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly groupService = inject(GroupService);
 
   readonly groupId = input.required<number>();
@@ -63,7 +65,7 @@ export class GroupSharePermissionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.isLoading.set(true);
-    this.groupService.getSharePermissions(this.groupId()).subscribe({
+    this.groupService.getSharePermissions(this.groupId()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: data => {
         const loaded = new Map(data.map(p => [p.shareType, p.enabled]));
         this.permissions.set(
@@ -98,7 +100,7 @@ export class GroupSharePermissionsComponent implements OnInit {
         shareType: r.shareType,
         enabled: r.enabled,
       })),
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.isSaving.set(false);
         this.closed.emit();

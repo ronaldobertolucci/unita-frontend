@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { EmployerService } from '../../../core/services/employer.service';
@@ -15,6 +16,7 @@ type ModalType = 'create' | 'edit' | 'confirm-delete' | null;
   styleUrl: './individual-employers.component.css',
 })
 export class IndividualEmployersComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly employerService = inject(EmployerService);
   private readonly fb = inject(FormBuilder);
 
@@ -41,7 +43,7 @@ export class IndividualEmployersComponent implements OnInit {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.employerService.loadIndividualEmployers().subscribe({
+    this.employerService.loadIndividualEmployers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -97,7 +99,7 @@ export class IndividualEmployersComponent implements OnInit {
       ? this.employerService.updateIndividual(this.selectedEmployer()!.id, payload)
       : this.employerService.createIndividual(payload);
 
-    request$.subscribe({
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -112,7 +114,7 @@ export class IndividualEmployersComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.employerService.deleteIndividual(employer.id).subscribe({
+    this.employerService.deleteIndividual(employer.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

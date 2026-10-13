@@ -182,7 +182,9 @@
 
     <!-- CONTEÚDO -->
     <main class="content">
-      <router-outlet />
+      @if (isAuthenticated()) {
+        <router-outlet />
+      }
     </main>
 
   </div>
@@ -302,6 +304,13 @@
     }
   </div>
 
+  @if (streamStatus() === 'unavailable' || streamStatus() === 'exhausted') {
+    <p class="notif-empty" role="status">As notificações em tempo real estão indisponíveis. Você pode atualizar a lista.</p>
+    <button type="button" class="notif-btn" (click)="refreshNotifications()" [disabled]="notificationsLoading()">Atualizar lista</button>
+  }
+  @if (streamStatus() === 'retrying') {
+    <p class="notif-empty" role="status">Reconectando notificações...</p>
+  }
   @if (notificationsLoading()) {
     <div class="notif-loading">
       <span class="spinner-sm"></span>

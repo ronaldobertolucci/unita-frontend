@@ -1,4 +1,5 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal, DestroyRef } from '@angular/core';
+import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -10,6 +11,9 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class CategoryService {
+  private readonly session = inject(SessionService);
+  private readonly sessionCleanup = this.session.registerCleanup(() => { this._categories.set([]); }, inject(DestroyRef));
+
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
@@ -19,7 +23,7 @@ export class CategoryService {
   // ─── Listagem ─────────────────────────────────────────────────────────────
 
   loadCategories(): Observable<CategoryDto[]> {
-    return this.http.get<CategoryDto[]>(`${this.base}/categories`).pipe(
+    return this.session.scoped(() => this.http.get<CategoryDto[]>(`${this.base}/categories`)).pipe(
       tap(list => this._categories.set(this.sort(list)))
     );
   }
@@ -27,13 +31,13 @@ export class CategoryService {
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   create(payload: CreateCategoryPayload): Observable<CategoryDto> {
-    return this.http.post<CategoryDto>(`${this.base}/categories`, payload).pipe(
+    return this.session.scoped(() => this.http.post<CategoryDto>(`${this.base}/categories`, payload)).pipe(
       tap(created => this._categories.update(list => this.sort([...list, created])))
     );
   }
 
   update(id: number, payload: UpdateCategoryPayload): Observable<CategoryDto> {
-    return this.http.patch<CategoryDto>(`${this.base}/categories/${id}`, payload).pipe(
+    return this.session.scoped(() => this.http.patch<CategoryDto>(`${this.base}/categories/${id}`, payload)).pipe(
       tap(updated => this._categories.update(list =>
         this.sort(list.map(c => c.id === id ? updated : c))
       ))
@@ -41,7 +45,7 @@ export class CategoryService {
   }
 
   delete(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/categories/${id}`).pipe(
+    return this.session.scoped(() => this.http.delete<void>(`${this.base}/categories/${id}`)).pipe(
       tap(() => this._categories.update(list => list.filter(c => c.id !== id)))
     );
   }

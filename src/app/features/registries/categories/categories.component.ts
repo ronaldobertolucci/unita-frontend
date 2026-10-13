@@ -1,4 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CategoryService } from '../../../core/services/category.service';
@@ -15,6 +16,7 @@ type ModalType = 'create' | 'edit' | 'confirm-delete' | null;
   styleUrl: './categories.component.css',
 })
 export class CategoriesComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly categoryService = inject(CategoryService);
   private readonly fb = inject(FormBuilder);
 
@@ -59,7 +61,7 @@ export class CategoriesComponent implements OnInit {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.categoryService.loadCategories().subscribe({
+    this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -123,7 +125,7 @@ export class CategoriesComponent implements OnInit {
       ? this.categoryService.update(this.selectedCategory()!.id, payload)
       : this.categoryService.create(payload);
 
-    request$.subscribe({
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -138,7 +140,7 @@ export class CategoriesComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.categoryService.delete(category.id).subscribe({
+    this.categoryService.delete(category.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

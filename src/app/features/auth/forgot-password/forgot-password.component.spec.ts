@@ -55,7 +55,7 @@ describe('ForgotPasswordComponent', () => {
       const req = httpMock.expectOne(`${environment.apiUrl}/password/forgot`);
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ email: 'joao@email.com' });
-      req.flush({});
+      req.flush({ message: 'neutral' });
     });
 
     it('should set submitted = true on success', () => {
@@ -63,7 +63,7 @@ describe('ForgotPasswordComponent', () => {
       component.onSubmit();
 
       const req = httpMock.expectOne(`${environment.apiUrl}/password/forgot`);
-      req.flush({});
+      req.flush({ message: 'neutral' });
 
       expect(component.submitted()).toBe(true);
     });
@@ -78,8 +78,27 @@ describe('ForgotPasswordComponent', () => {
         { status: 500, statusText: 'Internal Server Error' }
       );
 
-      expect(component.errorMessage()).toBe('Erro interno');
+      expect(component.errorMessage()).toContain('servidor');
       expect(component.submitted()).toBe(false);
     });
   });
+  it('does not accept malformed success or auto-repeat a lost request', () => {
+    component.form.setValue({ email: 'test@example.com' }); component.onSubmit(); component.onSubmit();
+    httpMock.expectOne('/api/password/forgot').flush({});
+    expect(component.submitted()).toBe(false); expect(component.errorMessage()).toContain('não foi confirmado');
+    httpMock.expectNone('/api/password/forgot');
+  });
+  it('maps email validation without inferring whether an account exists', () => {
+    component.form.setValue({ email: 'test@example.com' }); component.onSubmit();
+    httpMock.expectOne('/api/password/forgot').flush({ error: 'Validation Failed', errors: [{ field: 'email' }] }, { status: 400, statusText: 'Bad Request' });
+    expect(component.emailControl.hasError('api')).toBe(true); expect(component.submitted()).toBe(false);
+  });
+  it('uses neutral success without an email echo or delivery deadline', () => {
+    component.form.setValue({ email: 'test@example.com' }); component.onSubmit();
+    httpMock.expectOne('/api/password/forgot').flush({ message: 'neutral' }); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('test@example.com');
+    expect(fixture.nativeElement.textContent).not.toContain('em breve');
+    expect(fixture.nativeElement.textContent).toContain('links de redefinição anteriores são invalidados');
+  });
+
 });

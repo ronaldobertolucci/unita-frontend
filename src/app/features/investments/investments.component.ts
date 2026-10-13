@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, signal, inject, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, computed, effect, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
@@ -34,6 +35,7 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('pt-BR', {
   styleUrl: './investments.component.css',
 })
 export class InvestmentsComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private fb = inject(FormBuilder);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -131,7 +133,7 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.assetService.loadAssets();
-    this.legalEntityService.loadLegalEntities().subscribe();
+    this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     this.buildForms();
 
     this.pageContextService.pageSubtitle.set('Acompanhe seus ativos de renda fixa e previdência');
@@ -229,7 +231,7 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
         taxFree: !!taxFree,
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.assetService.loadAssets();
           this.isSaving.set(false);
@@ -260,7 +262,7 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
         taxRegime,
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.assetService.loadAssets();
           this.isSaving.set(false);

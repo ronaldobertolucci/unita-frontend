@@ -1,146 +1,69 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import {
-  HttpClientTestingModule,
-  HttpTestingController,
-} from '@angular/common/http/testing';
-import { ActivatedRoute } from '@angular/router';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
+import { BehaviorSubject, Subject, of } from 'rxjs';
 import { ResetPasswordComponent } from './reset-password.component';
-import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 
-function buildActivatedRoute(token: string | null) {
-  return {
-    snapshot: {
-      queryParamMap: {
-        get: (key: string) => (key === 'token' ? token : null),
-      },
-    },
-  };
-}
-
-describe('ResetPasswordComponent', () => {
-  let fixture: ComponentFixture<ResetPasswordComponent>;
-  let component: ResetPasswordComponent;
-  let httpMock: HttpTestingController;
-
-  function setup(token: string | null) {
-    TestBed.configureTestingModule({
-      imports: [ResetPasswordComponent, HttpClientTestingModule, RouterTestingModule],
-      providers: [
-        { provide: ActivatedRoute, useValue: buildActivatedRoute(token) },
-      ],
-    });
-
-    fixture = TestBed.createComponent(ResetPasswordComponent);
-    component = fixture.componentInstance;
-    httpMock = TestBed.inject(HttpTestingController);
+ describe('H11 reset password state machine', () => {
+  let fixture: ComponentFixture<ResetPasswordComponent>, component: ResetPasswordComponent;
+  let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let validation: Subject<{ message: string }>, reset: Subject<{ message: string }>;
+  let auth: { validateResetToken: jest.Mock; resetPassword: jest.Mock };
+  function setup(token?: string | string[]) {
+    params = new BehaviorSubject(convertToParamMap(token === undefined ? {} : { token }));
+    validation = new Subject(); reset = new Subject();
+    auth = { validateResetToken: jest.fn().mockReturnValue(validation), resetPassword: jest.fn().mockReturnValue(reset) };
+    TestBed.configureTestingModule({ imports: [ResetPasswordComponent, RouterTestingModule], providers: [
+      { provide: AuthService, useValue: auth }, { provide: ActivatedRoute, useValue: { queryParamMap: params } }
+    ] });
+    fixture = TestBed.createComponent(ResetPasswordComponent); component = fixture.componentInstance; fixture.detectChanges();
   }
-
-  afterEach(() => httpMock.verify());
-
-  describe('when no token in URL', () => {
-    it('should set state to invalid-token immediately', () => {
-      setup(null);
-      fixture.detectChanges();
-      expect(component.pageState()).toBe('invalid-token');
-      httpMock.expectNone(`${environment.apiUrl}/password/reset/validate`);
-    });
+  const valid = () => { validation.next({ message: 'Token is valid' }); validation.complete(); };
+  const submit = (password = ' exact password ') => {
+    component.form.setValue({ newPassword: password, confirmPassword: password }); component.onSubmit();
+  };
+  afterEach(() => { fixture?.destroy(); TestBed.resetTestingModule(); });
+  it.each([undefined, '', ' ', ['a', 'b']])('blocks an absent/blank/duplicate token %j and explains reload', token => {
+    setup(token); expect(component.pageState()).toBe('invalid-token'); expect(auth.validateResetToken).not.toHaveBeenCalled();
+    expect(component.errorMessage()).toContain('Reabra o link'); submit(); expect(auth.resetPassword).not.toHaveBeenCalled();
   });
-
-  describe('when token is present in URL', () => {
-    beforeEach(() => setup('valid-token'));
-
-    it('should start with validating state', () => {
-      // Antes de detectChanges (ngOnInit ainda não rodou)
-      expect(component.pageState()).toBe('validating');
-    });
-
-    it('should set state to form after successful token validation', () => {
-      fixture.detectChanges();
-      const req = httpMock.expectOne(
-        `${environment.apiUrl}/password/reset/validate?token=valid-token`
-      );
-      req.flush({});
-      expect(component.pageState()).toBe('form');
-    });
-
-    it('should set state to invalid-token when token validation fails', () => {
-      fixture.detectChanges();
-      const req = httpMock.expectOne(
-        `${environment.apiUrl}/password/reset/validate?token=valid-token`
-      );
-      req.flush({ message: 'Token inválido' }, { status: 400, statusText: 'Bad Request' });
-      expect(component.pageState()).toBe('invalid-token');
-    });
+  it('never posts before validation and sends only the exact new password with token', () => {
+    setup('opaque+/='); submit(); expect(auth.resetPassword).not.toHaveBeenCalled(); valid(); submit();
+    expect(auth.resetPassword).toHaveBeenCalledWith({ token: 'opaque+/=', newPassword: ' exact password ' });
+    component.onSubmit(); expect(auth.resetPassword).toHaveBeenCalledTimes(1);
+    reset.next({ message: 'reset' }); reset.complete(); expect(component.pageState()).toBe('success');
+    expect(component.newPasswordControl.value).toBeNull(); expect(component['token']).toBeNull();
   });
-
-  describe('form validation', () => {
-    beforeEach(() => {
-      setup('valid-token');
-      fixture.detectChanges();
-      // Confirma token como válido
-      httpMock
-        .expectOne(`${environment.apiUrl}/password/reset/validate?token=valid-token`)
-        .flush({});
-    });
-
-    it('should not submit when form is empty', () => {
-      component.onSubmit();
-      httpMock.expectNone(`${environment.apiUrl}/password/reset`);
-      expect(component.newPasswordControl.touched).toBe(true);
-    });
-
-    it('should show minlength error when password is too short', () => {
-      component.form.patchValue({ newPassword: '123' });
-      component.form.markAllAsTouched();
-      expect(component.newPasswordControl.hasError('minlength')).toBe(true);
-    });
-
-    it('should show passwordMismatch error when passwords differ', () => {
-      component.form.patchValue({ newPassword: '12345678', confirmPassword: 'different' });
-      component.confirmPasswordControl.markAsTouched();
-      expect(component.hasPasswordMismatch).toBe(true);
-    });
+  it.each(['1234567', '        '])('rejects invalid new password %j', password => {
+    setup('token'); valid(); submit(password); expect(auth.resetPassword).not.toHaveBeenCalled();
   });
-
-  describe('onSubmit()', () => {
-    beforeEach(() => {
-      setup('valid-token');
-      fixture.detectChanges();
-      httpMock
-        .expectOne(`${environment.apiUrl}/password/reset/validate?token=valid-token`)
-        .flush({});
-    });
-
-    it('should call POST /password/reset with token and new password', () => {
-      component.form.setValue({ newPassword: 'newpass123', confirmPassword: 'newpass123' });
-      component.onSubmit();
-
-      const req = httpMock.expectOne(`${environment.apiUrl}/password/reset`);
-      expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual({ token: 'valid-token', newPassword: 'newpass123' });
-      req.flush({});
-    });
-
-    it('should set state to success after successful reset', () => {
-      component.form.setValue({ newPassword: 'newpass123', confirmPassword: 'newpass123' });
-      component.onSubmit();
-
-      httpMock.expectOne(`${environment.apiUrl}/password/reset`).flush({});
-
-      expect(component.pageState()).toBe('success');
-    });
-
-    it('should set errorMessage on reset failure', () => {
-      component.form.setValue({ newPassword: 'newpass123', confirmPassword: 'newpass123' });
-      component.onSubmit();
-
-      httpMock
-        .expectOne(`${environment.apiUrl}/password/reset`)
-        .flush({ message: 'Token expirado' }, { status: 400, statusText: 'Bad Request' });
-
-      expect(component.errorMessage()).toBe('Token expirado');
-      expect(component.pageState()).toBe('form');
-    });
+  it('rejects mismatched confirmation and allows an eight-character password', () => {
+    setup('token'); valid(); component.form.setValue({ newPassword: '12345678', confirmPassword: 'different' }); component.onSubmit();
+    expect(component.hasPasswordMismatch).toBe(true); expect(auth.resetPassword).not.toHaveBeenCalled(); submit('12345678'); expect(auth.resetPassword).toHaveBeenCalledTimes(1);
+  });
+  it('permits explicit readonly revalidation after a transient failure, without an automatic request', () => {
+    setup('token'); validation.error({ status: 500 }); expect(component.pageState()).toBe('validation-error');
+    expect(auth.validateResetToken).toHaveBeenCalledTimes(1); auth.validateResetToken.mockReturnValue(of({ message: 'valid' }));
+    component.revalidate(); expect(component.pageState()).toBe('form'); expect(auth.validateResetToken).toHaveBeenCalledTimes(2);
+  });
+  it('ends the flow when token is rejected during validation or between validation and reset', () => {
+    setup('token'); valid(); submit(); reset.error({ status: 400, error: { error: 'Invalid Token', message: 'Token expired or already used' } });
+    expect(component.pageState()).toBe('invalid-token'); expect(component['token']).toBeNull(); component.onSubmit(); expect(auth.resetPassword).toHaveBeenCalledTimes(1);
+  });
+  it('maps newPassword validation and permits correcting that field', () => {
+    setup('token'); valid(); submit(); reset.error({ status: 400, error: { error: 'Validation Failed', errors: [{ field: 'newPassword', message: 'internal' }] } });
+    expect(component.pageState()).toBe('form'); expect(component.newPasswordControl.hasError('api')).toBe(true);
+    component.newPasswordControl.setValue('corrected password'); expect(component.newPasswordControl.hasError('api')).toBe(false);
+  });
+  it.each([0, 500, 400, 429])('does not allow reset retry after unknown HTTP %s', status => {
+    setup('token'); valid(); submit(); reset.error({ status, error: { message: 'unknown' } });
+    expect(component.pageState()).toBe('uncertain'); expect(component.errorMessage()).toContain('pode ter sido alterada');
+    expect(component['token']).toBeNull(); component.onSubmit(); expect(auth.resetPassword).toHaveBeenCalledTimes(1);
+  });
+  it('link changes and leaving suppress old validation/reset callbacks and clear fields', () => {
+    setup('old'); const old = validation; validation = new Subject(); auth.validateResetToken.mockReturnValue(validation);
+    params.next(convertToParamMap({ token: 'new' })); old.next({ message: 'old valid' }); expect(component.pageState()).toBe('validating');
+    valid(); submit(); fixture.destroy(); reset.next({ message: 'late' }); expect(component.pageState()).not.toBe('success'); expect(component['token']).toBeNull();
   });
 });

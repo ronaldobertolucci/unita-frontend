@@ -1,36 +1,36 @@
-# UnitaFrontend
+# Unita frontend
 
-Este projeto foi criado usando [Angular CLI](https://github.com/angular/angular-cli) versão 19.2.19.
+Interface web do Unita. Este projeto depende do backend [unita-api](https://github.com/ronaldobertolucci/unita-api).
 
-## Instale as dependências do projeto
+## Como rodar
+
+Inicie o `unita-api` em `http://localhost:8080`, seguindo as instruções do seu repositório.
+
+Depois, na pasta deste projeto:
 
 ```bash
-npm install
+npm ci
+npm start
 ```
 
-## Servidor de desenvolvimento
+Acesse [http://localhost:4200](http://localhost:4200).
 
-Para desenvolvimento local, rode
+## Como rodar os testes
+
+Execute todos os testes:
 
 ```bash
-ng serve
+npm test
 ```
 
-Uma vez que o servidor está rodando, abra o navegador e acesse `http://localhost:4200/`.
-
-## Rodando com Docker
-
-Primeiro, construa a imagem
+Para acompanhar alterações:
 
 ```bash
-docker build -t unita-frontend .
+npm run test:watch
 ```
 
- Depois, rode o container com 
+Para gerar o relatório de cobertura:
 
 ```bash
-docker run -p 4200:4200 \
-  -e API_URL=http://localhost:8080/api \
-  -e PRODUCTION=true \
-  unita-frontend
+npm run test:coverage
 ```

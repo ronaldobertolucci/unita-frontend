@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { EmployerService } from '../../../core/services/employer.service';
@@ -16,6 +17,7 @@ type ModalType = 'create' | 'edit' | 'confirm-delete' | null;
   styleUrl: './legal-entity-employers.component.css',
 })
 export class LegalEntityEmployersComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly employerService = inject(EmployerService);
   private readonly legalEntityService = inject(LegalEntityService);
   private readonly fb = inject(FormBuilder);
@@ -43,7 +45,7 @@ export class LegalEntityEmployersComponent implements OnInit {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.employerService.loadLegalEntityEmployers().subscribe({
+    this.employerService.loadLegalEntityEmployers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -84,7 +86,7 @@ export class LegalEntityEmployersComponent implements OnInit {
   private loadLegalEntities(): void {
     if (this.legalEntities().length > 0) return;
     this.isLoadingEntities.set(true);
-    this.legalEntityService.loadLegalEntities().subscribe({
+    this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: list => { this.legalEntities.set(list); this.isLoadingEntities.set(false); },
       error: () => this.isLoadingEntities.set(false),
     });
@@ -106,7 +108,7 @@ export class LegalEntityEmployersComponent implements OnInit {
       ? this.employerService.updateLegalEntity(this.selectedEmployer()!.id, payload)
       : this.employerService.createLegalEntity(payload);
 
-    request$.subscribe({
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -121,7 +123,7 @@ export class LegalEntityEmployersComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.employerService.deleteLegalEntity(employer.id).subscribe({
+    this.employerService.deleteLegalEntity(employer.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

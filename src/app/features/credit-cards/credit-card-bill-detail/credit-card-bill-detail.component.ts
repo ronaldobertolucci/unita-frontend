@@ -1,4 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -45,6 +46,7 @@ interface BillDisplayItem {
   styleUrl: './credit-card-bill-detail.component.css',
 })
 export class CreditCardBillDetailComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -138,21 +140,21 @@ export class CreditCardBillDetailComponent implements OnInit {
     this.isLoading.set(true);
 
     // Carrega a fatura
-    this.creditCardService.getBill(this.cardId, this.billId).subscribe({
+    this.creditCardService.getBill(this.cardId, this.billId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: bill => this.bill.set(bill),
       error: () => this.router.navigate(['/credit-cards', this.cardId]),
     });
 
     // Carrega categorias se necessário
     if (this.categoryService.categories().length === 0) {
-      this.categoryService.loadCategories().subscribe();
+      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
     }
 
     // Carrega compras e statement em paralelo
     let pending = 2;
     const done = () => { if (--pending === 0) this.isLoading.set(false); };
 
-    this.creditCardService.getPurchases(this.cardId).subscribe({
+    this.creditCardService.getPurchases(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: purchases => { this.purchases.set(purchases); done(); },
       error: () => done(),
     });
@@ -161,7 +163,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   private loadStatement(callback?: () => void): void {
-    this.creditCardService.getBillStatement(this.cardId, this.billId).subscribe({
+    this.creditCardService.getBillStatement(this.cardId, this.billId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: statement => {
         this.installments.set(statement.installments);
         this.refunds.set(statement.refunds);
@@ -205,7 +207,7 @@ export class CreditCardBillDetailComponent implements OnInit {
       amount: v.amount!,
       refundDate: v.refundDate!,
       categoryId: v.categoryId!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: refund => {
         this.refunds.update(list => [...list, refund]);
         this.refreshBill();
@@ -235,7 +237,7 @@ export class CreditCardBillDetailComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deletePurchase(this.cardId, purchaseId).subscribe({
+    this.creditCardService.deletePurchase(this.cardId, purchaseId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purchases.update(list => list.filter(p => p.id !== purchaseId));
         this.loadStatement();
@@ -251,7 +253,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   private refreshBill(): void {
-    this.creditCardService.getBill(this.cardId, this.billId).subscribe({
+    this.creditCardService.getBill(this.cardId, this.billId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: bill => this.bill.set(bill),
     });
   }
@@ -271,7 +273,7 @@ export class CreditCardBillDetailComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deleteRefund(this.cardId, this.billId, refundId).subscribe({
+    this.creditCardService.deleteRefund(this.cardId, this.billId, refundId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.refunds.update(list => list.filter(r => r.id !== refundId));
         this.refreshBill();

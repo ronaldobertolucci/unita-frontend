@@ -1,112 +1,96 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import {
-  AbstractControl,
-  FormBuilder,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators,
-} from '@angular/forms';
+import { AuthAccessibilityDirective } from '../../../core/auth/auth-accessibility.directive';
+import { Component, DestroyRef, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../../environments/environment';
+import { Subject, takeUntil } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { AuthService } from '../../../core/services/auth.service';
+import { LinkTokenService } from '../../../core/auth/link-token.service';
+import { applyAuthFields, AuthRetryWait, matchingPasswords, nonBlankControl } from '../../../core/auth/auth-form';
+import { classifyAuthError, readAuthApiError } from '../../../core/auth/auth-errors';
 
-function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
-  const password = group.get('newPassword')?.value;
-  const confirm = group.get('confirmPassword')?.value;
-  if (password && confirm && password !== confirm) {
-    return { passwordMismatch: true };
-  }
-  return null;
-}
-
-type PageState = 'validating' | 'invalid-token' | 'form' | 'success';
-
-@Component({
-  selector: 'app-reset-password',
-  standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
-  templateUrl: './reset-password.component.html',
-  styleUrl: './reset-password.component.css',
-})
-export class ResetPasswordComponent implements OnInit {
+type PageState = 'validating' | 'validation-error' | 'invalid-token' | 'form' | 'success' | 'uncertain';
+@Component({ selector: 'app-reset-password', standalone: true, imports: [ReactiveFormsModule, RouterLink, AuthAccessibilityDirective],
+  templateUrl: './reset-password.component.html', styleUrl: './reset-password.component.css' })
+export class ResetPasswordComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
-  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
-
+  private readonly links = inject(LinkTokenService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly linkChanges = new Subject<void>();
+  private version = 0;
+  private token: string | null = null;
+  readonly retry = new AuthRetryWait(this.destroyRef);
   readonly pageState = signal<PageState>('validating');
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly showPassword = signal(false);
   readonly showConfirmPassword = signal(false);
-
-  private token = '';
-
-  readonly form = this.fb.group(
-    {
-      newPassword: ['', [Validators.required, Validators.minLength(8)]],
-      confirmPassword: ['', [Validators.required]],
-    },
-    { validators: passwordMatchValidator }
-  );
-
-  get newPasswordControl() { return this.form.get('newPassword')!; }
-  get confirmPasswordControl() { return this.form.get('confirmPassword')!; }
-
-  get hasPasswordMismatch(): boolean {
-    return (
-      this.form.hasError('passwordMismatch') &&
-      this.confirmPasswordControl.touched
-    );
-  }
+  readonly form = this.fb.group({
+    newPassword: ['', [nonBlankControl, Validators.minLength(8)]], confirmPassword: ['', [Validators.required]]
+  }, { validators: matchingPasswords('newPassword') });
+  get newPasswordControl() { return this.form.controls.newPassword; }
+  get confirmPasswordControl() { return this.form.controls.confirmPassword; }
+  get hasPasswordMismatch(): boolean { return this.form.hasError('passwordMismatch') && this.confirmPasswordControl.touched; }
 
   ngOnInit(): void {
-    this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
-
-    if (!this.token) {
-      this.pageState.set('invalid-token');
-      return;
-    }
-
-    this.http
-      .get(`${environment.apiUrl}/password/reset/validate`, {
-        params: { token: this.token },
-      })
-      .subscribe({
-        next: () => this.pageState.set('form'),
-        error: () => this.pageState.set('invalid-token'),
-      });
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      this.linkChanges.next(); this.version++; this.clearSecrets(); this.retry.clear(); this.isLoading.set(false);
+      const link = this.links.take('/reset-password', params); this.errorMessage.set(null);
+      if (!link.token) {
+        this.pageState.set('invalid-token');
+        this.errorMessage.set('Reabra o link recebido por e-mail. Após recarregar esta página, o token não está mais disponível. Se necessário, solicite outro link.');
+        return;
+      }
+      this.token = link.token; this.validateToken();
+    });
   }
-
-  togglePassword(): void { this.showPassword.update(v => !v); }
-  toggleConfirmPassword(): void { this.showConfirmPassword.update(v => !v); }
+  revalidate(): void {
+    if (this.pageState() === 'validation-error' && !this.isLoading() && this.retry.seconds() === 0) this.validateToken();
+  }
+  private validateToken(): void {
+    if (!this.token) return;
+    const version = this.version;
+    this.pageState.set('validating'); this.isLoading.set(true); this.errorMessage.set(null);
+    this.auth.validateResetToken(this.token).pipe(takeUntil(this.linkChanges), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { if (version === this.version) this.pageState.set('form'); },
+      error: error => {
+        if (version !== this.version) return;
+        const presentation = classifyAuthError('reset-validate', error);
+        this.errorMessage.set(presentation.message); this.isLoading.set(false); this.retry.start(error);
+        if (presentation.kind === 'invalid-link') { this.clearSecrets(); this.pageState.set('invalid-token'); }
+        else this.pageState.set('validation-error');
+      }, complete: () => { if (version === this.version) this.isLoading.set(false); }
+    });
+  }
+  togglePassword(): void { this.showPassword.update(value => !value); }
+  toggleConfirmPassword(): void { this.showConfirmPassword.update(value => !value); }
 
   onSubmit(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
-    this.isLoading.set(true);
-    this.errorMessage.set(null);
-
-    const { newPassword } = this.form.value;
-
-    this.http
-      .post(`${environment.apiUrl}/password/reset`, {
-        token: this.token,
-        newPassword: newPassword!,
-      })
-      .subscribe({
-        next: () => {
-          this.isLoading.set(false);
-          this.pageState.set('success');
-        },
-        error: err => {
-          this.isLoading.set(false);
-          this.errorMessage.set(
-            err.error?.message ?? 'Ocorreu um erro. Tente novamente.'
-          );
-        },
+    if (this.pageState() !== 'form' || !this.token || this.isLoading() || this.retry.seconds() > 0) return;
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    const version = this.version;
+    this.isLoading.set(true); this.errorMessage.set(null);
+    this.auth.resetPassword({ token: this.token, newPassword: this.newPasswordControl.value! })
+      .pipe(takeUntil(this.linkChanges), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => { if (version === this.version) { this.clearSecrets(); this.pageState.set('success'); } },
+        error: error => {
+          if (version !== this.version) return;
+          const presentation = classifyAuthError('reset-password', error), evidence = readAuthApiError(error);
+          this.isLoading.set(false); this.retry.start(error);
+          if (presentation.kind === 'invalid-link') {
+            this.clearSecrets(); this.pageState.set('invalid-token'); this.errorMessage.set(presentation.message);
+          } else if (evidence.status === 400 && evidence.error === 'Validation Failed' && evidence.fields.has('newPassword')) {
+            applyAuthFields(this.form, error, { newPassword: 'Informe uma senha não branca com pelo menos 8 caracteres.' });
+            this.errorMessage.set('Confira a nova senha informada.');
+          } else {
+            this.clearSecrets(); this.pageState.set('uncertain');
+            this.errorMessage.set('Não foi possível confirmar o resultado. A senha pode ter sido alterada. Tente fazer login ou solicite outro link; esta redefinição não será repetida.');
+          }
+        }, complete: () => { if (version === this.version) this.isLoading.set(false); }
       });
   }
+  private clearSecrets(): void { this.token = null; this.form.reset(); this.showPassword.set(false); this.showConfirmPassword.set(false); }
+  ngOnDestroy(): void { this.linkChanges.next(); this.linkChanges.complete(); this.version++; this.clearSecrets(); }
 }

@@ -1,36 +1,32 @@
+import { AuthAccessibilityDirective } from '../../../core/auth/auth-accessibility.directive';
 import {
   Component,
+  DestroyRef,
+  OnDestroy,
   inject,
   signal,
 } from '@angular/core';
 import {
-  AbstractControl,
   FormBuilder,
   ReactiveFormsModule,
-  ValidationErrors,
   Validators,
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
-import { translateApiError } from '../../../core/utils/api-error.util';
-
-function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
-  const password = group.get('password')?.value;
-  const confirm = group.get('confirmPassword')?.value;
-  if (password && confirm && password !== confirm) {
-    return { passwordMismatch: true };
-  }
-  return null;
-}
+import { applyAuthFields, AuthRetryWait, latestBirthDate, matchingPasswords, nonBlankControl, pastCalendarDate } from '../../../core/auth/auth-form';
+import { classifyAuthError } from '../../../core/auth/auth-errors';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthAccessibilityDirective],
   templateUrl: './register.component.html',
   styleUrl: './register.component.css',
 })
-export class RegisterComponent {
+export class RegisterComponent implements OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
+  readonly retry = new AuthRetryWait(this.destroyRef);
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -40,19 +36,19 @@ export class RegisterComponent {
   readonly showPassword = signal(false);
   readonly showConfirmPassword = signal(false);
 
-  /** Limite para o campo de data de nascimento (hoje) */
-  readonly maxDate = new Date().toISOString().split('T')[0];
+  /** Último dia passado no calendário local para o campo de nascimento */
+  readonly maxDate = latestBirthDate();
 
   readonly form = this.fb.group(
     {
-      firstName: ['', [Validators.required, Validators.maxLength(100)]],
-      lastName: ['', [Validators.required, Validators.maxLength(100)]],
-      email: ['', [Validators.required, Validators.email]],
-      dateOfBirth: ['', [Validators.required]],
-      password: ['', [Validators.required, Validators.minLength(8)]],
+      firstName: ['', [nonBlankControl, Validators.minLength(2), Validators.maxLength(100)]],
+      lastName: ['', [nonBlankControl, Validators.minLength(2), Validators.maxLength(100)]],
+      email: ['', [nonBlankControl, Validators.email, Validators.maxLength(255)]],
+      dateOfBirth: ['', [Validators.required, pastCalendarDate]],
+      password: ['', [nonBlankControl, Validators.minLength(8)]],
       confirmPassword: ['', [Validators.required]],
     },
-    { validators: passwordMatchValidator }
+    { validators: matchingPasswords('password') }
   );
 
   get firstNameControl() { return this.form.get('firstName')!; }
@@ -78,6 +74,7 @@ export class RegisterComponent {
   }
 
   onSubmit(): void {
+    if (this.isLoading() || this.retry.seconds() > 0) return;
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -96,20 +93,26 @@ export class RegisterComponent {
         dateOfBirth: dateOfBirth!,
         password: password!,
       })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () =>
-          this.router.navigate(['/login'], {
-            queryParams: { registered: true },
-          }),
+        next: () => {
+          this.form.reset();
+          void this.router.navigate(['/login'], { queryParams: { registered: true } });
+        },
         error: err => {
           this.isLoading.set(false);
-          const details: string[] = err.error?.details;
-          if (details?.length) {
-            this.errorMessage.set(details.join(' • '));
-          } else {
-            this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar conta.'));
-          }
+          applyAuthFields(this.form, err, {
+            firstName: 'Informe um nome não branco entre 2 e 100 caracteres.',
+            lastName: 'Informe um sobrenome não branco entre 2 e 100 caracteres.',
+            email: 'Confira o e-mail informado (até 255 caracteres).',
+            dateOfBirth: 'Informe uma data de nascimento real e anterior ao dia atual do servidor.',
+            password: 'Informe uma senha não branca com pelo menos 8 caracteres.'
+          });
+          this.errorMessage.set(classifyAuthError('register', err).message);
+          this.retry.start(err);
         },
+        complete: () => this.isLoading.set(false),
       });
   }
+  ngOnDestroy(): void { this.form.reset(); }
 }

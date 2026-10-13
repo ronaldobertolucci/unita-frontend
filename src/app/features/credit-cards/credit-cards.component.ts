@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -20,6 +21,7 @@ type ModalType = 'create' | 'detail' | 'confirm-update' | 'confirm-delete' | nul
   styleUrl: './credit-cards.component.css',
 })
 export class CreditCardsComponent implements OnInit, OnDestroy {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly creditCardService = inject(CreditCardService);
   private readonly legalEntityService = inject(LegalEntityService);
   private readonly fb = inject(FormBuilder);
@@ -73,7 +75,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.creditCardService.loadCreditCards().subscribe({
+    this.creditCardService.loadCreditCards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.isLoading.set(false),
       error: () => this.isLoading.set(false),
     });
@@ -123,7 +125,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   private loadLegalEntities(): void {
     if (this.legalEntities().length > 0) return;
     this.isLoadingRef.set(true);
-    this.legalEntityService.loadLegalEntities().subscribe({
+    this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.legalEntities.set(this.legalEntityService.legalEntities());
         this.isLoadingRef.set(false);
@@ -150,7 +152,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
       creditLimit: v.creditLimit!,
       closingDay: v.closingDay!,
       dueDay: v.dueDay!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -197,7 +199,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
       creditLimit: v.creditLimit!,
       closingDay: v.closingDay!,
       dueDay: v.dueDay!,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
@@ -215,7 +217,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deleteCreditCard(card.id).subscribe({
+    this.creditCardService.deleteCreditCard(card.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);

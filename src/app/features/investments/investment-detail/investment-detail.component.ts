@@ -1,4 +1,5 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import {
@@ -43,6 +44,7 @@ const CATEGORY_SELL = 'Resgate de Investimento';
   styleUrl: './investment-detail.component.css',
 })
 export class InvestmentDetailComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
@@ -111,14 +113,14 @@ export class InvestmentDetailComponent implements OnInit {
     this.assetId = Number(this.route.snapshot.paramMap.get('id'));
     this.loadAll();
 
-    this.legalEntityService.loadLegalEntities().subscribe();
-    this.categoryService.loadCategories().subscribe();
-    this.pocketService.loadPockets().subscribe();
+    this.legalEntityService.loadLegalEntities().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
   }
 
   private loadAll(): void {
     this.isLoading.set(true);
-    this.assetService.getAsset(this.assetId).subscribe({
+    this.assetService.getAsset(this.assetId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.asset.set(data);
         this.isLoading.set(false);
@@ -134,7 +136,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   private loadTransactions(): void {
     this.isLoadingTransactions.set(true);
-    this.assetService.getTransactions(this.assetId).subscribe({
+    this.assetService.getTransactions(this.assetId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (data) => {
         this.transactions.set(
           [...data].sort(
@@ -232,7 +234,6 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Submits ───────────────────────────────────────────────────────────────
   onEdit(): void {
-    console.log(this.editForm.value)
     this.editForm.markAllAsTouched();
     if (this.editForm.invalid) return;
 
@@ -248,7 +249,7 @@ export class InvestmentDetailComponent implements OnInit {
         custodianLegalEntityId: custodianLegalEntityId ? Number(custodianLegalEntityId) : null,
         liquidityType: liquidityType || null,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: (updated) => {
           this.asset.set(updated);
           this.isSaving.set(false);
@@ -275,7 +276,7 @@ export class InvestmentDetailComponent implements OnInit {
         currentValue: Number(currentValue),
         lastValuationDate,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: (updated) => {
           this.asset.set(updated);
           this.isSaving.set(false);
@@ -307,7 +308,7 @@ export class InvestmentDetailComponent implements OnInit {
         categoryId: Number(categoryId),
         notes: notes?.trim() || undefined,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.isSaving.set(false);
           this.closeModal();
@@ -338,7 +339,7 @@ export class InvestmentDetailComponent implements OnInit {
         categoryId: Number(categoryId),
         notes: notes?.trim() || undefined,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.isSaving.set(false);
           this.closeModal();
@@ -371,7 +372,7 @@ export class InvestmentDetailComponent implements OnInit {
         categoryId: Number(categoryId),
         notes: notes?.trim() || undefined,
       })
-      .subscribe({
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.isSaving.set(false);
           this.closeModal();
@@ -388,7 +389,7 @@ export class InvestmentDetailComponent implements OnInit {
     this.isSaving.set(true);
     this.errorMessage.set('');
 
-    this.assetService.deleteAsset(this.assetId).subscribe({
+    this.assetService.deleteAsset(this.assetId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.isSaving.set(false);
         // Retorna para a listagem preservando o filtro

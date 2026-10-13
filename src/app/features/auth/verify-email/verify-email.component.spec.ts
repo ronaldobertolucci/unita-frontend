@@ -1,304 +1,70 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { ActivatedRoute } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { VerifyEmailComponent } from './verify-email.component';
 import { AuthService } from '../../../core/services/auth.service';
+import { Location } from '@angular/common';
 
-function buildActivatedRoute(token: string | null) {
-  return {
-    snapshot: {
-      queryParamMap: {
-        get: (key: string) => (key === 'token' ? token : null),
-      },
-    },
-  };
-}
-
-function buildAuthService() {
-  return {
-    verifyEmail:          jest.fn(),
-    resendVerification:   jest.fn(),
-  };
-}
-
-describe('VerifyEmailComponent', () => {
-  let fixture: ComponentFixture<VerifyEmailComponent>;
-  let component: VerifyEmailComponent;
-  let authServiceSpy: ReturnType<typeof buildAuthService>;
-  let router: Router;
-
-  function setup(token: string | null = null) {
-    authServiceSpy = buildAuthService();
-
-    TestBed.configureTestingModule({
-      imports: [VerifyEmailComponent, RouterTestingModule],
-      providers: [
-        { provide: AuthService,    useValue: authServiceSpy },
-        { provide: ActivatedRoute, useValue: buildActivatedRoute(token) },
-      ],
-    });
-
-    fixture   = TestBed.createComponent(VerifyEmailComponent);
-    component = fixture.componentInstance;
-    router    = TestBed.inject(Router);
-    fixture.detectChanges();
+ describe('H10 confirmation and neutral resend', () => {
+  let fixture: ComponentFixture<VerifyEmailComponent>, component: VerifyEmailComponent;
+  let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let auth: { verifyEmail: jest.Mock; resendVerification: jest.Mock };
+  function setup(token?: string | string[], result = new Subject<void>()) {
+    params = new BehaviorSubject(convertToParamMap(token === undefined ? {} : { token }));
+    auth = { verifyEmail: jest.fn().mockReturnValue(result), resendVerification: jest.fn().mockReturnValue(of(undefined)) };
+    TestBed.configureTestingModule({ imports: [VerifyEmailComponent, RouterTestingModule], providers: [
+      { provide: AuthService, useValue: auth }, { provide: ActivatedRoute, useValue: { queryParamMap: params } }
+    ] });
+    jest.spyOn(TestBed.inject(Location), 'replaceState');
+    fixture = TestBed.createComponent(VerifyEmailComponent); component = fixture.componentInstance; fixture.detectChanges();
+    return result;
   }
-
-  // ─── Sem token na URL ─────────────────────────────────────────────────────
-
-  describe('without token in URL', () => {
-    beforeEach(() => setup(null));
-
-    it('should create the component', () => {
-      expect(component).toBeTruthy();
-    });
-
-    it('should go directly to resend state', () => {
-      expect(component.pageState()).toBe('resend');
-    });
-
-    it('should NOT call verifyEmail', () => {
-      expect(authServiceSpy.verifyEmail).not.toHaveBeenCalled();
-    });
-
-    it('should start with no errorMessage', () => {
-      expect(component.errorMessage()).toBeNull();
-    });
-
-    it('should start with alreadyVerified false', () => {
-      expect(component.alreadyVerified()).toBe(false);
-    });
-
-    it('should start with an invalid resendForm', () => {
-      expect(component.resendForm.invalid).toBe(true);
-    });
+  afterEach(() => { fixture?.destroy(); TestBed.resetTestingModule(); });
+  it.each([undefined, '', '  ', ['a', 'b']])('does not consume an absent/blank/duplicate token %j', token => {
+    setup(token); expect(auth.verifyEmail).not.toHaveBeenCalled(); expect(component.pageState()).toBe('resend');
   });
-
-  // ─── Com token válido na URL ──────────────────────────────────────────────
-
-  describe('with valid token in URL', () => {
-    beforeEach(() => {
-      authServiceSpy = buildAuthService();
-      authServiceSpy.verifyEmail.mockReturnValue(of(undefined));
-      TestBed.configureTestingModule({
-        imports: [VerifyEmailComponent, RouterTestingModule],
-        providers: [
-          { provide: AuthService,    useValue: authServiceSpy },
-          { provide: ActivatedRoute, useValue: buildActivatedRoute('valid-token') },
-        ],
-      });
-      fixture   = TestBed.createComponent(VerifyEmailComponent);
-      component = fixture.componentInstance;
-      router    = TestBed.inject(Router);
-    });
-
-    it('should call verifyEmail with the token from the URL', () => {
-      fixture.detectChanges();
-      expect(authServiceSpy.verifyEmail).toHaveBeenCalledWith('valid-token');
-    });
-
-    it('should start in verifying state before the response', () => {
-      // Before detectChanges the observable hasn't resolved in the test
-      expect(component.pageState()).toBe('verifying');
-    });
-
-    it('should navigate to /login?verified=true on success', () => {
-      const navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-      fixture.detectChanges();
-      expect(navigateSpy).toHaveBeenCalledWith(['/login'], { queryParams: { verified: true } });
-    });
+  it('scrubs before consuming, preserves opaque characters and navigates to login on 200', () => {
+    const result = setup('opaque+/= token'); const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    expect(TestBed.inject(Location).replaceState).toHaveBeenCalledWith('/verify-email', '');
+    expect(auth.verifyEmail).toHaveBeenCalledWith('opaque+/= token'); result.next();
+    expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { verified: true } });
   });
-
-  // ─── Com token inválido na URL ────────────────────────────────────────────
-
-  describe('with invalid token in URL', () => {
-    beforeEach(() => {
-      authServiceSpy = buildAuthService();
-      authServiceSpy.verifyEmail.mockReturnValue(
-        throwError(() => ({ status: 400, error: { message: 'Token inválido' } }))
-      );
-      TestBed.configureTestingModule({
-        imports: [VerifyEmailComponent, RouterTestingModule],
-        providers: [
-          { provide: AuthService,    useValue: authServiceSpy },
-          { provide: ActivatedRoute, useValue: buildActivatedRoute('invalid-token') },
-        ],
-      });
-      fixture   = TestBed.createComponent(VerifyEmailComponent);
-      component = fixture.componentInstance;
-      router    = TestBed.inject(Router);
-      fixture.detectChanges();
-    });
-
-    it('should transition to resend state on error', () => {
-      expect(component.pageState()).toBe('resend');
-    });
-
-    it('should set errorMessage explaining the invalid token', () => {
-      expect(component.errorMessage()).toBeTruthy();
-    });
-
-    it('should NOT navigate', () => {
-      const navigateSpy = jest.spyOn(router, 'navigate');
-      expect(navigateSpy).not.toHaveBeenCalled();
-    });
+  it.each([
+    [400, { error: 'Bad Request', message: 'Invalid verification token' }, 'inválido'],
+    [409, { error: 'Conflict', message: 'Token has already been used' }, 'utilizado'],
+    [409, { error: 'Conflict', message: 'Token has expired' }, 'expirou'],
+    [0, {}, 'conexão'], [500, {}, 'servidor'], [409, { message: 'unknown' }, 'não foi confirmado']
+  ])('shows only contracted confirmation feedback for %s', (status, body, message) => {
+    const result = setup('token'); result.error({ status, error: body });
+    expect(component.errorMessage()).toContain(message); expect(component.pageState()).toBe('resend');
+    expect(auth.verifyEmail).toHaveBeenCalledTimes(1);
   });
-
-  // ─── submitResend() — validação de formulário ─────────────────────────────
-
-  describe('submitResend() — form validation', () => {
-    beforeEach(() => setup(null));
-
-    it('should mark form as touched and not call API when form is empty', () => {
-      component.submitResend();
-      expect(authServiceSpy.resendVerification).not.toHaveBeenCalled();
-      expect(component.emailControl.touched).toBe(true);
-    });
-
-    it('should mark email as invalid when format is wrong', () => {
-      component.resendForm.setValue({ email: 'not-an-email' });
-      component.resendForm.markAllAsTouched();
-      expect(component.emailControl.hasError('email')).toBe(true);
-    });
-
-    it('should mark email as invalid when empty', () => {
-      component.resendForm.setValue({ email: '' });
-      component.resendForm.markAllAsTouched();
-      expect(component.emailControl.hasError('required')).toBe(true);
-    });
+  it('drops the old link reply and cancels after leaving', () => {
+    const old = setup('old'), latest = new Subject<void>(); auth.verifyEmail.mockReturnValue(latest);
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    params.next(convertToParamMap({ token: 'new' })); old.next(); expect(navigate).not.toHaveBeenCalled();
+    fixture.destroy(); latest.next(); expect(navigate).not.toHaveBeenCalled();
   });
-
-  // ─── submitResend() — sucesso ─────────────────────────────────────────────
-
-  describe('submitResend() — success', () => {
-    beforeEach(() => setup(null));
-
-    it('should call resendVerification with the entered email', () => {
-      authServiceSpy.resendVerification.mockReturnValue(of(undefined));
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(authServiceSpy.resendVerification).toHaveBeenCalledWith('joao@email.com');
-    });
-
-    it('should transition to resend-sent state on success', () => {
-      authServiceSpy.resendVerification.mockReturnValue(of(undefined));
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.pageState()).toBe('resend-sent');
-    });
-
-    it('should set isSubmitting to false after success', () => {
-      authServiceSpy.resendVerification.mockReturnValue(of(undefined));
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.isSubmitting()).toBe(false);
-    });
-
-    it('should clear errorMessage before submitting', () => {
-      authServiceSpy.resendVerification.mockReturnValue(of(undefined));
-      component['errorMessage'].set('erro anterior');
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.errorMessage()).toBeNull();
-    });
+  it.each(['nonexistent', 'confirmed', 'disabled', 'pending'])('renders the same neutral result for server state %s', () => {
+    setup(); component.resendForm.setValue({ email: 'synthetic@example.com' }); component.submitResend(); fixture.detectChanges();
+    expect(component.pageState()).toBe('resend-sent'); expect(fixture.nativeElement.textContent).toContain('conta elegível');
+    expect(fixture.nativeElement.textContent).not.toContain('em instantes'); expect(fixture.nativeElement.textContent).not.toContain('já foi verificado');
   });
-
-  // ─── submitResend() — erro 409 (já verificado) ────────────────────────────
-
-  describe('submitResend() — 409 already verified', () => {
-    beforeEach(() => setup(null));
-
-    it('should set alreadyVerified to true on 409', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 409 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.alreadyVerified()).toBe(true);
-    });
-
-    it('should NOT set errorMessage on 409', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 409 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.errorMessage()).toBeNull();
-    });
-
-    it('should stay in resend state on 409', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 409 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.pageState()).toBe('resend');
-    });
-
-    it('should set isSubmitting to false on 409', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 409 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.isSubmitting()).toBe(false);
-    });
-
-    it('should reset alreadyVerified to false on next submission attempt', () => {
-      authServiceSpy.resendVerification.mockReturnValueOnce(
-        throwError(() => ({ status: 409 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.alreadyVerified()).toBe(true);
-
-      authServiceSpy.resendVerification.mockReturnValue(of(undefined));
-      component.submitResend();
-      expect(component.alreadyVerified()).toBe(false);
-    });
+  it('never interprets a resend 409 as email confirmation', () => {
+    setup(); auth.resendVerification.mockReturnValue(throwError(() => ({ status: 409 })));
+    component.resendForm.setValue({ email: 'synthetic@example.com' }); component.submitResend();
+    expect(component.errorMessage()).toContain('não foi confirmado'); expect(component.pageState()).toBe('resend');
   });
-
-  // ─── submitResend() — erro genérico ───────────────────────────────────────
-
-  describe('submitResend() — generic error', () => {
-    beforeEach(() => setup(null));
-
-    it('should set errorMessage on non-409 error', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 500 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.errorMessage()).toBeTruthy();
-    });
-
-    it('should NOT set alreadyVerified on non-409 error', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 500 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.alreadyVerified()).toBe(false);
-    });
-
-    it('should set isSubmitting to false on error', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 500 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.isSubmitting()).toBe(false);
-    });
-
-    it('should stay in resend state on error', () => {
-      authServiceSpy.resendVerification.mockReturnValue(
-        throwError(() => ({ status: 500 }))
-      );
-      component.resendForm.setValue({ email: 'joao@email.com' });
-      component.submitResend();
-      expect(component.pageState()).toBe('resend');
-    });
+  it('blocks duplicate resend and discards its result when the link changes', () => {
+    setup(); const resend = new Subject<void>(); auth.resendVerification.mockReturnValue(resend);
+    component.resendForm.setValue({ email: 'synthetic@example.com' }); component.submitResend(); component.submitResend();
+    expect(auth.resendVerification).toHaveBeenCalledTimes(1);
+    params.next(convertToParamMap({ token: 'new' })); resend.next(); expect(component.pageState()).toBe('verifying');
+  });
+  it('maps email field validation and does not send an invalid form', () => {
+    setup(); component.submitResend(); expect(auth.resendVerification).not.toHaveBeenCalled();
+    auth.resendVerification.mockReturnValue(throwError(() => ({ status: 400, error: { error: 'Validation Failed', errors: [{ field: 'email' }] } })));
+    component.resendForm.setValue({ email: 'synthetic@example.com' }); component.submitResend(); expect(component.emailControl.hasError('api')).toBe(true);
   });
 });
