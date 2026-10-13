@@ -34,3 +34,25 @@ Para gerar o relatório de cobertura:
 ```bash
 npm run test:coverage
 ```
+
+## Build Docker
+
+```bash
+docker build -t unita-frontend:local .
+```
+
+O build usa BuildKit e instala as dependências uma vez com `npm ci`, incluindo
+as ferramentas necessárias para compilar Angular. A camada de instalação copia
+apenas `package.json` e `package-lock.json`, por isso alterações no código não
+reinstalam as dependências. A auditoria do npm deve ser executada separadamente,
+fora do build da imagem.
+
+Somente `angular.json`, `tsconfig.json`, `tsconfig.app.json`, `src/` e `public/`
+entram na compilação. Alterações no README, nas ferramentas locais ou nos
+arquivos de inicialização do Nginx não recompilam Angular.
+
+Os caches de downloads do npm e de compilação do Angular persistem no mesmo
+builder Docker e não entram na imagem final. Um builder novo começa sem esses
+caches; limpar o cache do builder também elimina esse benefício. A imagem final
+continua contendo Nginx e os arquivos compilados, com configuração da API na
+inicialização por `API_UPSTREAM`, `API_URL` e `PRODUCTION`.

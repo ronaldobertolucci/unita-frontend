@@ -1,9 +1,17 @@
+# syntax=docker/dockerfile:1
+
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build -- --configuration production
+COPY package.json package-lock.json ./
+# Reuse downloaded packages when the lockfile changes.
+RUN --mount=type=cache,id=unita-frontend-npm,target=/root/.npm,sharing=locked \
+    npm ci --no-audit --no-fund --prefer-offline
+COPY angular.json tsconfig.json tsconfig.app.json ./
+COPY src ./src
+COPY public ./public
+# Keep Angular's incremental cache across source changes.
+RUN --mount=type=cache,id=unita-frontend-angular,target=/app/.angular/cache,sharing=locked \
+    npm run build -- --configuration production
 
 FROM nginx:stable-alpine
 ENV API_UPSTREAM=http://app:8080 \
