@@ -137,7 +137,7 @@
 .entity-cnpj {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .entity-actions {

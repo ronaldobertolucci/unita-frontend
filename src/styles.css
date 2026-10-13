@@ -51,6 +51,8 @@ html,
 body {
   height: 100%;
   font-family: var(--font-body);
+  /* Números com altura uniforme e a mesma largura para facilitar a leitura de valores. */
+  font-variant-numeric: lining-nums tabular-nums;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
