@@ -568,7 +568,7 @@
 <div class="modal-overlay" (click)="closeModal()">
   <div class="modal modal--wide" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>Registrar resgate</h3>
+      <h3>Registrar resgate integral</h3>
       <button class="modal-close" (click)="closeModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
@@ -578,7 +578,7 @@
       </button>
     </div>
 
-    <p class="modal-description">O valor líquido creditado em conta será: valor bruto − imposto.</p>
+    <p class="modal-description">Este resgate encerra toda a posição, inclusive se o líquido for zero. Informe o imposto retido; o valor líquido é o bruto menos o imposto.</p>
 
     @if (errorMessage()) {
     <div class="modal-error">
@@ -595,17 +595,17 @@
         <div class="field"
           [class.field--invalid]="ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched">
           <label>Valor bruto (R$)</label>
-          <input type="number" formControlName="grossAmount" min="0.01" step="0.01" class="field-input--disabled" />
+          <input type="number" formControlName="grossAmount" min="0" step="0.01" />
           @if (ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched) {
-          <span class="field-error">Valor inválido</span>
+          <span class="field-error">{{ ctrl(sellForm,'grossAmount').getError('server') || 'Informe um valor bruto maior que zero.' }}</span>
           }
         </div>
         <div class="field"
-          [class.field--invalid]="ctrl(sellForm,'taxAmount').invalid && ctrl(sellForm,'taxAmount').touched">
+          [class.field--invalid]="(ctrl(sellForm,'taxAmount').invalid || sellForm.hasError('taxExceedsGross')) && ctrl(sellForm,'taxAmount').touched">
           <label>Imposto IR (R$)</label>
           <input type="number" formControlName="taxAmount" min="0" step="0.01" placeholder="0,00" />
-          @if (ctrl(sellForm,'taxAmount').invalid && ctrl(sellForm,'taxAmount').touched) {
-          <span class="field-error">Valor inválido</span>
+          @if ((ctrl(sellForm,'taxAmount').invalid || sellForm.hasError('taxExceedsGross')) && ctrl(sellForm,'taxAmount').touched) {
+          <span class="field-error">{{ ctrl(sellForm,'taxAmount').getError('server') || (sellForm.hasError('taxExceedsGross') ? 'O imposto não pode superar o bruto.' : 'Informe um imposto maior ou igual a zero.') }}</span>
           }
         </div>
       </div>
@@ -633,20 +633,49 @@
         }
       </div>
 
-      <!-- FIX 4: categoria desabilitada -->
-      <div class="field">
+      <div class="field" [class.field--invalid]="ctrl(sellForm,'categoryId').invalid && ctrl(sellForm,'categoryId').touched">
         <label>Categoria</label>
-        <input type="text" [value]="categoryNameFor('sell')" disabled class="field-input--disabled" />
+        <select formControlName="categoryId">
+          <option value="">Selecione...</option>
+          @for (category of sellCategories(); track category.id) {
+          <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+        @if (ctrl(sellForm,'categoryId').invalid && ctrl(sellForm,'categoryId').touched) {
+        <span class="field-error">Selecione uma categoria de receita ou neutra.</span>
+        }
       </div>
 
       <div class="field">
         <label>Observações <span class="label-optional">(opcional)</span></label>
-        <input type="text" formControlName="notes" placeholder="Ex: Resgate parcial" />
+        <input type="text" formControlName="notes" placeholder="Ex: Resgate total" />
       </div>
 
+      <p class="modal-description" aria-live="polite">Líquido previsto:
+        @if (sellNetAmount() !== null) { <strong>{{ sellNetAmount() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong> }
+        @else { — }
+      </p>
+      @if (sellNeedsReview()) {
+      <div class="modal-error" role="status">
+        <div>
+          <p>Confira o resultado antes de reenviar.</p>
+          @if (sellReviewLoaded()) {
+          <p>Estado: {{ statusLabel(asset()!.status) }}. Saldo da conta: {{ sellBalance() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}.</p>
+          @for (tx of transactions(); track tx.id) {
+          <p>{{ tx.transactionDate }} — {{ transactionLabel(tx.type) }}: {{ tx.amount | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</p>
+          }
+          <a [routerLink]="['/pockets', sellPocketId()]" target="_blank" rel="noopener">Conferir extrato da conta</a>
+          }
+          <button type="button" class="btn-secondary" (click)="refreshSellResult()" [disabled]="sellRefreshing()">{{ sellRefreshing() ? 'Consultando...' : 'Consultar resultado' }}</button>
+          @if (sellReviewLoaded() && asset()?.status !== 'REDEEMED') {
+          <button type="button" class="btn-secondary" (click)="allowSellRetry()">Conferi os históricos e o resgate não foi registrado</button>
+          }
+        </div>
+      </div>
+      }
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+        <button type="submit" class="btn-primary" [disabled]="isSaving() || sellRefreshing() || sellNeedsReview() || asset()?.status === 'REDEEMED'">
           @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
         </button>
       </div>

@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
+import { forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -10,6 +11,8 @@ import {
   AbstractControl,
 } from '@angular/forms';
 
+import { TransactionService } from '../../../core/services/transaction.service';
+import { redemptionNet } from '../../../core/utils/investment-redemption.util';
 import { AssetService } from '../../../core/services/asset.service';
 import { LegalEntityService } from '../../../core/services/legal-entity.service';
 import { CategoryService } from '../../../core/services/category.service';
@@ -53,6 +56,7 @@ export class InvestmentDetailComponent implements OnInit {
   readonly legalEntityService = inject(LegalEntityService);
   readonly categoryService = inject(CategoryService);
   readonly pocketService = inject(PocketService);
+  readonly transactionService = inject(TransactionService);
 
   // ── Parâmetros de retorno ─────────────────────────────────────────────────
   readonly backQueryParams = {
@@ -68,6 +72,11 @@ export class InvestmentDetailComponent implements OnInit {
   readonly isSaving = signal(false);
   readonly errorMessage = signal('');
 
+  readonly sellNeedsReview = signal(false);
+  readonly sellReviewLoaded = signal(false);
+  readonly sellRefreshing = signal(false);
+  readonly sellPocketId = signal<number | null>(null);
+  readonly sellBalance = signal<number | null>(null);
   private assetId!: number;
 
   // ── Computed ──────────────────────────────────────────────────────────────
@@ -97,8 +106,12 @@ export class InvestmentDetailComponent implements OnInit {
   private readonly categoryYield = computed(() =>
     this.categoryService.categories().find((c) => c.name === CATEGORY_YIELD),
   );
+  readonly sellCategories = computed(() =>
+    this.categoryService.categories().filter(c => c.type === 'INCOME' || c.type === 'NEUTRAL'),
+  );
+
   private readonly categorySell = computed(() =>
-    this.categoryService.categories().find((c) => c.name === CATEGORY_SELL),
+    this.sellCategories().find((c) => c.name === CATEGORY_SELL),
   );
 
   // ── Forms ─────────────────────────────────────────────────────────────────
@@ -217,6 +230,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
+    if (this.isSaving() || (type === 'sell' && this.asset()?.status === 'REDEEMED')) return;
     this.errorMessage.set('');
     this.activeModal.set(type);
 
@@ -228,6 +242,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   closeModal(): void {
+    if (this.isSaving()) return;
     this.activeModal.set(null);
     this.errorMessage.set('');
   }
@@ -352,37 +367,122 @@ export class InvestmentDetailComponent implements OnInit {
       });
   }
 
+  sellNetAmount(): number | null {
+    const { grossAmount, taxAmount } = this.sellForm.value;
+    if (this.sellForm.controls['grossAmount'].invalid || this.sellForm.controls['taxAmount'].invalid ||
+        this.sellForm.hasError('taxExceedsGross')) return null;
+    return redemptionNet(Number(grossAmount), Number(taxAmount));
+  }
+
   onSell(): void {
+    if (this.isSaving() || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
     this.sellForm.markAllAsTouched();
     if (this.sellForm.invalid) return;
 
     this.isSaving.set(true);
     this.errorMessage.set('');
-
-    const { grossAmount, taxAmount, quantity, pocketId, transactionDate, categoryId, notes } =
-      this.sellForm.getRawValue();
-
-    this.assetService
-      .sell(this.assetId, {
-        grossAmount: Number(grossAmount),
-        taxAmount: Number(taxAmount),
-        quantity: Number(quantity),
-        pocketId: Number(pocketId),
-        transactionDate,
-        categoryId: Number(categoryId),
-        notes: notes?.trim() || undefined,
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => {
-          this.isSaving.set(false);
-          this.closeModal();
-          this.loadAll();
-        },
-        error: (err) => {
-          this.isSaving.set(false);
+    const { grossAmount, taxAmount, pocketId, transactionDate, categoryId, notes } = this.sellForm.getRawValue();
+    this.sellPocketId.set(Number(pocketId));
+    this.assetService.sell(this.assetId, {
+      grossAmount: Number(grossAmount), taxAmount: Number(taxAmount),
+      pocketId: Number(pocketId), transactionDate, categoryId: Number(categoryId),
+      notes: notes?.trim() || undefined,
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.isSaving.set(false);
+        // Keep writes blocked until the authoritative state has been read again.
+        this.sellNeedsReview.set(true);
+        this.refreshSellResult(true);
+      },
+      error: (err) => {
+        this.isSaving.set(false);
+        if (err?.status === 400 && Array.isArray(err.error?.errors)) {
+          for (const fieldError of err.error.errors) {
+            const control = this.sellForm.get(fieldError.field);
+            if (control) {
+              control.setErrors({ ...control.errors, server: fieldError.message });
+              control.markAsTouched();
+            }
+          }
+          this.errorMessage.set('Revise os campos indicados antes de enviar o resgate.');
+        } else {
           this.errorMessage.set(translateApiError(err?.error?.message));
-        },
-      });
+          if (err?.status === 400 && err.error?.message === 'taxAmount must not exceed grossAmount') {
+            this.sellForm.setErrors({ taxExceedsGross: true });
+          }
+        }
+        if (err?.status === 404) {
+          this.refreshSellAvailability();
+        } else if (err?.status === 409) {
+          this.sellNeedsReview.set(true);
+          this.refreshSellResult();
+          this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+        } else if (err?.status === 0 || err?.status >= 500 || err?.name === 'TimeoutError') {
+          this.sellNeedsReview.set(true);
+          this.errorMessage.set('Não foi possível confirmar o resgate. Confira o estado do ativo, o histórico e o extrato da conta antes de tentar novamente.');
+          this.refreshSellResult();
+        }
+      },
+    });
+  }
+
+  private refreshSellAvailability(): void {
+    this.sellRefreshing.set(true);
+    forkJoin({
+      asset: this.assetService.getAsset(this.assetId),
+      history: this.assetService.getTransactions(this.assetId),
+      pockets: this.pocketService.loadPockets(),
+      categories: this.categoryService.loadCategories(),
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ asset, history }) => {
+        this.asset.set(asset);
+        this.transactions.set([...history].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
+        for (const control of Object.values(this.sellForm.controls)) control.updateValueAndValidity();
+        this.sellRefreshing.set(false);
+        if (asset.status === 'REDEEMED') this.closeModal();
+      },
+      error: () => {
+        this.sellRefreshing.set(false);
+        // Leave the unavailable investment screen; fresh selectors load on return.
+        this.router.navigate(['/investments'], { queryParams: this.backQueryParams });
+      },
+    });
+  }
+
+  refreshSellResult(closeAfterSuccess = false): void {
+    const pocketId = this.sellPocketId();
+    if (!pocketId || this.sellRefreshing()) return;
+    this.sellRefreshing.set(true);
+    this.sellReviewLoaded.set(false);
+    forkJoin({
+      asset: this.assetService.getAsset(this.assetId),
+      history: this.assetService.getTransactions(this.assetId),
+      balance: this.pocketService.getBalance(pocketId),
+      statement: this.transactionService.loadTransactions(pocketId),
+      pockets: this.pocketService.loadPockets(),
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ asset, history, balance }) => {
+        this.asset.set(asset);
+        this.transactions.set([...history].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
+        this.sellBalance.set(balance);
+        this.sellReviewLoaded.set(true);
+        this.sellRefreshing.set(false);
+        this.assetService.loadAssets();
+        if (asset.status === 'REDEEMED' || closeAfterSuccess) {
+          this.closeModal();
+        }
+      },
+      error: () => {
+        this.sellRefreshing.set(false);
+        this.errorMessage.set('Não foi possível atualizar todos os dados. Consulte o resultado novamente antes de reenviar.');
+      },
+    });
+  }
+
+  allowSellRetry(): void {
+    if (!this.sellReviewLoaded() || this.sellRefreshing() || this.asset()?.status === 'REDEEMED') return;
+    this.sellNeedsReview.set(false);
+    this.errorMessage.set('');
   }
 
   onDelete(): void {
@@ -450,15 +550,26 @@ export class InvestmentDetailComponent implements OnInit {
   private buildSellForm(): void {
     const cat = this.categorySell();
     const currentValue = this.asset()?.position.currentValue ?? '';
+    const finiteAmount = (positive: boolean) => (control: AbstractControl) => {
+      const value = control.value;
+      if (value == null || value === '') return null; // required handles absence
+      const amount = Number(value);
+      return Number.isFinite(amount) && (positive ? amount > 0 : amount >= 0) ? null : { amount: true };
+    };
     this.sellForm = this.fb.group({
-      grossAmount: [{ value: currentValue, disabled: true }, [Validators.required, Validators.min(0.01)]],
-      taxAmount: ['', [Validators.required, Validators.min(0)]],
-      quantity: [{ value: 1, disabled: true }],
-      pocketId: ['', Validators.required],
+      grossAmount: [currentValue, [Validators.required, finiteAmount(true)]],
+      taxAmount: ['', [Validators.required, finiteAmount(false)]],
+      pocketId: ['', [Validators.required, (control: AbstractControl) =>
+        this.eligiblePockets().some(p => p.active && p.id === Number(control.value)) ? null : { pocket: true }]],
       transactionDate: [this.toLocalDateString(new Date()), Validators.required],
-      categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],
+      categoryId: [cat?.id ?? '', [Validators.required, (control: AbstractControl) =>
+        this.sellCategories().some(c => c.id === Number(control.value)) ? null : { category: true }]],
       notes: [''],
-    });
+    }, { validators: form => {
+      const gross = form.get('grossAmount');
+      const tax = form.get('taxAmount');
+      return gross?.valid && tax?.valid && Number(tax.value) > Number(gross.value) ? { taxExceedsGross: true } : null;
+    } });
   }
 
   private toLocalDateString(date: Date): string {

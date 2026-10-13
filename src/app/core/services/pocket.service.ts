@@ -74,6 +74,10 @@ export class PocketService {
     );
   }
 
+  getBalance(id: number): Observable<number> {
+    return this.session.scoped(() => this.http.get<number>(`${this.base}/pockets/${id}/balance`));
+  }
+
   // ─── Dados de referência (carregados sob demanda) ─────────────────────────
 
   getLegalEntities(): Observable<LegalEntityDto[]> {

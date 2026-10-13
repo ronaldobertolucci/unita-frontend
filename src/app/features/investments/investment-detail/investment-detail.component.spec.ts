@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, LOCALE_ID } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -12,6 +12,7 @@ import { InvestmentDetailComponent } from './investment-detail.component';
 import { AssetService } from '../../../core/services/asset.service';
 import { LegalEntityService } from '../../../core/services/legal-entity.service';
 import { CategoryService } from '../../../core/services/category.service';
+import { TransactionService } from '../../../core/services/transaction.service';
 import { PocketService } from '../../../core/services/pocket.service';
 import { AssetDetailDto, InvestmentTransactionDto } from '../../../core/models/asset.model';
 import { CategoryDto } from '../../../core/models/category.model';
@@ -75,7 +76,7 @@ const mockTxTax: InvestmentTransactionDto = {
 
 const mockCategoryBuy: CategoryDto  = { id: 11, name: 'Aporte em Investimento',    type: 'EXPENSE', global: true };
 const mockCategoryYield: CategoryDto = { id: 12, name: 'Rendimento de Investimento', type: 'INCOME', global: true };
-const mockCategorySell: CategoryDto  = { id: 13, name: 'Resgate de Investimento',    type: 'EXPENSE', global: true };
+const mockCategorySell: CategoryDto  = { id: 13, name: 'Resgate de Investimento',    type: 'INCOME', global: true };
 
 const mockPocket: PocketSummaryDto      = { id: 5, type: 'BANK_ACCOUNT',   label: 'Banco X – Corrente', active: true, balance: 1000 };
 const mockPocketCash: PocketSummaryDto  = { id: 6, type: 'CASH',           label: 'Carteira',           active: true, balance: 200  };
@@ -89,6 +90,7 @@ const mockLegalEntity: LegalEntityDto = {
 
 function buildAssetService(detail: AssetDetailDto = mockDetail, txs: InvestmentTransactionDto[] = []) {
   return {
+    loadAssets:     jest.fn(),
     getAsset:       jest.fn().mockReturnValue(of(detail)),
     getTransactions: jest.fn().mockReturnValue(of(txs)),
     assets:         signal([]),
@@ -110,6 +112,7 @@ function buildCategoryService(categories: CategoryDto[] = []) {
 
 function buildPocketService(pockets: PocketSummaryDto[] = []) {
   return {
+    getBalance:   jest.fn().mockReturnValue(of(1000)),
     pockets:      signal(pockets),
     loadPockets:  jest.fn().mockReturnValue(of(pockets)),
   };
@@ -150,6 +153,7 @@ describe('InvestmentDetailComponent', () => {
       providers: [
         { provide: AssetService,       useValue: assetServiceSpy       },
         { provide: CategoryService,    useValue: categoryServiceSpy    },
+        { provide: TransactionService, useValue: { loadTransactions: jest.fn().mockReturnValue(of([])) } },
         { provide: PocketService,      useValue: pocketServiceSpy      },
         { provide: LegalEntityService, useValue: legalEntityServiceSpy },
         // ─── MOCK CORRIGIDO AQUI ───
@@ -520,7 +524,141 @@ describe('InvestmentDetailComponent', () => {
       expect(assetServiceSpy.sell).not.toHaveBeenCalled();
     });
 
-    it('should call sell with grossAmount from currentValue, quantity=1, categoryId from getRawValue', () => {
+    function fillSell(grossAmount: unknown = 100, taxAmount: unknown = 10): void {
+      component.openModal('sell');
+      component.sellForm.patchValue({ grossAmount, taxAmount, pocketId: 5, categoryId: 13 });
+    }
+
+    it.each([
+      [null, 0], ['', 0], [0, 0], [-1, 0], [100, null], [100, ''], [100, -50], [100, 150],
+      [Infinity, 0], [100, NaN],
+    ])('rejects gross %s / tax %s without writing', (gross, tax) => {
+      fillSell(gross, tax);
+      component.onSell();
+      expect(component.sellForm.invalid).toBe(true);
+      expect(assetServiceSpy.sell).not.toHaveBeenCalled();
+    });
+
+    it.each([[0, 100], [10, 90], [100, 0]])('accepts tax %s and previews net %s', (tax, net) => {
+      fillSell(100, tax);
+      expect(component.sellNetAmount()).toBe(net);
+      assetServiceSpy.sell.mockReturnValue(of([mockTxSell, mockTxTax]));
+      assetServiceSpy.getAsset.mockReturnValue(of(mockDetailRedeemed));
+      component.onSell();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(assetServiceSpy.sell.mock.calls[0][1]).not.toHaveProperty('quantity');
+      expect(component.asset()?.status).toBe('REDEEMED');
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
+      expect(TestBed.inject(TransactionService).loadTransactions).toHaveBeenCalledWith(5);
+      component.openModal('sell');
+      expect(component.activeModal()).toBeNull();
+    });
+
+    it('renders an editable gross amount, integral redemption and zero net preview', () => {
+      fillSell(100, 100);
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      expect((element.querySelector('[formControlName="grossAmount"]') as HTMLInputElement).disabled).toBe(false);
+      expect(element.textContent).toContain('Registrar resgate integral');
+      expect(element.textContent).toContain('Líquido previsto:');
+      expect(element.textContent).toMatch(/R\$\s*0,00/);
+      const categories = element.querySelector('[formControlName="categoryId"]') as HTMLSelectElement;
+      expect(Array.from(categories.options).map(option => option.value)).toEqual(['', '12', '13']);
+    });
+
+    it('uses decimal subtraction for the preview and permits small positive gross amounts', () => {
+      fillSell(0.3, 0.1);
+      expect(component.sellNetAmount()).toBe(0.2);
+      fillSell(0.001, 0);
+      expect(component.sellForm.valid).toBe(true);
+    });
+
+    it('rejects an expense category even if supplied programmatically', () => {
+      fillSell();
+      component.sellForm.patchValue({ categoryId: 11 });
+      component.onSell();
+      expect(assetServiceSpy.sell).not.toHaveBeenCalled();
+    });
+
+    it('prevents a second submit and closing while saving', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(new Subject());
+      component.onSell();
+      component.onSell();
+      component.closeModal();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(component.activeModal()).toBe('sell');
+    });
+
+    it('marks API field errors and permits correction', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 400, error: {
+        errors: [{ field: 'taxAmount', message: 'must be greater than or equal to 0' }],
+      } })));
+      component.onSell();
+      expect(component.sellForm.get('taxAmount')?.getError('server')).toBeTruthy();
+      component.sellForm.patchValue({ taxAmount: 0 });
+      expect(component.sellForm.valid).toBe(true);
+      expect(component.sellNeedsReview()).toBe(false);
+    });
+
+    it('handles the service relation error without an errors array', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 400, error: {
+        message: 'taxAmount must not exceed grossAmount', errors: null,
+      } })));
+      component.onSell();
+      expect(component.sellForm.hasError('taxExceedsGross')).toBe(true);
+      expect(component.errorMessage()).toContain('imposto');
+    });
+
+    it.each([0, 500])('consults an uncertain result after HTTP %s without repeating the write', status => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status })));
+      component.onSell();
+      component.onSell();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(component.sellNeedsReview()).toBe(true);
+      expect(component.sellReviewLoaded()).toBe(true);
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
+      expect(TestBed.inject(TransactionService).loadTransactions).toHaveBeenCalledWith(5);
+      component.allowSellRetry();
+      expect(component.sellNeedsReview()).toBe(false);
+    });
+
+    it('keeps retry blocked when a result consultation fails', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
+      pocketServiceSpy.getBalance.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.onSell();
+      component.allowSellRetry();
+      component.onSell();
+      expect(component.sellReviewLoaded()).toBe(false);
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows correcting an unavailable account after refreshing selectors on 404', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 404 })));
+      pocketServiceSpy.getBalance.mockReturnValue(throwError(() => ({ status: 404 })));
+      component.onSell();
+      expect(component.sellRefreshing()).toBe(false);
+      expect(component.sellNeedsReview()).toBe(false);
+      expect(pocketServiceSpy.loadPockets).toHaveBeenCalledTimes(2);
+      expect(categoryServiceSpy.loadCategories).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([404, 409])('refreshes state after HTTP %s', status => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status })));
+      assetServiceSpy.getAsset.mockReturnValue(of(mockDetailRedeemed));
+      component.onSell();
+      expect(component.asset()?.status).toBe('REDEEMED');
+      expect(component.activeModal()).toBeNull();
+      expect(categoryServiceSpy.loadCategories).toHaveBeenCalledTimes(2);
+    });
+
+    it('should call sell with grossAmount from currentValue and selected categoryId', () => {
       assetServiceSpy.sell.mockReturnValue(of([mockTxSell, mockTxTax]));
       assetServiceSpy.getAsset.mockReturnValue(of(mockDetail));
       assetServiceSpy.getTransactions.mockReturnValue(of([]));
@@ -530,7 +668,7 @@ describe('InvestmentDetailComponent', () => {
       });
       component.onSell();
       expect(assetServiceSpy.sell).toHaveBeenCalledWith(1, expect.objectContaining({
-        grossAmount: 10500, taxAmount: 150, quantity: 1,
+        grossAmount: 10500, taxAmount: 150,
         pocketId: 5, transactionDate: '2025-02-01', categoryId: 13,
       }));
       expect(component.activeModal()).toBeNull();

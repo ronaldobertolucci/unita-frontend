@@ -293,7 +293,7 @@ describe('AssetService', () => {
       const taxTx: InvestmentTransactionDto = { ...mockTransaction, id: 13, type: 'TAX', amount: 150 };
       let result: InvestmentTransactionDto[] | undefined;
       const payload = {
-        grossAmount: 10500, taxAmount: 150, quantity: 1,
+        grossAmount: 10500, taxAmount: 150,
         pocketId: 5, transactionDate: '2025-01-15', categoryId: 13,
       };
       service.sell(1, payload).subscribe(r => result = r);

@@ -70,6 +70,7 @@ export interface InvestmentTransactionDto {
   amount: number;
   transactionDate: string;
   notes: string | null;
+  pocketTransactionId?: number | null;
 }
 
 // ── Payloads de criação ──────────────────────────────────────────────────────
@@ -127,7 +128,6 @@ export interface YieldPayload {
 export interface SellPayload {
   grossAmount: number;
   taxAmount: number;
-  quantity: number;
   pocketId: number;
   transactionDate: string;
   categoryId: number;

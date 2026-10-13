@@ -1,4 +1,6 @@
 const ERROR_MAP: Record<string, string> = {
+  'taxAmount must not exceed grossAmount': 'O imposto não pode ser maior que o valor bruto.',
+  'Asset has already been fully redeemed': 'Este investimento já foi resgatado integralmente.',
   'User not found': 'Usuário não encontrado. Verifique o e-mail informado.',
   'User is already a member': 'Este usuário já é membro do grupo.',
   'User already has a pending invitation': 'Este usuário já possui um convite pendente.',
