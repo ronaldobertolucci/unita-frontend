@@ -1,4 +1,5 @@
 import { DestroyRef, Injectable, Injector, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, defer, finalize, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { SessionService } from './session.service';
 import { PocketService } from './pocket.service';
@@ -31,6 +32,7 @@ export interface PocketReview {
 export class FinancialRecoveryService {
   private readonly injector = inject(Injector);
   private readonly session = inject(SessionService);
+  private ownerId: number | null = null;
   readonly state = signal<'clear' | 'sending' | 'pending' | 'checking' | 'review'>('clear');
   readonly operation = signal<PendingOperation | null>(null);
   readonly pockets = signal<PocketReview[]>([]);
@@ -40,32 +42,51 @@ export class FinancialRecoveryService {
   readonly refundStatement = signal<BillStatementDto | null>(null);
 
   constructor() {
-    this.session.registerCleanup(() => this.clear(), inject(DestroyRef));
+    const destroy = inject(DestroyRef);
+    this.session.contextChanges$.pipe(takeUntilDestroyed(destroy)).subscribe(reason => {
+      // Expiry cancels HTTP, but cannot prove that the server rolled back a write.
+      // Preserve the obligation to reconcile only for the renewing account.
+      if (reason === 'expired' && this.operation() && this.ownerId !== null &&
+          this.ownerId === this.session.renewalOwner()) {
+        this.clearReview();
+        this.state.set('pending');
+      } else {
+        this.clear();
+      }
+    });
+    this.session.sessionUpdates$.pipe(takeUntilDestroyed(destroy)).subscribe(() => {
+      if (this.operation() && this.ownerId !== this.session.user()?.id) this.clear();
+    });
+    destroy.onDestroy(() => this.clear());
   }
 
   mark(operation: PendingOperation): void {
+    this.ownerId = this.session.user()?.id ?? this.session.renewalOwner();
     this.operation.set(operation);
-    this.pockets.set([]);
-    this.bills.set([]);
-    this.purchases.set([]);
-    this.refunds.set([]);
-    this.refundStatement.set(null);
+    this.clearReview();
     this.state.set('pending');
   }
 
   trackWrite<T>(operation: PendingOperation, request: Observable<T>): Observable<T> {
     return defer(() => {
       const version = this.session.version();
+      this.ownerId = this.session.user()?.id ?? this.session.renewalOwner();
       this.operation.set(operation);
       this.state.set('sending');
       return request.pipe(
         tap({
-          next: () => this.clear(),
-          error: error => isUncertainFinancialWrite(error) ? this.mark(operation) : this.clear(),
+          next: () => {
+            if (version === this.session.version() && this.operation() === operation) this.clear();
+          },
+          error: error => {
+            if (version === this.session.version() && this.operation() === operation) {
+              isUncertainFinancialWrite(error) ? this.mark(operation) : this.clear();
+            }
+          },
         }),
         finalize(() => {
           // Navigation can cancel HTTP after the server has already applied a write.
-          if (version === this.session.version() && this.state() === 'sending') {
+          if (version === this.session.version() && this.operation() === operation && this.state() === 'sending') {
             this.mark(operation);
             this.check();
           }
@@ -89,8 +110,10 @@ export class FinancialRecoveryService {
   }
 
   check(): void {
+    this.session.getToken();
     const operation = this.operation();
     if (!operation || this.state() === 'checking' || this.state() === 'sending') return;
+    if (this.ownerId !== null && this.ownerId !== this.session.user()?.id) return;
     const version = this.session.version();
     this.state.set('checking');
     const emptyCard = { bills: [] as CreditCardBillDto[], purchases: [] as CreditCardPurchaseDto[],
@@ -106,9 +129,10 @@ export class FinancialRecoveryService {
           : of(emptyCard)));
     this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), card: cards }))
       .pipe(finalize(() => {
-        if (version === this.session.version() && this.state() === 'checking') this.state.set('pending');
+        if (version === this.session.version() && this.operation() === operation && this.state() === 'checking') this.state.set('pending');
       })).subscribe({
         next: data => {
+          if (version !== this.session.version() || this.operation() !== operation) return;
           this.pockets.set(data.pockets);
           this.bills.set(data.card.bills);
           this.purchases.set(data.card.purchases);
@@ -140,12 +164,18 @@ export class FinancialRecoveryService {
   }
 
   confirm(): void {
+    this.session.getToken();
     if (this.state() === 'review') this.clear();
   }
 
   private clear(): void {
+    this.ownerId = null;
     this.state.set('clear');
     this.operation.set(null);
+    this.clearReview();
+  }
+
+  private clearReview(): void {
     this.pockets.set([]);
     this.bills.set([]);
     this.purchases.set([]);
