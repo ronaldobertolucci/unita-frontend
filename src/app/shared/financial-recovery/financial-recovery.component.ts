@@ -14,6 +14,15 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
         <p>{{ recovery.operation()?.message ? 'Operação em conferência' : 'Não foi possível confirmar o resultado' }}: {{ recovery.operation()?.label }}.</p>
         <p>Confira os saldos, os extratos e, quando houver, a fatura antes de enviar uma nova operação. Se continuar em dúvida, procure suporte para conciliar o resultado.</p>
         @if (recovery.state() === 'review') {
+          @if (recovery.investment(); as investment) {
+            <p><a class="review-link" [routerLink]="['/investments', investment.asset.id]">{{ investment.asset.name }}</a> · Valor atual: {{ formatCurrency(investment.asset.position.currentValue) }} · Total aportado: {{ formatCurrency(investment.asset.position.totalInvested) }}</p>
+            <p>Histórico do investimento. Compare os registros com o extrato da conta; um novo envio pode duplicar um aporte ou rendimento já registrado.</p>
+            <ul class="review-history">
+              @for (tx of investment.transactions; track tx.id) {
+                <li><span>#{{ tx.id }} · {{ tx.transactionDate | date:'dd/MM/yyyy':'UTC' }} · {{ investmentTransactionLabel(tx.type) }} · {{ tx.notes }} @if (tx.pocketTransactionId != null) { · Lançamento #{{ tx.pocketTransactionId }} }</span><strong>{{ formatCurrency(tx.amount) }}</strong></li>
+              } @empty { <li>Nenhuma movimentação disponível neste investimento.</li> }
+            </ul>
+          }
           @for (pocket of recovery.pockets(); track pocket.id) {
             <p><a class="review-link" [routerLink]="['/pockets', pocket.id]">{{ pocket.label }}</a> · Saldo: {{ formatCurrency(pocket.balance) }}</p>
             <ul class="review-history">
@@ -79,6 +88,9 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
 })
 export class FinancialRecoveryComponent {
   readonly recovery = inject(FinancialRecoveryService);
+  investmentTransactionLabel(type: string): string {
+    return ({ BUY: 'Aporte', YIELD: 'Rendimento', SELL: 'Resgate', TAX: 'Imposto' } as Record<string, string>)[type] ?? type;
+  }
   formatCurrency(amount: number): string {
     return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }

@@ -212,6 +212,32 @@ describe('Financial recovery with the actual HTTP read services', () => {
     expect(error).toHaveBeenCalledWith(expect.any(HttpErrorResponse));
     backend.expectNone(`${base}/pockets/10/transactions/101`);
   });
+
+  it('requires investment position, history, account balance and statement before reconciling a lost buy response', () => {
+    const operation = { label: 'Aporte', pocketIds: [10], assetId: 30 };
+    service.mark(operation); service.check();
+    completePocketReview();
+    backend.expectOne(`${base}/assets/30`).flush({ id: 30, name: 'CDB', position: { currentValue: 180, totalInvested: 180 } });
+    expect(service.state()).toBe('checking'); service.confirm(); expect(service.state()).toBe('checking');
+    backend.expectOne(`${base}/assets/30/transactions`).flush([
+      { id: 81, type: 'BUY', amount: 80, transactionDate: '2026-10-14', notes: null, pocketTransactionId: 101 },
+    ]);
+    expect(service.state()).toBe('review'); expect(service.investment()?.transactions[0].pocketTransactionId).toBe(101);
+    expect(service.pockets()[0].transactions[0].id).toBe(101);
+    TestBed.inject(SessionService).invalidate('expired');
+    expect(service.investment()).toBeNull(); expect(service.operation()).toEqual(operation); expect(service.state()).toBe('pending');
+    backend.expectNone(`${base}/assets/30/transactions/buy`);
+  });
+
+  it('keeps a yield blocked if investment history cannot be consulted', () => {
+    service.mark({ label: 'Rendimento', pocketIds: [10], assetId: 30 }); service.check();
+    completePocketReview();
+    backend.expectOne(`${base}/assets/30`).flush({ id: 30 });
+    backend.expectOne(`${base}/assets/30/transactions`).error(new ProgressEvent('error'));
+    service.confirm();
+    expect(service.state()).toBe('pending'); expect(service.investment()).toBeNull();
+    backend.expectNone(`${base}/assets/30/transactions/yield`);
+  });
   it('reads the refund list, statement and destination state before explicit reconciliation', () => {
     const refund = { id: 31, description: 'Devolução', amount: 50, refundDate: '2026-10-14', purchaseId: 81,
       category: { id: 2, name: 'Estornos', type: 'INCOME', global: false } };

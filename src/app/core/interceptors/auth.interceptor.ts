@@ -26,7 +26,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   let attempted = req.context.get(AUTH_RECOVERY_ATTEMPTED) || !hadAccess;
   let sentToken: string;
   const financialWrite =
-    (req.method === 'POST' && /\/(transfers(?:\/fgts\/withdrawal)?|pockets\/\d+\/transactions)$/.test(req.url.split('?')[0])) ||
+    (req.method === 'POST' && /\/(transfers(?:\/fgts\/withdrawal)?|pockets\/\d+\/transactions|assets\/\d+\/transactions\/(buy|yield))$/.test(req.url.split('?')[0])) ||
     (req.method === 'PUT' && /\/credit-cards\/\d+\/bills\/\d+\/pay$/.test(req.url.split('?')[0])) ||
     (req.method === 'DELETE' && /\/(pockets\/\d+\/transactions\/\d+|pockets\/(bank-accounts|benefit-accounts|fgts)\/\d+|credit-cards\/\d+)$/.test(req.url.split('?')[0]));
   const send = (token: string) => {

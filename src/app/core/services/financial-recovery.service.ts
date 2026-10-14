@@ -5,6 +5,8 @@ import { SessionService } from './session.service';
 import { PocketService } from './pocket.service';
 import { TransactionService } from './transaction.service';
 import { CreditCardService } from './credit-card.service';
+import { AssetService } from './asset.service';
+import { AssetDetailDto, InvestmentTransactionDto } from '../models/asset.model';
 import { TransactionDto } from '../models/transaction.model';
 import { BillStatementDto, CreditCardBillDto, CreditCardPurchaseDto, CreditCardRefundDto } from '../models/credit-card.model';
 import { isUncertainFinancialWrite } from '../utils/financial-operation.util';
@@ -12,6 +14,7 @@ import { isUncertainFinancialWrite } from '../utils/financial-operation.util';
 interface PendingOperation {
   label: string;
   pocketIds: number[];
+  assetId?: number;
   cardId?: number;
   billId?: number;
   reviewPurchases?: boolean;
@@ -40,6 +43,7 @@ export class FinancialRecoveryService {
   readonly purchases = signal<CreditCardPurchaseDto[]>([]);
   readonly refunds = signal<CreditCardRefundDto[]>([]);
   readonly refundStatement = signal<BillStatementDto | null>(null);
+  readonly investment = signal<{ asset: AssetDetailDto; transactions: InvestmentTransactionDto[] } | null>(null);
 
   constructor() {
     const destroy = inject(DestroyRef);
@@ -127,7 +131,11 @@ export class FinancialRecoveryService {
             statement: operation.reviewRefunds && operation.billId !== undefined
               ? this.injector.get(CreditCardService).getBillStatement(operation.cardId!, operation.billId) : of(null) })
           : of(emptyCard)));
-    this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), card: cards }))
+    const investment = operation.assetId === undefined ? of(null) : forkJoin({
+      asset: this.injector.get(AssetService).getAsset(operation.assetId),
+      transactions: this.injector.get(AssetService).getTransactions(operation.assetId),
+    });
+    this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), card: cards, investment }))
       .pipe(finalize(() => {
         if (version === this.session.version() && this.operation() === operation && this.state() === 'checking') this.state.set('pending');
       })).subscribe({
@@ -138,6 +146,7 @@ export class FinancialRecoveryService {
           this.purchases.set(data.card.purchases);
           this.refunds.set(data.card.refunds);
           this.refundStatement.set(data.card.statement);
+          this.investment.set(data.investment);
           this.state.set('review');
         },
         error: () => {},
@@ -181,5 +190,6 @@ export class FinancialRecoveryService {
     this.purchases.set([]);
     this.refunds.set([]);
     this.refundStatement.set(null);
+    this.investment.set(null);
   }
 }

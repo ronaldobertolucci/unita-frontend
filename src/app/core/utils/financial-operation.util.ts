@@ -12,8 +12,8 @@ export function transactionProtectionMessage(tx: TransactionDto): string {
   return `${labels[tx.operationType ?? 'UNLINKED'] ?? 'Operação financeira protegida'} — exclusão indisponível.`;
 }
 
-export function isUncertainFinancialWrite(error: { status?: number }): boolean {
-  return error.status === 0 || error.status === 408 || (error.status ?? 0) >= 500;
+export function isUncertainFinancialWrite(error: { status?: number; name?: string }): boolean {
+  return error.name === 'TimeoutError' || error.status === 0 || error.status === 408 || (error.status ?? 0) >= 500;
 }
 
 export function financialErrorMessage(error: any, resource: 'transaction' | 'pocket' | 'card', fallback: string): string {

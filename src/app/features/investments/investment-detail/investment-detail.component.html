@@ -1,3 +1,7 @@
+@if (activeModal() !== 'buy' && activeModal() !== 'yield') {
+  <app-financial-recovery />
+}
+
 <!-- Loading -->
 @if (isLoading()) {
 <div class="loading-state">
@@ -152,7 +156,7 @@
   <!-- Ações de transação -->
   @if (a.status !== 'REDEEMED') {
   <div class="action-row">
-    <button class="btn-tx btn-tx--buy" (click)="openModal('buy')">
+    <button class="btn-tx btn-tx--buy" (click)="openModal('buy')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
         stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19" />
@@ -160,7 +164,7 @@
       </svg>
       Aporte
     </button>
-    <button class="btn-tx btn-tx--yield" (click)="openModal('yield')">
+    <button class="btn-tx btn-tx--yield" (click)="openModal('yield')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
         stroke-linejoin="round">
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
@@ -168,7 +172,7 @@
       </svg>
       Resgate parcial
     </button>
-    <button class="btn-tx btn-tx--sell" (click)="openModal('sell')">
+    <button class="btn-tx btn-tx--sell" (click)="openModal('sell')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
         stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19" />
@@ -414,6 +418,7 @@
     </div>
     }
 
+    <app-financial-recovery />
     <form [formGroup]="buyForm" (ngSubmit)="onBuy()" novalidate>
       <div class="form-row">
         <div class="field" [class.field--invalid]="ctrl(buyForm,'amount').invalid && ctrl(buyForm,'amount').touched">
@@ -470,7 +475,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+        <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
           @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
         </button>
       </div>
@@ -507,6 +512,7 @@
     </div>
     }
 
+    <app-financial-recovery />
     <form [formGroup]="yieldForm" (ngSubmit)="onYield()" novalidate>
       <div class="form-row">
         <div class="field"
@@ -554,7 +560,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="isSaving()">
+        <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
           @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
         </button>
       </div>

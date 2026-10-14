@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, LOCALE_ID } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import localePt from '@angular/common/locales/pt';
-import { of, throwError, Subject } from 'rxjs';
+import { of, throwError, Subject, TimeoutError } from 'rxjs';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -14,6 +14,8 @@ import { LegalEntityService } from '../../../core/services/legal-entity.service'
 import { CategoryService } from '../../../core/services/category.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { PocketService } from '../../../core/services/pocket.service';
+import { SessionService } from '../../../core/services/session.service';
+import { syntheticSession } from '../../../core/testing/session.mock';
 import { AssetDetailDto, InvestmentTransactionDto } from '../../../core/models/asset.model';
 import { CategoryDto } from '../../../core/models/category.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
@@ -153,7 +155,7 @@ describe('InvestmentDetailComponent', () => {
       providers: [
         { provide: AssetService,       useValue: assetServiceSpy       },
         { provide: CategoryService,    useValue: categoryServiceSpy    },
-        { provide: TransactionService, useValue: { loadTransactions: jest.fn().mockReturnValue(of([])) } },
+        { provide: TransactionService, useValue: { loadTransactions: jest.fn().mockReturnValue(of([])), getTransactions: jest.fn().mockReturnValue(of([])) } },
         { provide: PocketService,      useValue: pocketServiceSpy      },
         { provide: LegalEntityService, useValue: legalEntityServiceSpy },
         // ─── MOCK CORRIGIDO AQUI ───
@@ -514,6 +516,93 @@ describe('InvestmentDetailComponent', () => {
   });
 
   // ─── onSell() ─────────────────────────────────────────────────────────────
+
+  describe.each(['buy', 'yield'] as const)('reconciliation of %s writes', kind => {
+    beforeEach(() => setup());
+    const submit = () => kind === 'buy' ? component.onBuy() : component.onYield();
+    const request = () => kind === 'buy' ? assetServiceSpy.buy : assetServiceSpy.recordYield;
+    const fillForm = () => {
+      component.openModal(kind);
+      const form = kind === 'buy' ? component.buyForm : component.yieldForm;
+      form.patchValue({ amount: 80, quantity: 1, pocketId: 5, transactionDate: '2026-10-14', notes: 'Teste' });
+      return form;
+    };
+
+    it.each([0, 408, 500, 'timeout'])('blocks re-submission after %s until all reads and explicit confirmation', status => {
+      const form = fillForm();
+      const history = new Subject<InvestmentTransactionDto[]>();
+      assetServiceSpy.getTransactions.mockReturnValue(history);
+      const updated = { ...mockDetail, position: { ...mockDetail.position, currentValue: 10420 } };
+      assetServiceSpy.getAsset.mockReturnValue(of(updated));
+      request().mockReturnValue(throwError(() => status === 'timeout' ? new TimeoutError() : { status }));
+      submit(); fixture.detectChanges();
+      expect(component.isSaving()).toBe(false); expect(form.value.amount).toBe(80);
+      expect(component.financialRecovery.state()).toBe('checking');
+      expect(fixture.nativeElement.querySelector('.modal button[type="submit"]').disabled).toBe(true);
+      submit(); component.financialRecovery.confirm();
+      expect(request()).toHaveBeenCalledTimes(1); expect(component.financialRecovery.state()).toBe('checking');
+      history.next([{ ...mockTxBuy, pocketTransactionId: 101 }]); history.complete(); fixture.detectChanges();
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(component.asset()?.position.currentValue).toBe(10420);
+      expect(fixture.nativeElement.querySelector('.modal .review-notice').textContent).toContain('Lançamento #101');
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(5);
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
+      submit(); expect(request()).toHaveBeenCalledTimes(1);
+      component.financialRecovery.confirm(); fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.modal button[type="submit"]').disabled).toBe(false);
+      expect(request()).toHaveBeenCalledTimes(1);
+      request().mockReturnValue(of(mockTxBuy));
+      submit(); expect(request()).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves the block after a failed consultation and closing/reopening the page', () => {
+      fillForm();
+      request().mockReturnValue(throwError(() => ({ status: 0 })));
+      assetServiceSpy.getTransactions.mockReturnValue(throwError(() => ({ status: 500 })));
+      submit(); component.financialRecovery.confirm();
+      expect(component.financialRecovery.state()).toBe('pending');
+      component.closeModal(); component.openModal(kind);
+      expect(component.activeModal()).toBeNull();
+      fixture.destroy();
+      fixture = TestBed.createComponent(InvestmentDetailComponent);
+      component = fixture.componentInstance; fixture.detectChanges();
+      component.openModal(kind);
+      expect(component.financialRecovery.state()).toBe('pending'); expect(component.activeModal()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.review-notice')).not.toBeNull();
+      expect(request()).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects concurrent submission and reconciles a response cancelled by navigation', () => {
+      fillForm(); const pending = new Subject<InvestmentTransactionDto>();
+      request().mockReturnValue(pending);
+      submit(); submit(); fixture.detectChanges();
+      expect(request()).toHaveBeenCalledTimes(1);
+      expect(fixture.nativeElement.querySelector('.modal button[type="submit"]').disabled).toBe(true);
+      fixture.destroy();
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(assetServiceSpy.getAsset).toHaveBeenCalledTimes(2);
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(5);
+    });
+
+    it('preserves an interrupted write through expiry and same-user renewal', () => {
+      const session = TestBed.inject(SessionService);
+      session.accept(syntheticSession(), session.version());
+      fillForm(); request().mockReturnValue(new Subject<InvestmentTransactionDto>());
+      submit(); session.invalidate('expired'); fixture.destroy();
+      expect(component.financialRecovery.state()).toBe('pending');
+      session.accept(syntheticSession(), session.version());
+      component.financialRecovery.check();
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(request()).toHaveBeenCalledTimes(1);
+    });
+
+    it('permits correction after a definite validation rejection', () => {
+      fillForm(); request().mockReturnValue(throwError(() => ({ status: 400, error: { error: 'Validation Failed' } })));
+      submit(); expect(component.financialRecovery.state()).toBe('clear');
+      expect(assetServiceSpy.getAsset).toHaveBeenCalledTimes(1);
+      request().mockReturnValue(of(mockTxBuy)); submit(); expect(request()).toHaveBeenCalledTimes(2);
+    });
+  });
 
   describe('onSell()', () => {
     beforeEach(() => setup());

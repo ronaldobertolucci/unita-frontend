@@ -1,5 +1,5 @@
-import { Component, OnInit, signal, computed, inject, DestroyRef } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { Component, OnInit, signal, computed, effect, inject, DestroyRef } from '@angular/core';
+import { Observable, finalize, forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -24,6 +24,9 @@ import {
   LiquidityType,
 } from '../../../core/models/asset.model';
 import { translateApiError } from '../../../core/utils/api-error.util';
+import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 
 type ModalType =
   | 'edit'
@@ -42,7 +45,7 @@ const CATEGORY_SELL = 'Resgate de Investimento';
 @Component({
   selector: 'app-investment-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, FinancialRecoveryComponent],
   templateUrl: './investment-detail.component.html',
   styleUrl: './investment-detail.component.css',
 })
@@ -57,6 +60,7 @@ export class InvestmentDetailComponent implements OnInit {
   readonly categoryService = inject(CategoryService);
   readonly pocketService = inject(PocketService);
   readonly transactionService = inject(TransactionService);
+  readonly financialRecovery = inject(FinancialRecoveryService);
 
   // ── Parâmetros de retorno ─────────────────────────────────────────────────
   readonly backQueryParams = {
@@ -78,6 +82,16 @@ export class InvestmentDetailComponent implements OnInit {
   readonly sellPocketId = signal<number | null>(null);
   readonly sellBalance = signal<number | null>(null);
   private assetId!: number;
+
+  constructor() {
+    effect(() => {
+      const review = this.financialRecovery.investment();
+      if (review && review.asset.id === this.assetId) {
+        this.asset.set(review.asset);
+        this.transactions.set([...review.transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
+      }
+    });
+  }
 
   // ── Computed ──────────────────────────────────────────────────────────────
   readonly variation = computed(() => {
@@ -230,7 +244,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
-    if (this.isSaving() || (type === 'sell' && this.asset()?.status === 'REDEEMED')) return;
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear' || (type === 'sell' && this.asset()?.status === 'REDEEMED')) return;
     this.errorMessage.set('');
     this.activeModal.set(type);
 
@@ -249,6 +263,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Submits ───────────────────────────────────────────────────────────────
   onEdit(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.editForm.markAllAsTouched();
     if (this.editForm.invalid) return;
 
@@ -278,6 +293,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onUpdatePosition(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.positionForm.markAllAsTouched();
     if (this.positionForm.invalid) return;
 
@@ -305,6 +321,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onBuy(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.buyForm.markAllAsTouched();
     if (this.buyForm.invalid) return;
 
@@ -314,7 +331,7 @@ export class InvestmentDetailComponent implements OnInit {
     const { amount, quantity, pocketId, transactionDate, categoryId, notes } =
       this.buyForm.getRawValue();
 
-    this.assetService
+    this.submitInvestmentTransaction('Aporte', Number(pocketId), this.assetService
       .buy(this.assetId, {
         amount: Number(amount),
         quantity: Number(quantity),
@@ -322,21 +339,11 @@ export class InvestmentDetailComponent implements OnInit {
         transactionDate,
         categoryId: Number(categoryId),
         notes: notes?.trim() || undefined,
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => {
-          this.isSaving.set(false);
-          this.closeModal();
-          this.loadAll();
-        },
-        error: (err) => {
-          this.isSaving.set(false);
-          this.errorMessage.set(translateApiError(err?.error?.message));
-        },
-      });
+      }));
   }
 
   onYield(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.yieldForm.markAllAsTouched();
     if (this.yieldForm.invalid) return;
 
@@ -346,25 +353,31 @@ export class InvestmentDetailComponent implements OnInit {
     const { amount, pocketId, transactionDate, categoryId, notes } =
       this.yieldForm.getRawValue();
 
-    this.assetService
+    this.submitInvestmentTransaction('Rendimento', Number(pocketId), this.assetService
       .recordYield(this.assetId, {
         amount: Number(amount),
         pocketId: Number(pocketId),
         transactionDate,
         categoryId: Number(categoryId),
         notes: notes?.trim() || undefined,
-      })
-      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => {
-          this.isSaving.set(false);
-          this.closeModal();
-          this.loadAll();
-        },
-        error: (err) => {
-          this.isSaving.set(false);
-          this.errorMessage.set(translateApiError(err?.error?.message));
-        },
-      });
+      }));
+  }
+
+  private submitInvestmentTransaction(label: string, pocketId: number, request: Observable<InvestmentTransactionDto>): void {
+    this.financialRecovery.trackWrite({
+      label: `${label}: ${this.asset()?.name ?? 'Investimento'}`, pocketIds: [pocketId], assetId: this.assetId,
+    }, request).pipe(finalize(() => this.isSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.isSaving.set(false);
+        this.closeModal();
+        this.loadAll();
+      },
+      error: (err) => {
+        this.isSaving.set(false);
+        this.errorMessage.set(financialWriteErrorMessage(err, 'Não foi possível registrar a movimentação do investimento.'));
+        if (isUncertainFinancialWrite(err)) this.financialRecovery.check();
+      },
+    });
   }
 
   sellNetAmount(): number | null {
@@ -375,7 +388,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onSell(): void {
-    if (this.isSaving() || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear' || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
     this.sellForm.markAllAsTouched();
     if (this.sellForm.invalid) return;
 
@@ -486,6 +499,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onDelete(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.isSaving.set(true);
     this.errorMessage.set('');
 

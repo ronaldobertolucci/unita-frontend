@@ -94,14 +94,9 @@ describe('Unita HTTP policy and bounded session recovery', () => {
     backend.expectOne('/api/auth/me').flush({ code: 'INVALID_TOKEN' }, { status: 401, statusText: 'Unauthorized' });
     backend.expectNone('/api/auth/refresh'); expect(session.isAuthenticated()).toBe(false);
   });
-  it.each([['POST', '/api/assets/1/transactions/buy']])('repeats %s %s only after a contracted pre-controller 401, preserving the body', async (method, url) => {
-    const body = { amount: 10, description: 'synthetic write' }; http.request(method, url, { body }).subscribe();
-    backend.expectOne(url).flush({ code: 'SESSION_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
-    await flushCoordination(); backend.expectOne('/api/auth/refresh').flush({ ...syntheticSession(), token: 'renewed' });
-    await flushCoordination(); const retry = backend.expectOne(url); expect(retry.request.body).toEqual(body); retry.flush({});
-  });
   it.each([
     ['POST', '/api/transfers'], ['POST', '/api/transfers/fgts/withdrawal'],
+    ['POST', '/api/assets/1/transactions/buy'], ['POST', '/api/assets/1/transactions/yield'],
     ['POST', '/api/pockets/1/transactions'], ['PUT', '/api/credit-cards/1/bills/2/pay'],
     ['DELETE', '/api/pockets/1/transactions/2'], ['DELETE', '/api/pockets/bank-accounts/1'],
     ['DELETE', '/api/pockets/benefit-accounts/1'], ['DELETE', '/api/pockets/fgts/1'], ['DELETE', '/api/credit-cards/1'],
