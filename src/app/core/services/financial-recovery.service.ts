@@ -5,7 +5,7 @@ import { PocketService } from './pocket.service';
 import { TransactionService } from './transaction.service';
 import { CreditCardService } from './credit-card.service';
 import { TransactionDto } from '../models/transaction.model';
-import { CreditCardBillDto } from '../models/credit-card.model';
+import { CreditCardBillDto, CreditCardPurchaseDto } from '../models/credit-card.model';
 import { isUncertainFinancialWrite } from '../utils/financial-operation.util';
 
 interface PendingOperation {
@@ -13,6 +13,8 @@ interface PendingOperation {
   pocketIds: number[];
   cardId?: number;
   billId?: number;
+  reviewPurchases?: boolean;
+  purchaseId?: number;
   message?: string;
 }
 
@@ -32,6 +34,7 @@ export class FinancialRecoveryService {
   readonly operation = signal<PendingOperation | null>(null);
   readonly pockets = signal<PocketReview[]>([]);
   readonly bills = signal<CreditCardBillDto[]>([]);
+  readonly purchases = signal<CreditCardPurchaseDto[]>([]);
 
   constructor() {
     this.session.registerCleanup(() => this.clear(), inject(DestroyRef));
@@ -41,6 +44,7 @@ export class FinancialRecoveryService {
     this.operation.set(operation);
     this.pockets.set([]);
     this.bills.set([]);
+    this.purchases.set([]);
     this.state.set('pending');
   }
 
@@ -84,22 +88,34 @@ export class FinancialRecoveryService {
     if (!operation || this.state() === 'checking' || this.state() === 'sending') return;
     const version = this.session.version();
     this.state.set('checking');
-    const cards = operation.cardId === undefined ? of([] as CreditCardBillDto[]) :
+    const emptyCard = { bills: [] as CreditCardBillDto[], purchases: [] as CreditCardPurchaseDto[] };
+    const cards = operation.cardId === undefined ? of(emptyCard) :
       this.injector.get(CreditCardService).loadCreditCards().pipe(switchMap(list =>
         list.some(card => card.id === operation.cardId)
-          ? this.readBills(operation)
-          : of([] as CreditCardBillDto[])));
-    this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), bills: cards }))
+          ? forkJoin({ bills: this.readBills(operation), purchases: this.readPurchases(operation) })
+          : of(emptyCard)));
+    this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), card: cards }))
       .pipe(finalize(() => {
         if (version === this.session.version() && this.state() === 'checking') this.state.set('pending');
       })).subscribe({
         next: data => {
           this.pockets.set(data.pockets);
-          this.bills.set(data.bills);
+          this.bills.set(data.card.bills);
+          this.purchases.set(data.card.purchases);
           this.state.set('review');
         },
         error: () => {},
       });
+  }
+
+  private readPurchases(operation: PendingOperation): Observable<CreditCardPurchaseDto[]> {
+    if (!operation.reviewPurchases) return of([]);
+    const cards = this.injector.get(CreditCardService);
+    return cards.getPurchases(operation.cardId!).pipe(switchMap(list =>
+      operation.purchaseId !== undefined && list.some(p => p.id === operation.purchaseId)
+        ? cards.getPurchase(operation.cardId!, operation.purchaseId).pipe(
+          map(purchase => list.map(p => p.id === purchase.id ? purchase : p)))
+        : of(list)));
   }
 
   private readBills(operation: PendingOperation): Observable<CreditCardBillDto[]> {
@@ -120,5 +136,6 @@ export class FinancialRecoveryService {
     this.operation.set(null);
     this.pockets.set([]);
     this.bills.set([]);
+    this.purchases.set([]);
   }
 }

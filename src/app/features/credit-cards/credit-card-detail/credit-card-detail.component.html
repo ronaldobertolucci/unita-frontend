@@ -50,7 +50,7 @@
     <!-- ─── Faturas ─── -->
     <div class="section-header">
       <h3 class="section-title">Faturas</h3>
-      <button class="btn-primary btn-primary--sm" (click)="openCreatePurchaseModal()">
+      <button class="btn-primary btn-primary--sm" [disabled]="isSaving() || checkingComposition() || financialRecovery.state() !== 'clear'" (click)="openCreatePurchaseModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
@@ -154,239 +154,174 @@
       }
     }
 
+    <div class="section-header purchases-header">
+      <h3 class="section-title">Compras</h3>
+      <button type="button" class="btn-bill-action" [disabled]="isSaving() || checkingComposition()" (click)="refreshPurchaseHistory()">Atualizar histórico</button>
+    </div>
+    @if (purchasesError()) { <p class="field-error" role="alert">{{ purchasesError() }}</p> }
+    <div class="bills-list">
+      @for (purchase of purchases(); track purchase.id) {
+        <div class="bill-item">
+          <button type="button" class="bill-item-link purchase-link" [disabled]="isSaving() || checkingComposition()" (click)="openPurchaseDetail(purchase)">
+            <span class="bill-dates">
+              <span class="purchase-name">{{ purchase.description }}</span>
+              <span class="bill-label">{{ formatDate(purchase.purchaseDate) }} · {{ purchase.installmentsCount === 1 ? 'À vista' : purchase.installmentsCount + ' parcelas' }}</span>
+              @if (isIncompletePurchase(purchase)) { <span class="field-error">Plano legado incompleto ou inconsistente</span> }
+            </span>
+            <span class="bill-amount">{{ formatCurrency(purchase.totalValue) }}</span>
+          </button>
+        </div>
+      } @empty { @if (!purchasesError()) { <p class="field-empty-hint">Nenhuma compra registrada.</p> } }
+    </div>
+
   }
 
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════
-     MODAL: Nova compra — Step 1
-══════════════════════════════════════════════════════════════════ -->
-@if (activeModal() === 'create-purchase-step1') {
+@if (activeModal() === 'purchase-form') {
   <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
-
+    <div class="modal modal--purchase" role="dialog" aria-modal="true" aria-labelledby="purchaseTitle" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <div class="modal-header-left">
-          <span class="modal-step-label">Passo 1 de 2</span>
-          <h3>Nova compra</h3>
-        </div>
-        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+        <h3 id="purchaseTitle">{{ editingPurchaseId() ? 'Corrigir compra' : 'Nova compra' }}</h3>
+        <button type="button" class="modal-close" [disabled]="isSaving() || checkingComposition()" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-
-      <ng-container *ngTemplateOutlet="errorBanner" />
-
-      @if (reviewedPurchases(); as recorded) {
-        <p class="field-error">Confira a lista consultada antes de decidir criar outra compra. Não há reenvio automático.</p>
-        @for (purchase of recorded; track purchase.id) {
-          <p class="bill-dates">{{ purchase.description }} · {{ formatDate(purchase.purchaseDate) }} · {{ formatCurrency(purchase.totalValue) }}</p>
-        }
+      <app-financial-recovery />
+      @if (errorMessage()) { <div class="modal-error" role="alert">{{ errorMessage() }}</div> }
+      @if (checkingComposition()) { <p class="field-empty-hint" role="status">Consultando dados atuais…</p> }
+      @if (editingPurchaseId()) {
+        <p class="plan-hint">A correção substitui todas as parcelas e recalcula o calendário a partir da data da compra, inclusive parcelas movidas. Somente faturas abertas e sem pagamento permitem a alteração.</p>
+        @if (!canEditPurchase()) { <p class="field-error">A compra está indisponível ou contém faturas protegidas. Confira o histórico e as faturas.</p> }
       }
-      <form [formGroup]="purchaseStep1Form" (ngSubmit)="submitPurchaseStep1()" novalidate>
-
-        <div class="field-row">
-          <div class="field" [class.field--invalid]="s1TotalValue.invalid && s1TotalValue.touched">
-            <label for="s1Value">Valor total (R$)</label>
-            <input id="s1Value" type="number" formControlName="totalValue" placeholder="0,00" step="0.01" min="0.01" />
-            @if (s1TotalValue.invalid && s1TotalValue.touched) {
-              <span class="field-error">
-                @if (s1TotalValue.hasError('required')) { Obrigatório }
-                @else { Maior que zero }
-              </span>
-            }
+      <form [formGroup]="purchaseForm" (ngSubmit)="submitPurchase()" novalidate>
+        <fieldset class="purchase-fields" [disabled]="isSaving() || checkingComposition() || financialRecovery.state() !== 'clear'">
+          <div class="field" [class.field--invalid]="controlError('description')">
+            <label for="purchaseDescription">Descrição</label>
+            <input id="purchaseDescription" type="text" formControlName="description" placeholder="Ex: Geladeira, Notebook..." maxlength="255" autocomplete="off" />
+            @if (controlError('description'); as error) { <span class="field-error">{{ error }}</span> }
           </div>
-          <div class="field" [class.field--invalid]="s1InstallmentsCount.invalid && s1InstallmentsCount.touched">
-            <label for="s1Count">Nº de parcelas</label>
-            <input id="s1Count" type="number" formControlName="installmentsCount" placeholder="1" min="1" max="99" />
-            @if (s1InstallmentsCount.invalid && s1InstallmentsCount.touched) {
-              <span class="field-error">
-                @if (s1InstallmentsCount.hasError('required')) { Obrigatório }
-                @else { Entre 1 e 99 }
-              </span>
-            }
+          <div class="field-row">
+            <div class="field" [class.field--invalid]="controlError('totalValue')">
+              <label for="purchaseValue">Valor total (R$)</label>
+              <input id="purchaseValue" type="text" inputmode="decimal" formControlName="totalValue" placeholder="0,00" autocomplete="off" />
+              @if (controlError('totalValue'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
+            <div class="field" [class.field--invalid]="controlError('installmentsCount')">
+              <label for="purchaseCount">Nº de parcelas</label>
+              <input id="purchaseCount" type="number" formControlName="installmentsCount" min="1" max="120" step="1" />
+              @if (controlError('installmentsCount'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
           </div>
-        </div>
-
-        <div class="field" [class.field--invalid]="s1Description.invalid && s1Description.touched">
-          <label for="s1Desc">Descrição</label>
-          <input id="s1Desc" type="text" formControlName="description" placeholder="Ex: Geladeira, Notebook..." autocomplete="off" />
-          @if (s1Description.invalid && s1Description.touched) {
-            <span class="field-error">
-              @if (s1Description.hasError('required')) { Descrição é obrigatória }
-              @else { Máximo de 255 caracteres }
-            </span>
-          }
-        </div>
-
-        <div class="field" [class.field--invalid]="s1PurchaseDate.invalid && s1PurchaseDate.touched">
-          <label for="s1Date">Data da compra</label>
-          <input id="s1Date" type="date" formControlName="purchaseDate" />
-          @if (s1PurchaseDate.invalid && s1PurchaseDate.touched) {
-            <span class="field-error">Data é obrigatória</span>
-          }
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
-            @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Próximo }
-          </button>
-        </div>
-
-      </form>
-    </div>
-  </div>
-}
-
-<!-- ══════════════════════════════════════════════════════════════════
-     MODAL: Nova compra — Step 2 (parcelas)
-══════════════════════════════════════════════════════════════════ -->
-@if (activeModal() === 'create-purchase-step2') {
-  <div class="modal-overlay">
-    <div class="modal" (click)="$event.stopPropagation()">
-
-      <div class="modal-header">
-        <div class="modal-header-left">
-          <span class="modal-step-label">
-            Parcela {{ currentInstallmentIndex() }} de {{ currentPurchase()!.installmentsCount }}
-          </span>
-          <h3>{{ currentPurchase()!.description }}</h3>
-        </div>
-        <button class="modal-close" (click)="tryCloseStep2()" aria-label="Fechar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="progress-bar">
-        <div
-          class="progress-fill"
-          [style.width.%]="((currentInstallmentIndex() - 1) / currentPurchase()!.installmentsCount) * 100"
-        ></div>
-      </div>
-
-      <ng-container *ngTemplateOutlet="errorBanner" />
-
-      @if (reviewedInstallments(); as recorded) {
-        <p class="field-error">Confira as parcelas consultadas antes de decidir por um novo envio.</p>
-        @for (installment of recorded; track installment.id) {
-          <p class="bill-dates">Parcela {{ installment.installmentNumber }} · {{ formatCurrency(installment.amount) }} · Vencimento {{ formatDate(installment.billDueDate) }}</p>
-        }
-        @if (currentInstallmentRecorded()) {
-          <button type="button" class="btn-secondary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="acceptRecordedInstallment()">Reconheço esta parcela; continuar sem reenviar</button>
-        }
-      }
-      <form [formGroup]="installmentForm" (ngSubmit)="submitInstallment()" novalidate>
-
-        <div class="field" [class.field--invalid]="instAmount.invalid && instAmount.touched">
-          <label for="instAmt">Valor da parcela (R$)</label>
-          <input id="instAmt" type="number" formControlName="amount" placeholder="0,00" step="0.01" min="0.01" />
-          @if (instAmount.invalid && instAmount.touched) {
-            <span class="field-error">
-              @if (instAmount.hasError('required')) { Obrigatório }
-              @else { Maior que zero }
-            </span>
-          }
-        </div>
-
-        <div class="field" [class.field--invalid]="instCategoryId.invalid && instCategoryId.touched">
-          <label for="instCat">Categoria</label>
-          <select id="instCat" formControlName="categoryId">
-            <option [value]="null" disabled selected>Selecione uma categoria</option>
-            @for (cat of expenseCategories(); track cat.id) {
-              <option [value]="cat.id">{{ cat.name }}</option>
-            }
-          </select>
-          @if (instCategoryId.invalid && instCategoryId.touched) {
-            <span class="field-error">Selecione uma categoria</span>
-          }
-        </div>
-
-        <div class="modal-actions">
-          @if (errorMessage()) {
-            <button type="button" class="btn-action btn-action--danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchaseFromStep2()">
-              @if (isSaving()) { <span class="spinner spinner--light"></span> } @else {
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6M14 11v6"/>
-                </svg>
+          <div class="field-row">
+            <div class="field" [class.field--invalid]="controlError('purchaseDate')">
+              <label for="purchaseDate">Data da compra</label>
+              <input id="purchaseDate" type="date" formControlName="purchaseDate" />
+              @if (controlError('purchaseDate'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
+            <div class="field" [class.field--invalid]="controlError('categoryId')">
+              <label for="purchaseCategory">Categoria padrão</label>
+              <select id="purchaseCategory" formControlName="categoryId">
+                <option [ngValue]="null" disabled>Selecione a categoria</option>
+                @for (category of expenseCategories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+              </select>
+              @if (controlError('categoryId'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
+          </div>
+          @if (expenseCategories().length === 0) { <p class="field-empty-hint">Nenhuma categoria de despesa ou neutra disponível.</p> }
+          <div class="field">
+            <label for="purchaseMode">Parcelamento</label>
+            <select id="purchaseMode" formControlName="installmentMode">
+              <option value="AUTOMATIC">Automático · dividir o total</option>
+              <option value="CUSTOM">Personalizado · valores e categorias</option>
+            </select>
+          </div>
+          <p class="plan-hint">Para compra à vista, use uma parcela. As datas e faturas são definidas pela data da compra; os vencimentos serão exibidos após salvar.</p>
+          @if (purchaseForm.value.installmentMode === 'CUSTOM') {
+            <div formArrayName="installments" class="plan-rows">
+              @for (row of installmentRows.controls; track row; let index = $index) {
+                <div [formGroupName]="index" class="plan-row">
+                  <span class="plan-row-number">Parcela {{ index + 1 }}</span>
+                  <div class="field-row">
+                    <div class="field" [class.field--invalid]="controlError('installments[' + index + '].amount', row.controls.amount)">
+                      <label [for]="'amount-' + index">Valor (R$)</label>
+                      <input [id]="'amount-' + index" type="text" inputmode="decimal" formControlName="amount" placeholder="0,00" />
+                      @if (controlError('installments[' + index + '].amount', row.controls.amount); as error) { <span class="field-error">{{ error }}</span> }
+                    </div>
+                    <div class="field" [class.field--invalid]="controlError('installments[' + index + '].categoryId', row.controls.categoryId)">
+                      <label [for]="'category-' + index">Categoria</label>
+                      <select [id]="'category-' + index" formControlName="categoryId">
+                        <option [ngValue]="null">Usar categoria padrão</option>
+                        @for (category of expenseCategories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+                      </select>
+                      @if (controlError('installments[' + index + '].categoryId', row.controls.categoryId); as error) { <span class="field-error">{{ error }}</span> }
+                    </div>
+                  </div>
+                </div>
               }
-              Excluir compra
-            </button>
+            </div>
+          } @else if (automaticAmounts().length) {
+            <div class="plan-preview">
+              <span class="plan-row-number">Prévia dos valores</span>
+              @for (amount of automaticAmounts(); track $index) {
+                <div class="plan-preview-row"><span>Parcela {{ $index + 1 }}</span><strong>{{ formatCurrency(amount / 100) }}</strong></div>
+              }
+              <p class="plan-hint">A diferença de centavos fica na última parcela. O plano salvo será confirmado pelo sistema.</p>
+            </div>
           }
-          <button type="submit" class="btn-primary btn-primary--full" [disabled]="checkingComposition() || currentInstallmentRecorded() || isSaving() || financialRecovery.state() !== 'clear'">
-            @if (isSaving()) {
-              <span class="spinner"></span> Salvando...
-            } @else if (currentInstallmentIndex() === currentPurchase()!.installmentsCount) {
-              Concluir
-            } @else {
-              Próxima parcela
-            }
+          @if (planError()) { <p class="field-error" role="alert">{{ planError() }}</p> }
+          @if (fieldErrors()['installments']) { <p class="field-error">{{ fieldErrors()['installments'] }}</p> }
+        </fieldset>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" [disabled]="isSaving() || checkingComposition()" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || checkingComposition() || financialRecovery.state() !== 'clear' || !ownedCardAvailable() || (editingPurchaseId() !== null && !canEditPurchase())">
+            @if (isSaving()) { <span class="spinner"></span> Salvando… } @else { {{ editingPurchaseId() ? 'Salvar correção' : 'Salvar compra' }} }
           </button>
         </div>
-
       </form>
     </div>
   </div>
 }
 
-<!-- ══════════════════════════════════════════════════════════════════
-     MODAL: Aviso de fechamento no meio do step 2
-══════════════════════════════════════════════════════════════════ -->
-@if (activeModal() === 'warn-close-mid-purchase') {
-  <div class="modal-overlay">
-    <div class="modal modal--confirm" (click)="$event.stopPropagation()">
-
-      <div class="confirm-icon confirm-icon--warning">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-      </div>
-
-      <h3>Compra criada sem todas as parcelas</h3>
-      <p>
-        A compra <strong>{{ currentPurchase()?.description }}</strong> foi criada, mas apenas
-        <strong>{{ currentInstallmentIndex() - 1 }}</strong> de
-        <strong>{{ currentPurchase()?.installmentsCount }}</strong> parcelas foram registradas.
-        As parcelas faltantes não aparecerão na fatura até serem adicionadas.
-      </p>
-
-      <div class="modal-actions modal-actions--center">
-        <button type="button" class="btn-secondary" (click)="cancelCloseStep2()" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">Continuar cadastrando</button>
-        <button type="button" class="btn-ghost btn-ghost--warn" (click)="confirmCloseStep2()" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">Sair assim mesmo</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchaseFromStep2()">
-          @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir compra }
+@if (activeModal() === 'purchase-detail') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal modal--purchase" role="dialog" aria-modal="true" aria-labelledby="purchaseDetailTitle" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="purchaseDetailTitle">Detalhes da compra</h3>
+        <button type="button" class="modal-close" [disabled]="checkingComposition()" (click)="closeModal()" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-
+      @if (errorMessage()) { <div class="modal-error" role="alert">{{ errorMessage() }}</div> }
+      @if (checkingComposition()) { <p class="field-empty-hint" role="status">Consultando compra e faturas…</p> }
+      @if (currentPurchase(); as purchase) {
+        <div class="pay-summary">
+          <span class="pay-summary-label">{{ purchase.description }}</span>
+          <span class="pay-summary-amount">{{ formatCurrency(purchase.totalValue) }}</span>
+          <span class="pay-summary-period">{{ formatDate(purchase.purchaseDate) }} · {{ purchase.installmentsCount === 1 ? 'À vista' : purchase.installmentsCount + ' parcelas' }}</span>
+        </div>
+        @if (isIncompletePurchase(purchase)) {
+          <p class="field-error">Este plano legado está incompleto ou inconsistente. Uma correção exige informar o plano inteiro e ter todas as faturas elegíveis.</p>
+        }
+        <div class="plan-rows">
+          @for (installment of sortedInstallments(purchase); track installment.id) {
+            <div class="plan-row">
+              <div class="plan-preview-row"><strong>Parcela {{ installment.installmentNumber }}</strong><strong>{{ formatCurrency(installment.amount) }}</strong></div>
+              <p class="plan-hint">{{ formatDate(installment.installmentDate) }} · {{ installment.category.name }}</p>
+              <a class="back-link" [routerLink]="['/credit-cards', card()!.id, 'bills', installment.creditCardBillId]">Fatura com vencimento em {{ formatDate(installment.billDueDate) }}</a>
+            </div>
+          } @empty { <p class="field-empty-hint">Nenhuma parcela registrada nesta compra.</p> }
+        </div>
+        @if (!canEditPurchase()) { <p class="plan-hint">Correção indisponível: há faturas protegidas. Faturas fechadas precisam ser reabertas explicitamente; faturas pagas permanecem protegidas.</p> }
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" [disabled]="checkingComposition()" (click)="closeModal()">Fechar</button>
+          <button type="button" class="btn-primary" [disabled]="!canEditPurchase() || checkingComposition() || financialRecovery.state() !== 'clear'" (click)="openEditPurchaseModal()">Corrigir compra</button>
+        </div>
+      }
     </div>
   </div>
 }
 
-<!-- ══════════════════════════════════════════════════════════════════
-     TEMPLATE: Banner de erro
-══════════════════════════════════════════════════════════════════ -->
-<ng-template #errorBanner>
-  @if (errorMessage()) {
-    <div class="modal-error">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-      </svg>
-      {{ errorMessage() }}
-    </div>
-  }
-</ng-template>
-
-<!-- ══════════════════════════════════════════════════════════════════
-     MODAL: Pagar fatura
-══════════════════════════════════════════════════════════════════ -->
 @if (activeModal() === 'pay-bill') {
   <div class="modal-overlay" (click)="closeModal()">
     <div class="modal" (click)="$event.stopPropagation()">

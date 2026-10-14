@@ -645,8 +645,31 @@
   padding: 1.75rem;
   width: 100%;
   max-width: 400px;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal--purchase { max-width: 560px; }
+.purchases-header { margin-top: 1.75rem; }
+.purchase-link { width: 100%; background: none; border: none; text-align: left; font: inherit; cursor: pointer; }
+.purchase-link:disabled, .btn-secondary:disabled, .modal-close:disabled { opacity: 0.65; cursor: not-allowed; }
+.purchase-name { color: var(--text-primary); font-size: 0.9rem; font-weight: 600; overflow-wrap: anywhere; }
+.purchase-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.plan-hint { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin-bottom: 0.75rem; }
+.plan-rows { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+.plan-row, .plan-preview { background: var(--input-bg); border: 1px solid var(--border-subtle); border-radius: var(--radius-input); padding: 0.85rem; margin-bottom: 0.75rem; }
+.plan-row .field { margin-bottom: 0; }
+.plan-row-number { display: block; color: var(--text-primary); font-size: 0.85rem; font-weight: 600; margin-bottom: 0.65rem; }
+.plan-preview-row { display: flex; justify-content: space-between; gap: 1rem; color: var(--text-secondary); font-size: 0.85rem; padding: 0.35rem 0; }
+.plan-preview-row strong { color: var(--text-primary); }
+.plan-preview .plan-hint { margin: 0.75rem 0 0; }
+.plan-row .back-link { margin-bottom: 0; }
+
+@media (max-width: 480px) {
+  .modal--purchase .field-row { grid-template-columns: 1fr; }
+  .modal--purchase .plan-row .field { margin-bottom: 0.75rem; }
 }
 
 @keyframes slideUp {

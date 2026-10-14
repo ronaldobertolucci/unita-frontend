@@ -30,6 +30,8 @@ const mockBillPaid: CreditCardBillDto = {
 const mockPurchase: CreditCardPurchaseDto = {
   id: 100, description: 'Geladeira', totalValue: 300,
   purchaseDate: '2025-04-01', installmentsCount: 3,
+  installments: [{ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 10, installmentDate: '2025-04-01',
+    billDueDate: '2025-04-22', category: { id: 1, name: 'Alimentação', type: 'EXPENSE', global: false } }],
 };
 
 const mockExpenseCategory: CategoryDto = { id: 1, name: 'Alimentação', type: 'EXPENSE', global: false };
@@ -392,7 +394,7 @@ describe('CreditCardBillDetailComponent', () => {
     });
 
     it('allows same-bill movement and reloads the date returned by the server', () => {
-      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ ...mockInstallmentItem, creditCardBillId: 10, installmentDate: '2025-03-15', billDueDate: '2025-04-22' }]));
+      creditCardServiceSpy.getPurchases.mockReturnValue(of([{ ...mockPurchase, installments: [{ ...mockPurchase.installments[0], installmentDate: '2025-03-15' }] }]));
       component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
       component.moveInstallment();
       expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledWith(1, 100, 200, { amount: 100, creditCardBillId: 10 });
@@ -443,7 +445,8 @@ describe('CreditCardBillDetailComponent', () => {
       component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
       component.moveInstallment();
       expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledTimes(1);
-      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledTimes(2);
+      expect(creditCardServiceSpy.getPurchases).toHaveBeenCalledTimes(2);
+      expect(creditCardServiceSpy.getInstallments).not.toHaveBeenCalled();
       expect(component.errorMessage()).toContain('protegida');
     });
   });

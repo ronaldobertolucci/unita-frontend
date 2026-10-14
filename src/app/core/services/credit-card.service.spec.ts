@@ -50,6 +50,7 @@ const mockPurchase: CreditCardPurchaseDto = {
   totalValue: 300,
   purchaseDate: '2025-03-01',
   installmentsCount: 3,
+  installments: [],
 };
 
 const mockInstallment: CreditCardInstallmentDto = {
@@ -252,7 +253,7 @@ describe('CreditCardService', () => {
       let result: CreditCardPurchaseDto | undefined;
       service.createPurchase(1, {
         description: 'Geladeira', totalValue: 300,
-        purchaseDate: '2025-03-01', installmentsCount: 3,
+        purchaseDate: '2025-03-01', installmentsCount: 3, categoryId: 1, installmentMode: 'AUTOMATIC',
       }).subscribe(r => result = r);
       const req = http.expectOne(`${base}/credit-cards/1/purchases`);
       expect(req.request.body.description).toBe('Geladeira');
@@ -272,17 +273,21 @@ describe('CreditCardService', () => {
     });
   });
 
-  // ─── createInstallment() ──────────────────────────────────────────────────
+  it('reads the purchase detail with official installments', () => {
+    service.getPurchase(1, 100).subscribe(p => expect(p.installments).toEqual([mockInstallment]));
+    const req = http.expectOne(`${base}/credit-cards/1/purchases/100`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ ...mockPurchase, installments: [mockInstallment] });
+  });
 
-  describe('createInstallment()', () => {
-    it('should POST /credit-cards/:cardId/purchases/:purchaseId/installments', () => {
-      let result: CreditCardInstallmentDto | undefined;
-      service.createInstallment(1, 100, { installmentNumber: 1, amount: 100, categoryId: 1 }).subscribe(r => result = r);
-      const req = http.expectOne(`${base}/credit-cards/1/purchases/100/installments`);
-      expect(req.request.body).toEqual({ installmentNumber: 1, amount: 100, categoryId: 1 });
-      req.flush(mockInstallment);
-      expect(result).toEqual(mockInstallment);
-    });
+  it('replaces the complete purchase plan in one PUT', () => {
+    const payload = { description: 'Corrigida', totalValue: 100, purchaseDate: '2027-01-31', installmentsCount: 2,
+      categoryId: 1, installmentMode: 'CUSTOM' as const, installments: [{ installmentNumber: 2, amount: 60 }, { installmentNumber: 1, amount: 40, categoryId: 2 }] };
+    service.updatePurchase(1, 100, payload).subscribe(p => expect(p.installments).toEqual([mockInstallment]));
+    const req = http.expectOne(`${base}/credit-cards/1/purchases/100`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual(payload);
+    req.flush({ ...mockPurchase, installments: [mockInstallment] });
   });
 
   // ─── deleteInstallment() ──────────────────────────────────────────────────

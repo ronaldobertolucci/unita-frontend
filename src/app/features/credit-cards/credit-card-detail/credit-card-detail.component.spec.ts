@@ -42,6 +42,8 @@ const mockCategory: CategoryDto = { id: 1, name: 'Alimentação', type: 'EXPENSE
 const mockPurchase: CreditCardPurchaseDto = {
   id: 100, description: 'Notebook', totalValue: 300,
   purchaseDate: '2025-04-01', installmentsCount: 3,
+  installments: [1, 2, 3].map(number => ({ id: 199 + number, installmentNumber: number, amount: 100, creditCardBillId: 10,
+    installmentDate: `2025-0${3 + number}-01`, billDueDate: `2025-0${3 + number}-22`, category: mockCategory })),
 };
 
 function buildCreditCardService() {
@@ -54,6 +56,8 @@ function buildCreditCardService() {
     reopenBill: jest.fn().mockReturnValue(of({ ...mockBillClosed, status: 'OPEN' as const })),
     payBill: jest.fn().mockReturnValue(of({ ...mockBillClosed, status: 'PAID' as const })),
     createPurchase: jest.fn().mockReturnValue(of(mockPurchase)),
+    getPurchase: jest.fn().mockReturnValue(of(mockPurchase)),
+    updatePurchase: jest.fn().mockReturnValue(of(mockPurchase)),
     deletePurchase: jest.fn().mockReturnValue(of(undefined)),
     getPurchases: jest.fn().mockReturnValue(of([mockPurchase])),
     getInstallments: jest.fn().mockReturnValue(of([])),
@@ -272,156 +276,6 @@ describe('CreditCardDetailComponent', () => {
     });
   });
 
-  // ─── Fluxo de compra — step 1 ─────────────────────────────────────────────
-
-  describe('submitPurchaseStep1()', () => {
-    beforeEach(() => setup());
-
-    it('should not submit when form is invalid', () => {
-      component.openCreatePurchaseModal();
-      component.submitPurchaseStep1();
-      expect(creditCardServiceSpy.createPurchase).not.toHaveBeenCalled();
-    });
-
-    it('should create purchase and advance to step 2 on success', () => {
-      component.openCreatePurchaseModal();
-      component.purchaseStep1Form.setValue({
-        description: 'Notebook', totalValue: 300,
-        purchaseDate: '2025-04-01', installmentsCount: 3,
-      });
-      component.submitPurchaseStep1();
-      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalled();
-      expect(component.activeModal()).toBe('create-purchase-step2');
-      expect(component.currentPurchase()).toEqual(mockPurchase);
-      expect(component.currentInstallmentIndex()).toBe(1);
-    });
-
-    it('should suggest installment amount as totalValue / installmentsCount', () => {
-      component.openCreatePurchaseModal();
-      component.purchaseStep1Form.setValue({
-        description: 'Notebook', totalValue: 300,
-        purchaseDate: '2025-04-01', installmentsCount: 3,
-      });
-      component.submitPurchaseStep1();
-      expect(component.installmentForm.value.amount).toBe(100);
-    });
-
-    it('should set errorMessage on failure', () => {
-      creditCardServiceSpy.createPurchase.mockReturnValue(
-        throwError(() => ({ error: { message: 'Erro' } }))
-      );
-      component.openCreatePurchaseModal();
-      component.purchaseStep1Form.setValue({
-        description: 'Notebook', totalValue: 300,
-        purchaseDate: '2025-04-01', installmentsCount: 3,
-      });
-      component.submitPurchaseStep1();
-      expect(component.errorMessage()).toBeTruthy();
-      expect(component.activeModal()).toBe('create-purchase-step1');
-    });
-  });
-
-  // ─── Fluxo de compra — step 2 ─────────────────────────────────────────────
-
-  describe('submitInstallment()', () => {
-    beforeEach(() => {
-      setup();
-      component.currentPurchase.set(mockPurchase);
-      component.currentInstallmentIndex.set(1);
-      component.activeModal.set('create-purchase-step2');
-    });
-
-    it('should advance index on non-last installment', () => {
-      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
-      component.submitInstallment();
-      expect(component.currentInstallmentIndex()).toBe(2);
-      expect(component.activeModal()).toBe('create-purchase-step2');
-    });
-
-    it('should preserve categoryId when advancing', () => {
-      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
-      component.submitInstallment();
-      expect(component.installmentForm.value.categoryId).toBe(1);
-    });
-
-    it('should close modal and reload bills on last installment', () => {
-      component.currentInstallmentIndex.set(3);
-      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
-      component.submitInstallment();
-      expect(creditCardServiceSpy.getBills).toHaveBeenCalledTimes(2); // init + reload
-      expect(component.activeModal()).toBeNull();
-    });
-
-    it('should set errorMessage on failure', () => {
-      creditCardServiceSpy.createInstallment.mockReturnValue(
-        throwError(() => ({ error: { message: 'Fatura fechada' } }))
-      );
-      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
-      component.submitInstallment();
-      expect(component.errorMessage()).toBeTruthy();
-    });
-  });
-
-  // ─── tryCloseStep2 / warn modal ───────────────────────────────────────────
-
-  describe('tryCloseStep2()', () => {
-    beforeEach(() => setup());
-
-    it('should open warn-close-mid-purchase modal', () => {
-      component.currentPurchase.set(mockPurchase);
-      component.activeModal.set('create-purchase-step2');
-      component.tryCloseStep2();
-      expect(component.activeModal()).toBe('warn-close-mid-purchase');
-    });
-  });
-
-  describe('confirmCloseStep2()', () => {
-    beforeEach(() => setup());
-
-    it('should reset purchase state and close modal', () => {
-      component.currentPurchase.set(mockPurchase);
-      component.currentInstallmentIndex.set(2);
-      component.confirmCloseStep2();
-      expect(component.currentPurchase()).toBeNull();
-      expect(component.currentInstallmentIndex()).toBe(1);
-      expect(component.activeModal()).toBeNull();
-    });
-  });
-
-  describe('cancelCloseStep2()', () => {
-    beforeEach(() => setup());
-
-    it('should return to step 2 modal', () => {
-      component.activeModal.set('warn-close-mid-purchase');
-      component.cancelCloseStep2();
-      expect(component.activeModal()).toBe('create-purchase-step2');
-    });
-  });
-
-  // ─── deletePurchaseFromStep2() ────────────────────────────────────────────
-
-  describe('deletePurchaseFromStep2()', () => {
-    beforeEach(() => setup());
-
-    it('should delete purchase, reload bills and close modal', () => {
-      component.currentPurchase.set(mockPurchase);
-      component.deletePurchaseFromStep2();
-      expect(creditCardServiceSpy.deletePurchase).toHaveBeenCalledWith(1, 100);
-      expect(component.currentPurchase()).toBeNull();
-      expect(component.activeModal()).toBeNull();
-    });
-
-    it('should return to step 2 on failure', () => {
-      creditCardServiceSpy.deletePurchase.mockReturnValue(
-        throwError(() => ({ error: { message: 'Erro' } }))
-      );
-      component.currentPurchase.set(mockPurchase);
-      component.activeModal.set('warn-close-mid-purchase');
-      component.deletePurchaseFromStep2();
-      expect(component.activeModal()).toBe('create-purchase-step2');
-    });
-  });
-
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   describe('formatCurrency()', () => {
@@ -569,33 +423,191 @@ describe('CreditCardDetailComponent', () => {
     });
   });
 
-  describe('US-05 legacy purchase recovery', () => {
-    it('reads installments before deleting the whole purchase and blocks a protected installment', () => {
-      setup();
-      component.currentPurchase.set(mockPurchase);
-      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 11, billDueDate: '2025-03-22' }]));
-      component.deletePurchaseFromStep2();
-      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledWith(1, 100);
+
+  describe('US-04 complete purchase plan', () => {
+    function fill(mode: 'AUTOMATIC' | 'CUSTOM' = 'AUTOMATIC') {
+      component.openCreatePurchaseModal();
+      component.purchaseForm.patchValue({ description: 'Compra', totalValue: '100.00', purchaseDate: '2027-01-31',
+        installmentsCount: 3, categoryId: 1, installmentMode: mode });
+    }
+
+    beforeEach(() => setup());
+
+    it('sends one complete automatic POST, omits installments and shows the official response', () => {
+      fill();
+      const official = { ...mockPurchase, totalValue: 100, installments: mockPurchase.installments.map((i, index) => ({
+        ...i, amount: index === 2 ? 33.34 : 33.33, installmentDate: ['2027-01-31', '2027-02-28', '2027-03-31'][index],
+      })) };
+      creditCardServiceSpy.createPurchase.mockReturnValue(of(official));
+      expect(component.automaticAmounts()).toEqual([3333, 3333, 3334]);
+      component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledWith(1, {
+        description: 'Compra', totalValue: 100, purchaseDate: '2027-01-31', installmentsCount: 3,
+        categoryId: 1, installmentMode: 'AUTOMATIC',
+      });
+      expect(creditCardServiceSpy.createInstallment).not.toHaveBeenCalled();
       expect(creditCardServiceSpy.deletePurchase).not.toHaveBeenCalled();
-      expect(component.errorMessage()).toContain('protegida');
+      expect(component.currentPurchase()).toEqual(official);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('28/02/2027');
+      expect(fixture.nativeElement.textContent).toContain('33,34');
     });
 
-    it('consults an installment after losing its POST response and requires a decision before continuing', () => {
-      setup();
-      component.currentPurchase.set(mockPurchase);
-      component.activeModal.set('create-purchase-step2');
-      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
-      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 10, billDueDate: '2025-04-22' }]));
-      creditCardServiceSpy.createInstallment.mockReturnValue(throwError(() => ({ status: 0 })));
-      component.submitInstallment();
-      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledWith(1, 100);
-      expect(component.currentInstallmentRecorded()).toBe(true);
-      expect(component.currentInstallmentIndex()).toBe(1);
-      component.financialRecovery.confirm();
-      component.submitInstallment();
-      expect(creditCardServiceSpy.createInstallment).toHaveBeenCalledTimes(1);
-      component.acceptRecordedInstallment();
-      expect(component.currentInstallmentIndex()).toBe(2);
+    it('creates a cash purchase with one installment and accepts a neutral default category', () => {
+      categoryServiceSpy.categories.set([{ ...mockCategory, type: 'NEUTRAL' }]);
+      fill();
+      component.purchaseForm.patchValue({ installmentsCount: 1 });
+      component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledWith(1, expect.objectContaining({ installmentsCount: 1, categoryId: 1 }));
+    });
+
+    it('sends custom amounts and optional category overrides in one POST', () => {
+      categoryServiceSpy.categories.set([mockCategory, { id: 2, name: 'Outros', type: 'NEUTRAL', global: true }]);
+      fill('CUSTOM');
+      component.purchaseForm.patchValue({ installmentsCount: 2 });
+      component.installmentRows.at(0).setValue({ amount: '40,00', categoryId: 2 });
+      component.installmentRows.at(1).setValue({ amount: '60.00', categoryId: null });
+      component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledWith(1, expect.objectContaining({
+        installmentMode: 'CUSTOM', installments: [{ installmentNumber: 1, amount: 40, categoryId: 2 }, { installmentNumber: 2, amount: 60 }],
+      }));
+    });
+
+    it.each(['0', '0.001', '100.001', '9999999999999.999', '10000000000000', '-1'])('rejects invalid money %s before sending', value => {
+      fill(); component.purchaseForm.patchValue({ totalValue: value }); component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).not.toHaveBeenCalled();
+    });
+
+    it.each([0, 121, 1.5])('rejects count %s before sending', count => {
+      fill(); component.purchaseForm.patchValue({ installmentsCount: count }); component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).not.toHaveBeenCalled();
+    });
+
+    it('rejects zero installments and divergent custom sums', () => {
+      fill(); component.purchaseForm.patchValue({ totalValue: '0.02' }); component.submitPurchase();
+      expect(component.planError()).toContain('zero');
+      component.purchaseForm.patchValue({ totalValue: '100', installmentMode: 'CUSTOM' });
+      component.installmentRows.controls.forEach(row => row.patchValue({ amount: '33.33' }));
+      component.submitPurchase();
+      expect(component.planError()).toContain('soma');
+      expect(creditCardServiceSpy.createPurchase).not.toHaveBeenCalled();
+    });
+
+    it('rejects an income or unavailable category', () => {
+      fill(); component.purchaseForm.patchValue({ categoryId: 9 }); component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('categorias disponíveis');
+    });
+
+    it('blocks duplicate clicks and modal dismissal while the complete POST is pending', () => {
+      fill();
+      const response = new Subject<CreditCardPurchaseDto>();
+      creditCardServiceSpy.createPurchase.mockReturnValue(response);
+      component.submitPurchase(); component.submitPurchase(); component.closeModal();
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledTimes(1);
+      expect(component.activeModal()).toBe('purchase-form');
+      response.next(mockPurchase); response.complete();
+      expect(component.activeModal()).toBe('purchase-detail');
+    });
+
+    it('preserves form and displays nested server validation errors', () => {
+      fill('CUSTOM');
+      component.installmentRows.controls.forEach((row, index) => row.patchValue({ amount: index === 2 ? '33.34' : '33.33' }));
+      creditCardServiceSpy.createPurchase.mockReturnValue(throwError(() => ({ status: 400, error: { error: 'Validation Failed',
+        message: 'Invalid input data', errors: [{ field: 'installments[0].amount', message: 'numeric value out of bounds' }],
+        details: ['categoryId: must not be null'] } })));
+      component.submitPurchase(); fixture.detectChanges();
+      expect(component.purchaseForm.value.description).toBe('Compra');
+      expect(component.controlError('installments[0].amount', component.installmentRows.at(0).controls.amount)).toContain('duas casas');
+      expect(component.controlError('categoryId')).toBe('Obrigatório.');
+      expect(component.activeModal()).toBe('purchase-form');
+    });
+
+    it.each([0, 408, 500, 503])('requires fresh purchases and bills plus reconciliation after uncertain status %s', status => {
+      fill();
+      creditCardServiceSpy.createPurchase.mockReturnValue(throwError(() => ({ status })));
+      component.submitPurchase();
+      expect(creditCardServiceSpy.getPurchases).toHaveBeenCalledTimes(2);
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(component.financialRecovery.purchases()).toEqual([mockPurchase]);
+      component.submitPurchase();
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledTimes(1);
+      expect(creditCardServiceSpy.deletePurchase).not.toHaveBeenCalled();
+    });
+
+    it('keeps operations blocked if history cannot be read after a lost response', () => {
+      fill();
+      creditCardServiceSpy.createPurchase.mockReturnValue(throwError(() => ({ status: 0 })));
+      creditCardServiceSpy.getPurchases.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.submitPurchase(); component.financialRecovery.confirm(); component.submitPurchase();
+      expect(component.financialRecovery.state()).toBe('pending');
+      expect(creditCardServiceSpy.createPurchase).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not overwrite a fresh detail with an older reconciliation snapshot', () => {
+      fill();
+      creditCardServiceSpy.createPurchase.mockReturnValue(throwError(() => ({ status: 0 })));
+      component.submitPurchase();
+      fixture.detectChanges();
+      const updated = { ...mockPurchase, description: 'Corrigida em outra sessão',
+        installments: mockPurchase.installments.map(i => ({ ...i, id: i.id + 100 })) };
+      creditCardServiceSpy.getPurchase.mockReturnValue(of(updated));
+      component.openPurchaseDetail(mockPurchase);
+      fixture.detectChanges();
+      expect(component.currentPurchase()).toEqual(updated);
+      expect(component.financialRecovery.state()).toBe('review');
+    });
+
+    it('reads detail and current bills before editing and replaces all installment IDs after PUT', () => {
+      component.openPurchaseDetail(mockPurchase); component.openEditPurchaseModal();
+      expect(creditCardServiceSpy.getPurchase).toHaveBeenCalledTimes(2);
+      expect(component.purchaseForm.value.installmentMode).toBe('CUSTOM');
+      const updated = { ...mockPurchase, installments: mockPurchase.installments.map(i => ({ ...i, id: i.id + 100 })) };
+      creditCardServiceSpy.updatePurchase.mockReturnValue(of(updated));
+      creditCardServiceSpy.getPurchases.mockReturnValue(of([updated]));
+      component.submitPurchase();
+      expect(creditCardServiceSpy.updatePurchase).toHaveBeenCalledWith(1, 100, expect.objectContaining({ installmentMode: 'CUSTOM',
+        installments: [1, 2, 3].map(number => ({ installmentNumber: number, amount: 100, categoryId: 1 })) }));
+      expect(component.currentPurchase()!.installments.map(i => i.id)).toEqual([300, 301, 302]);
+      expect(component.purchases()).toEqual([updated]);
+    });
+
+    it.each(['CLOSED', 'PAID'] as const)('blocks editing purchases containing %s bills', status => {
+      creditCardServiceSpy.getBills.mockReturnValue(of([{ ...mockBillOpen, status }]));
+      component.openPurchaseDetail(mockPurchase); component.openEditPurchaseModal();
+      expect(component.canEditPurchase()).toBe(false);
+      expect(component.activeModal()).toBe('purchase-detail');
+      expect(creditCardServiceSpy.updatePurchase).not.toHaveBeenCalled();
+    });
+
+    it('blocks an open bill with a payment reference', () => {
+      creditCardServiceSpy.getBills.mockReturnValue(of([{ ...mockBillOpen, paymentId: 5 }]));
+      component.openPurchaseDetail(mockPurchase);
+      expect(component.canEditPurchase()).toBe(false);
+    });
+
+    it('reloads a protected PUT without discarding the entered correction', () => {
+      component.openPurchaseDetail(mockPurchase); component.openEditPurchaseModal();
+      component.purchaseForm.patchValue({ description: 'Correção' });
+      creditCardServiceSpy.updatePurchase.mockReturnValue(throwError(() => ({ status: 409, error: { message:
+        'Bill composition is protected. Only open bills without a payment can be changed' } })));
+      creditCardServiceSpy.getBills.mockReturnValue(of([{ ...mockBillOpen, status: 'PAID' }]));
+      component.submitPurchase();
+      expect(creditCardServiceSpy.getPurchase).toHaveBeenCalledTimes(3);
+      expect(component.purchaseForm.value.description).toBe('Correção');
+      expect(component.canEditPurchase()).toBe(false);
+      expect(component.errorMessage()).toContain('protegida');
+      expect(component.currentPurchase()).toEqual(mockPurchase);
+    });
+
+    it('keeps missing legacy rows blank until the user explicitly provides a complete plan', () => {
+      const legacy = { ...mockPurchase, installments: [mockPurchase.installments[0]] };
+      creditCardServiceSpy.getPurchase.mockReturnValue(of(legacy));
+      component.openPurchaseDetail(legacy); component.openEditPurchaseModal();
+      expect(component.isIncompletePurchase(legacy)).toBe(true);
+      expect(component.installmentRows.at(1).value.amount).toBe('');
+      component.submitPurchase();
+      expect(creditCardServiceSpy.updatePurchase).not.toHaveBeenCalled();
     });
   });
 

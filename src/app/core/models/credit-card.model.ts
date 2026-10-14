@@ -18,6 +18,7 @@ export interface CreditCardBillDto {
   totalInstallments: number;
   totalRefunds: number;
   totalAmount: number;
+  paymentId?: number | null;
 }
 
 export type BillStatus = 'OPEN' | 'CLOSED' | 'PAID';
@@ -28,6 +29,7 @@ export interface CreditCardPurchaseDto {
   totalValue: number;
   purchaseDate: string;       // yyyy-MM-dd
   installmentsCount: number;
+  installments: CreditCardInstallmentDto[];
 }
 
 export interface CreditCardInstallmentDto {
@@ -48,7 +50,8 @@ export interface InstallmentCategory {
   id: number;
   name: string;
   type: 'INCOME' | 'EXPENSE' | 'NEUTRAL';
-  isSystem: boolean;
+  global?: boolean;
+  isSystem?: boolean; // Compatibilidade com extratos anteriores.
 }
 
 export interface CreditCardRefundDto {
@@ -109,12 +112,15 @@ export interface CreatePurchasePayload {
   totalValue: number;
   purchaseDate: string;
   installmentsCount: number;
+  categoryId: number;
+  installmentMode?: 'AUTOMATIC' | 'CUSTOM';
+  installments?: PurchaseInstallmentPayload[];
 }
 
-export interface CreateInstallmentPayload {
+export interface PurchaseInstallmentPayload {
   installmentNumber: number;
   amount: number;
-  categoryId: number;
+  categoryId?: number;
 }
 
 export interface UpdateInstallmentPayload {

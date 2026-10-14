@@ -1,4 +1,12 @@
 const ERROR_MAP: Record<string, string> = {
+  'Invalid input data': 'Verifique os campos informados antes de enviar novamente.',
+  'installments: count must equal installmentsCount': 'Informe exatamente a quantidade de parcelas indicada na compra.',
+  'installments: numbers must be sequential from 1 to installmentsCount without duplicates': 'O plano deve conter cada número de parcela uma única vez, de 1 até a quantidade informada.',
+  'installments: sum must equal totalValue': 'A soma das parcelas deve ser exatamente igual ao valor total da compra.',
+  'installmentsCount: would generate a zero installment': 'A quantidade informada geraria uma parcela de valor zero.',
+  'installments: must be omitted in AUTOMATIC mode': 'O parcelamento automático deve ser enviado sem uma lista personalizada.',
+  'Invalid JSON, field type, date or installmentMode': 'Confira o formato dos valores, a data e o modo de parcelamento.',
+  'Individual installment creation is not allowed. Submit the complete purchase plan instead': 'Informe o plano completo da compra. Não é possível cadastrar uma parcela isolada.',
   'Bill composition is protected. Only open bills without a payment can be changed': 'Esta fatura está protegida. Somente faturas abertas e sem pagamento permitem alterações. Reabra uma fatura fechada explicitamente antes de corrigir sua composição.',
   'Individual installment deletion is not allowed. Delete the eligible purchase instead': 'Não é possível excluir uma parcela isolada. Exclua a compra inteira quando todas as parcelas estiverem em faturas abertas.',
   'Moving an installment must preserve its amount': 'A movimentação deve preservar o valor atual da parcela.',

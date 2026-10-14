@@ -12,7 +12,6 @@ import {
   CreditCardRefundDto,
   BillStatementDto,
   CreateCreditCardPayload,
-  CreateInstallmentPayload,
   CreatePurchasePayload,
   CreateRefundPayload,
   PayBillPayload,
@@ -131,6 +130,18 @@ export class CreditCardService {
     ));
   }
 
+  getPurchase(cardId: number, purchaseId: number): Observable<CreditCardPurchaseDto> {
+    return this.session.scoped(() => this.http.get<CreditCardPurchaseDto>(
+      `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}`
+    ));
+  }
+
+  updatePurchase(cardId: number, purchaseId: number, payload: CreatePurchasePayload): Observable<CreditCardPurchaseDto> {
+    return this.session.scoped(() => this.http.put<CreditCardPurchaseDto>(
+      `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}`, payload
+    ));
+  }
+
   deletePurchase(cardId: number, purchaseId: number): Observable<void> {
     return this.session.scoped(() => this.http.delete<void>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}`
@@ -142,17 +153,6 @@ export class CreditCardService {
   getInstallments(cardId: number, purchaseId: number): Observable<CreditCardInstallmentDto[]> {
     return this.session.scoped(() => this.http.get<CreditCardInstallmentDto[]>(
       `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments`
-    ));
-  }
-
-  createInstallment(
-    cardId: number,
-    purchaseId: number,
-    payload: CreateInstallmentPayload
-  ): Observable<CreditCardInstallmentDto> {
-    return this.session.scoped(() => this.http.post<CreditCardInstallmentDto>(
-      `${this.base}/credit-cards/${cardId}/purchases/${purchaseId}/installments`,
-      payload
     ));
   }
 

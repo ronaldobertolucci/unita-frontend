@@ -30,6 +30,17 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
               }
             </ul>
           }
+          @if (recovery.operation()?.reviewPurchases) {
+            <p>Compras consultadas. Um novo envio pode duplicar uma compra já registrada.</p>
+            <ul class="review-history">
+              @for (purchase of recovery.purchases(); track purchase.id) {
+                <li><span>#{{ purchase.id }} · {{ purchase.purchaseDate | date:'dd/MM/yyyy':'UTC' }} · {{ purchase.description }} · {{ purchase.installments.length }}/{{ purchase.installmentsCount }} parcelas</span><strong>{{ formatCurrency(purchase.totalValue) }}</strong></li>
+                @for (installment of purchase.installments; track installment.id) {
+                  <li><span>Parcela {{ installment.installmentNumber }} · {{ installment.installmentDate | date:'dd/MM/yyyy':'UTC' }} · Vencimento {{ installment.billDueDate | date:'dd/MM/yyyy':'UTC' }} · {{ installment.category.name }}</span><strong>{{ formatCurrency(installment.amount) }}</strong></li>
+                }
+              } @empty { <li>Nenhuma compra disponível neste cartão.</li> }
+            </ul>
+          }
           <p>A consulta mostra o estado atual. Ela não comprova, sozinha, o resultado de uma operação sem resposta. Contas removidas ou indisponíveis não aparecem.</p>
         }
         <div class="review-actions">

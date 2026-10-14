@@ -1,25 +1,22 @@
 import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
 import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
 import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
-import { Component, OnInit, inject, signal, computed, effect, DestroyRef } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect, untracked, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, finalize, Observable, tap, switchMap, throwError } from 'rxjs';
+import { forkJoin, finalize, Observable, tap, of, catchError, throwError } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl } from '@angular/forms';
 
 import { CreditCardService } from '../../../core/services/credit-card.service';
 import { PocketService } from '../../../core/services/pocket.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { CreditCardDto, CreditCardBillDto, BillStatus, CreditCardPurchaseDto, CreditCardInstallmentDto } from '../../../core/models/credit-card.model';
+import { CreditCardDto, CreditCardBillDto, BillStatus, CreditCardPurchaseDto, CreatePurchasePayload } from '../../../core/models/credit-card.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
+import { automaticPurchaseAmounts, centsDecimal, installmentCountValidator, purchaseCents,
+  purchaseDateValidator, purchaseFieldError, purchaseMoneyValidator, purchasePlanError } from '../purchase-plan.util';
 
-type ModalType =
-  | 'pay-bill'
-  | 'create-purchase-step1'
-  | 'create-purchase-step2'
-  | 'warn-close-mid-purchase'
-  | null;
+type ModalType = 'pay-bill' | 'purchase-form' | 'purchase-detail' | null;
 
 @Component({
   selector: 'app-credit-card-detail',
@@ -43,6 +40,12 @@ export class CreditCardDetailComponent implements OnInit {
   private readonly syncReviewedBills = effect(() => {
     if (this.financialRecovery.operation()?.cardId === this.cardId && this.financialRecovery.state() === 'review') {
       this.bills.set(this.financialRecovery.bills());
+      if (this.financialRecovery.operation()?.reviewPurchases) {
+        const list = this.financialRecovery.purchases();
+        const id = untracked(() => this.currentPurchase()?.id);
+        this.purchases.set(list);
+        this.currentPurchase.set(list.find(p => p.id === id) ?? null);
+      }
     }
   });
 
@@ -72,63 +75,91 @@ export class CreditCardDetailComponent implements OnInit {
       .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
   );
 
-  // ─── Estado do fluxo de criação de compra ────────────────────────────────
-
-  readonly reviewedInstallments = signal<CreditCardInstallmentDto[] | null>(null);
-  readonly reviewedPurchases = signal<CreditCardPurchaseDto[] | null>(null);
+  readonly purchases = signal<CreditCardPurchaseDto[]>([]);
+  readonly purchasesError = signal<string | null>(null);
   readonly checkingComposition = signal(false);
-  readonly currentInstallmentRecorded = computed(() => this.reviewedInstallments()?.some(i => i.installmentNumber === this.currentInstallmentIndex()) ?? false);
-
-  acceptRecordedInstallment(): void {
-    if (!this.currentInstallmentRecorded() || this.financialRecovery.state() !== 'clear' || this.isSaving()) return;
-    const purchase = this.currentPurchase();
-    if (!purchase) return;
-    if (this.currentInstallmentIndex() === purchase.installmentsCount) {
-      this.loadBills();
-      this.closeModal();
-    } else {
-      this.currentInstallmentIndex.update(index => index + 1);
-      this.errorMessage.set(null);
-    }
-  }
-
   readonly currentPurchase = signal<CreditCardPurchaseDto | null>(null);
-  readonly currentInstallmentIndex = signal(1);
+  readonly editingPurchaseId = signal<number | null>(null);
+  readonly ownedCardAvailable = signal(false);
+  readonly fieldErrors = signal<Record<string, string>>({});
+  private readonly formRevision = signal(0);
 
-  // ─── Formulários ─────────────────────────────────────────────────────────
-
-  readonly payForm = this.fb.group({
-    pocketId: [null as number | null, Validators.required],
-  });
-
+  readonly payForm = this.fb.group({ pocketId: [null as number | null, Validators.required] });
   get payPocketId() { return this.payForm.get('pocketId')!; }
 
-  readonly purchaseStep1Form = this.fb.group({
-    description: ['', [Validators.required, Validators.maxLength(255)]],
-    totalValue: [null as number | null, [Validators.required, Validators.min(0.01)]],
-    purchaseDate: ['', Validators.required],
-    installmentsCount: [null as number | null, [Validators.required, Validators.min(1), Validators.max(99)]],
-  });
-
-  readonly installmentForm = this.fb.group({
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+  readonly installmentRows = this.fb.array<ReturnType<CreditCardDetailComponent['newInstallmentRow']>>([]);
+  readonly purchaseForm = this.fb.group({
+    description: ['', [Validators.required, Validators.maxLength(255), (c: AbstractControl) =>
+      String(c.value ?? '').trim() ? null : { required: true }]],
+    totalValue: ['', [Validators.required, purchaseMoneyValidator]],
+    purchaseDate: ['', [Validators.required, purchaseDateValidator]],
+    installmentsCount: [1, [Validators.required, installmentCountValidator]],
     categoryId: [null as number | null, Validators.required],
+    installmentMode: ['AUTOMATIC' as 'AUTOMATIC' | 'CUSTOM', Validators.required],
+    installments: this.installmentRows,
   });
 
-  get s1Description() { return this.purchaseStep1Form.get('description')!; }
-  get s1TotalValue() { return this.purchaseStep1Form.get('totalValue')!; }
-  get s1PurchaseDate() { return this.purchaseStep1Form.get('purchaseDate')!; }
-  get s1InstallmentsCount() { return this.purchaseStep1Form.get('installmentsCount')!; }
-  get instAmount() { return this.installmentForm.get('amount')!; }
-  get instCategoryId() { return this.installmentForm.get('categoryId')!; }
+  readonly expenseCategories = computed(() => this.categoryService.categories()
+    .filter(c => c.type === 'EXPENSE' || c.type === 'NEUTRAL')
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
 
-  // ─── Categorias para parcelas ─────────────────────────────────────────────
+  readonly planError = computed(() => {
+    this.formRevision();
+    const v = this.purchaseForm.getRawValue();
+    return purchasePlanError(v.totalValue, v.installmentsCount ?? 0, v.installmentMode ?? '', v.installments);
+  });
 
-readonly expenseCategories = computed(() =>
-  this.categoryService.categories()
-    .filter(c => c.type === 'EXPENSE')
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-);
+  readonly automaticAmounts = computed(() => {
+    this.formRevision();
+    return automaticPurchaseAmounts(purchaseCents(this.purchaseForm.value.totalValue) ?? 0,
+      this.purchaseForm.value.installmentsCount ?? 0);
+  });
+
+  readonly canEditPurchase = computed(() => {
+    const purchase = this.currentPurchase();
+    return !!purchase && purchase.installments.every(i => this.bills().some(b =>
+      b.id === i.creditCardBillId && b.status === 'OPEN' && b.paymentId == null));
+  });
+
+  constructor() {
+    this.purchaseForm.controls.installmentsCount.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.syncInstallmentRows());
+    this.purchaseForm.controls.installmentMode.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.syncInstallmentRows());
+    this.purchaseForm.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.formRevision.update(v => v + 1);
+      this.fieldErrors.set({});
+    });
+  }
+
+  private newInstallmentRow(amount = '', categoryId: number | null = null) {
+    return this.fb.group({ amount: [amount, [Validators.required, purchaseMoneyValidator]], categoryId: [categoryId] });
+  }
+
+  private syncInstallmentRows(): void {
+    const count = this.purchaseForm.controls.installmentsCount.value;
+    if (!Number.isInteger(count) || count! < 1 || count! > 120) return;
+    const automatic = automaticPurchaseAmounts(purchaseCents(this.purchaseForm.controls.totalValue.value) ?? 0, count!);
+    while (this.installmentRows.length > count!) this.installmentRows.removeAt(this.installmentRows.length - 1, { emitEvent: false });
+    while (this.installmentRows.length < count!) {
+      const cents = automatic[this.installmentRows.length];
+      this.installmentRows.push(this.newInstallmentRow(!this.editingPurchaseId() && cents ? centsDecimal(cents) : ''), { emitEvent: false });
+    }
+    if (!this.editingPurchaseId() && this.purchaseForm.controls.installmentMode.value === 'CUSTOM') {
+      this.installmentRows.controls.forEach((row, index) => {
+        if (!row.controls.amount.value && !row.controls.amount.dirty && automatic[index]) {
+          row.controls.amount.setValue(centsDecimal(automatic[index]), { emitEvent: false });
+        }
+      });
+    }
+    this.formRevision.update(v => v + 1);
+  }
+
+  controlError(field: string, control: AbstractControl | null = this.purchaseForm.get(field)): string | null {
+    const server = this.fieldErrors()[field];
+    if (server) return server;
+    return control?.invalid && control.touched ? purchaseFieldError(field, control.hasError('required') ? 'must not be null' : '') : null;
+  }
 
   // ─── Totais ───────────────────────────────────────────────────────────────
 
@@ -158,6 +189,7 @@ readonly expenseCategories = computed(() =>
       next: card => {
         this.card.set(card);
         this.loadBills();
+        this.loadPurchases();
       },
       error: () => this.router.navigate(['/credit-cards']),
     });
@@ -167,7 +199,7 @@ readonly expenseCategories = computed(() =>
     }
 
     if (this.categoryService.categories().length === 0) {
-      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
     }
   }
 
@@ -260,7 +292,8 @@ readonly expenseCategories = computed(() =>
     })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => {
         this.replaceBill(updated);
-        this.closeModal();
+        this.activeModal.set(null);
+        this.errorMessage.set(null);
         forkJoin({ bill: this.refreshBillState(bill.id), pockets: this.financialRecovery.refreshPockets([pocketId]) })
           .pipe(finalize(() => this.isSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
             error: () => {
@@ -288,161 +321,207 @@ readonly expenseCategories = computed(() =>
     });
   }
 
-  // ─── Criação de compra ────────────────────────────────────────────────────
+  // ─── Compra com plano integral ───────────────────────────────────────────
+
+  private loadPurchases(): void {
+    this.creditCardService.getPurchases(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: list => { this.purchases.set(list); this.purchasesError.set(null); },
+      error: () => this.purchasesError.set('Não foi possível consultar as compras. Atualize o histórico.'),
+    });
+  }
+
+  refreshPurchaseHistory(): void {
+    if (this.isSaving() || this.checkingComposition()) return;
+    this.loadPurchases();
+    this.loadBills();
+  }
+
+  private refreshPurchaseReferences(): void {
+    this.checkingComposition.set(true);
+    this.ownedCardAvailable.set(false);
+    forkJoin({ cards: this.creditCardService.loadCreditCards(), categories: this.categoryService.loadCategories() })
+      .pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: ({ cards }) => {
+          this.ownedCardAvailable.set(cards.some(c => c.id === this.cardId));
+          if (!this.ownedCardAvailable()) this.errorMessage.set('Cartão indisponível. Atualize a seleção.');
+        },
+        error: () => this.errorMessage.set('Não foi possível atualizar cartões e categorias. Reabra o formulário para tentar consultar novamente.'),
+      });
+  }
 
   openCreatePurchaseModal(): void {
     if (this.isSaving() || this.checkingComposition() || this.financialRecovery.state() !== 'clear') return;
     this.currentPurchase.set(null);
-    this.currentInstallmentIndex.set(1);
-    this.reviewedInstallments.set(null);
-    this.reviewedPurchases.set(null);
-    this.purchaseStep1Form.reset({ purchaseDate: this.todayString() });
+    this.editingPurchaseId.set(null);
+    this.installmentRows.clear({ emitEvent: false });
+    this.purchaseForm.reset({ description: '', totalValue: '', purchaseDate: this.todayString(),
+      installmentsCount: 1, categoryId: null, installmentMode: 'AUTOMATIC' });
+    this.fieldErrors.set({});
     this.errorMessage.set(null);
-    this.activeModal.set('create-purchase-step1');
+    this.activeModal.set('purchase-form');
+    this.refreshPurchaseReferences();
   }
 
-  submitPurchaseStep1(): void {
-    if (this.checkingComposition()) return;
-    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
-    if (this.purchaseStep1Form.invalid) {
-      this.purchaseStep1Form.markAllAsTouched();
+  openPurchaseDetail(purchase: CreditCardPurchaseDto): void {
+    if (this.isSaving() || this.checkingComposition()) return;
+    this.currentPurchase.set(null);
+    this.errorMessage.set(null);
+    this.activeModal.set('purchase-detail');
+    this.checkingComposition.set(true);
+    forkJoin({ purchase: this.creditCardService.getPurchase(this.cardId, purchase.id), bills: this.creditCardService.getBills(this.cardId) })
+      .pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: data => { this.currentPurchase.set(data.purchase); this.bills.set(data.bills); this.replacePurchase(data.purchase); },
+        error: err => { this.errorMessage.set(financialWriteErrorMessage(err, 'Não foi possível consultar a compra.')); this.loadPurchases(); },
+      });
+  }
+
+  openEditPurchaseModal(): void {
+    const purchase = this.currentPurchase();
+    if (!purchase || !this.canEditPurchase() || this.isSaving() || this.checkingComposition() || this.financialRecovery.state() !== 'clear') return;
+    // Read again just before editing; eligibility is still checked by the server on PUT.
+    this.checkingComposition.set(true);
+    forkJoin({ purchase: this.creditCardService.getPurchase(this.cardId, purchase.id), bills: this.creditCardService.getBills(this.cardId),
+      cards: this.creditCardService.loadCreditCards(), categories: this.categoryService.loadCategories() })
+      .pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: data => {
+          this.currentPurchase.set(data.purchase);
+          this.bills.set(data.bills);
+          this.ownedCardAvailable.set(data.cards.some(c => c.id === this.cardId));
+          if (!this.ownedCardAvailable()) { this.errorMessage.set('Cartão indisponível. Atualize a seleção.'); return; }
+          if (!this.canEditPurchase()) { this.errorMessage.set('Esta compra contém parcelas em faturas protegidas. Confira as faturas antes de corrigir.'); return; }
+          this.preparePurchaseEdit(data.purchase);
+        },
+        error: err => this.errorMessage.set(financialWriteErrorMessage(err, 'Não foi possível atualizar a compra.')),
+      });
+  }
+
+  private preparePurchaseEdit(purchase: CreditCardPurchaseDto): void {
+    this.editingPurchaseId.set(purchase.id);
+    this.installmentRows.clear({ emitEvent: false });
+    this.purchaseForm.reset({ description: purchase.description, totalValue: String(purchase.totalValue),
+      purchaseDate: purchase.purchaseDate, installmentsCount: purchase.installmentsCount,
+      categoryId: purchase.installments[0]?.category.id ?? null, installmentMode: 'CUSTOM' }, { emitEvent: false });
+    // Missing legacy rows stay blank: the user must explicitly provide the complete plan.
+    for (let number = 1; number <= Math.min(120, purchase.installmentsCount); number++) {
+      const installment = purchase.installments.find(i => i.installmentNumber === number);
+      this.installmentRows.push(this.newInstallmentRow(installment ? String(installment.amount) : '', installment?.category.id ?? null), { emitEvent: false });
+    }
+    this.purchaseForm.markAsPristine();
+    this.purchaseForm.markAsUntouched();
+    this.formRevision.update(v => v + 1);
+    this.fieldErrors.set({});
+    this.errorMessage.set(null);
+    this.activeModal.set('purchase-form');
+  }
+
+  submitPurchase(): void {
+    if (this.isSaving() || this.checkingComposition() || this.financialRecovery.state() !== 'clear' || !this.ownedCardAvailable()) return;
+    if (this.editingPurchaseId() !== null && !this.canEditPurchase()) return;
+    const v = this.purchaseForm.getRawValue();
+    this.purchaseForm.markAllAsTouched();
+    const custom = v.installmentMode === 'CUSTOM';
+    const mainInvalid = ['description', 'totalValue', 'purchaseDate', 'installmentsCount', 'categoryId', 'installmentMode']
+      .some(field => this.purchaseForm.get(field)!.invalid);
+    if (mainInvalid || (custom && this.installmentRows.invalid) || this.planError()) return;
+    const availableCategory = (id: number | null) => this.expenseCategories().some(c => c.id === id);
+    if (!availableCategory(v.categoryId) || (custom && v.installments.some(i => i.categoryId != null && !availableCategory(i.categoryId)))) {
+      this.errorMessage.set('Selecione categorias disponíveis de despesa ou neutras para todo o plano.');
       return;
     }
+    const payload: CreatePurchasePayload = {
+      description: v.description!.trim(), totalValue: Number(centsDecimal(purchaseCents(v.totalValue)!)),
+      purchaseDate: v.purchaseDate!, installmentsCount: v.installmentsCount!, categoryId: v.categoryId!,
+      installmentMode: v.installmentMode!,
+      ...(custom ? { installments: v.installments.map((row, index) => ({ installmentNumber: index + 1,
+        amount: Number(centsDecimal(purchaseCents(row.amount)!)), ...(row.categoryId == null ? {} : { categoryId: row.categoryId }) })) } : {}),
+    };
+    const id = this.editingPurchaseId();
     this.isSaving.set(true);
     this.errorMessage.set(null);
-    const v = this.purchaseStep1Form.value;
-
-    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.createPurchase(this.cardId, {
-      description: v.description!,
-      totalValue: v.totalValue!,
-      purchaseDate: v.purchaseDate!,
-      installmentsCount: v.installmentsCount!,
-    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.fieldErrors.set({});
+    const operation = { label: id ? 'Correção integral da compra' : 'Criação da compra completa', pocketIds: [],
+      cardId: this.cardId, reviewPurchases: true, ...(id ? { purchaseId: id } : {}) };
+    const request = id ? this.creditCardService.updatePurchase(this.cardId, id, payload) : this.creditCardService.createPurchase(this.cardId, payload);
+    this.financialRecovery.trackWrite(operation, request).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: purchase => {
         this.currentPurchase.set(purchase);
-        this.currentInstallmentIndex.set(1);
-        const suggestedAmount = +(v.totalValue! / v.installmentsCount!).toFixed(2);
-        this.installmentForm.reset({ amount: suggestedAmount, categoryId: null });
+        this.replacePurchase(purchase);
+        this.editingPurchaseId.set(null);
+        this.activeModal.set('purchase-detail');
         this.isSaving.set(false);
-        this.activeModal.set('create-purchase-step2');
+        this.refreshPurchaseHistory();
       },
       error: err => {
         this.isSaving.set(false);
-        this.handleCompositionError(err, 'Erro ao criar compra.');
-      },
-    });
-  }
-
-  submitInstallment(): void {
-    if (this.checkingComposition() || this.currentInstallmentRecorded()) return;
-    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
-    if (this.installmentForm.invalid) {
-      this.installmentForm.markAllAsTouched();
-      return;
-    }
-    this.isSaving.set(true);
-    this.errorMessage.set(null);
-    const purchase = this.currentPurchase()!;
-    const index = this.currentInstallmentIndex();
-    const v = this.installmentForm.value;
-
-    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.createInstallment(this.cardId, purchase.id, {
-      installmentNumber: index,
-      amount: v.amount!,
-      categoryId: v.categoryId!,
-    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.isSaving.set(false);
-        const isLast = index === purchase.installmentsCount;
-        if (isLast) {
-          this.loadBills();
-          this.closeModal();
-        } else {
-          this.currentInstallmentIndex.set(index + 1);
-          const remaining = purchase.totalValue - (v.amount! * index);
-          const remainingInstallments = purchase.installmentsCount - index;
-          const suggested = +(remaining / remainingInstallments).toFixed(2);
-          this.installmentForm.patchValue({ amount: suggested > 0 ? suggested : null });
+        this.errorMessage.set(financialWriteErrorMessage(err, 'Erro ao salvar a compra.'));
+        if (err?.status === 400) this.applyPurchaseFieldErrors(err);
+        if (isUncertainFinancialWrite(err)) {
+          this.financialRecovery.mark({ ...operation, message: financialWriteErrorMessage(err, 'Erro ao salvar a compra.') });
+          this.financialRecovery.check();
+        } else if (err?.status === 409 || err?.status === 404) {
+          this.reloadRejectedPurchase(id, err.status === 404);
         }
       },
-      error: err => {
-        this.isSaving.set(false);
-        this.handleCompositionError(err, 'Erro ao criar parcela.');
-      },
     });
   }
 
-  tryCloseStep2(): void {
-    this.activeModal.set('warn-close-mid-purchase');
-  }
-
-  confirmCloseStep2(): void {
-    this.loadBills();
-    this.currentPurchase.set(null);
-    this.currentInstallmentIndex.set(1);
-    this.activeModal.set(null);
-    this.errorMessage.set(null);
-  }
-
-  cancelCloseStep2(): void {
-    this.activeModal.set('create-purchase-step2');
-  }
-
-  deletePurchaseFromStep2(): void {
-    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
-    const purchase = this.currentPurchase();
-    if (!purchase) return;
-    this.isSaving.set(true);
-    forkJoin({
-      bills: this.creditCardService.getBills(this.cardId),
-      installments: this.creditCardService.getInstallments(this.cardId, purchase.id),
-    }).pipe(switchMap(({ bills, installments }) => {
-      this.bills.set(bills);
-      if (!installments.every(i => bills.some(b => b.id === i.creditCardBillId && b.status === 'OPEN'))) {
-        return throwError(() => ({ status: 409, error: { message: 'Bill composition is protected. Only open bills without a payment can be changed' } }));
-      }
-      return this.financialRecovery.trackWrite({ label: 'Exclusão de compra inteira', pocketIds: [], cardId: this.cardId }, this.creditCardService.deletePurchase(this.cardId, purchase.id));
-    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.loadBills();
-        this.currentPurchase.set(null);
-        this.currentInstallmentIndex.set(1);
-        this.isSaving.set(false);
-        this.activeModal.set(null);
-        this.errorMessage.set(null);
-      },
-      error: err => {
-        this.isSaving.set(false);
-        this.handleCompositionError(err, 'Erro ao excluir compra.');
-        this.activeModal.set('create-purchase-step2');
-      },
-    });
-  }
-
-  private handleCompositionError(error: any, fallback: string): void {
-    this.errorMessage.set(financialWriteErrorMessage(error, fallback));
-    if (error?.status === 409 || error?.status === 404 || isUncertainFinancialWrite(error)) {
-      this.loadBills();
-      this.checkingComposition.set(true);
-      const purchase = this.currentPurchase();
-      const read: Observable<unknown> = purchase
-        ? this.creditCardService.getInstallments(this.cardId, purchase.id).pipe(tap(list => this.reviewedInstallments.set(list)))
-        : this.creditCardService.getPurchases(this.cardId).pipe(tap(list => this.reviewedPurchases.set(list)));
-      read.pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+  private reloadRejectedPurchase(id: number | null, refreshReferences: boolean): void {
+    this.checkingComposition.set(true);
+    forkJoin({ bills: this.creditCardService.getBills(this.cardId), purchases: this.creditCardService.getPurchases(this.cardId),
+      purchase: id ? this.creditCardService.getPurchase(this.cardId, id).pipe(catchError(error =>
+        error.status === 404 ? of(null) : throwError(() => error))) : of(null),
+      cards: refreshReferences ? this.creditCardService.loadCreditCards() : of(null),
+      categories: refreshReferences ? this.categoryService.loadCategories() : of(null) })
+      .pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: ({ bills, purchases, purchase, cards }) => {
+          this.bills.set(bills);
+          this.purchases.set(purchases);
+          if (id) this.currentPurchase.set(purchase);
+          if (purchase) this.replacePurchase(purchase);
+          if (cards) this.ownedCardAvailable.set(cards.some(c => c.id === this.cardId));
+        },
         error: () => {
-          this.financialRecovery.mark({ label: 'Conferência de compra ou parcela', pocketIds: [], cardId: this.cardId, message: 'Não foi possível consultar a composição. Confira o histórico antes de decidir por um novo envio.' });
+          this.financialRecovery.mark({ label: 'Conferência após compra rejeitada', pocketIds: [], cardId: this.cardId,
+            reviewPurchases: true, ...(id ? { purchaseId: id } : {}),
+            message: 'Não foi possível atualizar compras e faturas. Consulte o estado atual antes de enviar novamente.' });
+          this.financialRecovery.check();
         },
       });
+  }
+
+  private applyPurchaseFieldErrors(error: any): void {
+    const fields: Record<string, string> = {};
+    const errors = Array.isArray(error.error?.errors) ? error.error.errors : [];
+    const details = Array.isArray(error.error?.details) ? error.error.details : [];
+    for (const item of [...errors, ...details.map((detail: string) => {
+      const separator = typeof detail === 'string' ? detail.indexOf(':') : -1;
+      return separator < 0 ? null : { field: detail.slice(0, separator), message: detail.slice(separator + 1).trim() };
+    })]) {
+      if (typeof item?.field === 'string' && typeof item?.message === 'string') fields[item.field] = purchaseFieldError(item.field, item.message);
     }
-    if (isUncertainFinancialWrite(error)) {
-      this.financialRecovery.mark({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId, message: financialWriteErrorMessage(error, fallback) });
-      this.financialRecovery.check();
-    }
+    this.fieldErrors.set(fields);
+  }
+
+  private replacePurchase(purchase: CreditCardPurchaseDto): void {
+    this.purchases.update(list => [...list.filter(p => p.id !== purchase.id), purchase]);
+  }
+
+  sortedInstallments(purchase: CreditCardPurchaseDto) {
+    return [...purchase.installments].sort((a, b) => a.installmentNumber - b.installmentNumber);
+  }
+
+  isIncompletePurchase(purchase: CreditCardPurchaseDto): boolean {
+    const rows = this.sortedInstallments(purchase);
+    return purchaseCents(purchase.totalValue) === null || !Number.isInteger(purchase.installmentsCount) ||
+      purchase.installmentsCount < 1 || purchase.installmentsCount > 120 ||
+      rows.length !== purchase.installmentsCount || rows.some((i, index) => i.installmentNumber !== index + 1) ||
+      purchasePlanError(purchase.totalValue, purchase.installmentsCount, 'CUSTOM', rows) !== null;
   }
 
   // ─── Fechar modal ─────────────────────────────────────────────────────────
 
   closeModal(): void {
+    if (this.isSaving() || this.checkingComposition()) return;
     this.activeModal.set(null);
     this.errorMessage.set(null);
     this.selectedBill.set(null);

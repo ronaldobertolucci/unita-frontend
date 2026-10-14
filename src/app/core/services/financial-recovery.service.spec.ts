@@ -81,6 +81,34 @@ describe('Financial recovery with the actual HTTP read services', () => {
     expect(transactions.transactions().map(item => item.id)).toEqual([999]);
   });
 
+  it('reads purchases, detail and bills before releasing an uncertain complete-plan correction', () => {
+    service.mark({ label: 'Correção integral', pocketIds: [], cardId: 7, purchaseId: 50, reviewPurchases: true });
+    service.check();
+    backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
+    backend.expectOne(`${base}/pockets/my`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/bills`).flush([{ id: 21, status: 'OPEN' }]);
+    backend.expectOne(`${base}/credit-cards/7/purchases`).flush([{ id: 50, installments: [{ id: 101 }] }]);
+    expect(service.state()).toBe('checking');
+    backend.expectOne(`${base}/credit-cards/7/purchases/50`).flush({ id: 50, installments: [{ id: 202 }] });
+    expect(service.state()).toBe('review');
+    expect(service.purchases()[0].installments[0].id).toBe(202);
+    service.confirm();
+    expect(service.purchases()).toEqual([]);
+    expect(service.state()).toBe('clear');
+  });
+
+  it('keeps an uncertain purchase blocked when purchase history cannot be consulted', () => {
+    service.mark({ label: 'Criação integral', pocketIds: [], cardId: 7, reviewPurchases: true });
+    service.check();
+    backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
+    backend.expectOne(`${base}/pockets/my`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/bills`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/purchases`).error(new ProgressEvent('error'));
+    service.confirm();
+    expect(service.state()).toBe('pending');
+    expect(service.purchases()).toEqual([]);
+  });
+
   it('cancels reads and clears private review data when the user changes', () => {
     service.mark({ label: 'Transferência', pocketIds: [10] });
     service.check();

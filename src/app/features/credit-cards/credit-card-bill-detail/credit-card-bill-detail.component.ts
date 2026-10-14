@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, of, switchMap, map } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -78,8 +78,8 @@ export class CreditCardBillDetailComponent implements OnInit {
   readonly compositionReady = signal(false);
   readonly selectedInstallment = signal<{ purchaseId: number; installment: CreditCardInstallmentDto } | null>(null);
   readonly moveForm = this.fb.group({ creditCardBillId: [null as number | null, Validators.required] });
-  readonly openBills = computed(() => this.bills().filter(b => b.status === 'OPEN').sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
-  readonly canChangeComposition = computed(() => this.compositionReady() && !this.isLoading() && this.bill()?.status === 'OPEN');
+  readonly openBills = computed(() => this.bills().filter(b => b.status === 'OPEN' && b.paymentId == null).sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+  readonly canChangeComposition = computed(() => this.compositionReady() && !this.isLoading() && this.bill()?.status === 'OPEN' && this.bill()?.paymentId == null);
   readonly purchases = signal<CreditCardPurchaseDto[]>([]);
 
   // ─── Estado de exclusão ───────────────────────────────────────────────────
@@ -165,21 +165,14 @@ export class CreditCardBillDetailComponent implements OnInit {
       bills: this.creditCardService.getBills(this.cardId),
       purchases: this.creditCardService.getPurchases(this.cardId),
       statement: this.creditCardService.getBillStatement(this.cardId, this.billId),
-    }).pipe(
-      switchMap(data => (data.purchases.length
-        ? forkJoin(data.purchases.map(p => this.creditCardService.getInstallments(this.cardId, p.id)))
-        : of([] as CreditCardInstallmentDto[][])).pipe(
-          map(lists => ({ ...data, lists })),
-        )),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: ({ bill, bills, purchases, statement, lists }) => {
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ bill, bills, purchases, statement }) => {
         this.bill.set(bill);
         this.bills.set(bills);
         this.purchases.set(purchases);
         this.installments.set(statement.installments);
         this.refunds.set(statement.refunds);
-        this.purchaseInstallments.set(Object.fromEntries(purchases.map((p, index) => [p.id, lists[index]])));
+        this.purchaseInstallments.set(Object.fromEntries(purchases.map(p => [p.id, p.installments])));
         this.compositionReady.set(true);
         this.isLoading.set(false);
       },
@@ -197,7 +190,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   canDeletePurchase(purchaseId: number | undefined): boolean {
     if (!this.compositionReady() || this.isLoading() || purchaseId == null) return false;
     const installments = this.purchaseInstallments()[purchaseId];
-    return !!installments && installments.every(i => this.bills().some(b => b.id === i.creditCardBillId && b.status === 'OPEN'));
+    return !!installments && installments.every(i => this.bills().some(b => b.id === i.creditCardBillId && b.status === 'OPEN' && b.paymentId == null));
   }
 
   openMoveModal(item: BillDisplayItem): void {
