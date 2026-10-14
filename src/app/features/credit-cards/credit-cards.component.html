@@ -1,4 +1,5 @@
 <div class="page">
+  <app-financial-recovery />
   @if (recovery.cards() !== 'clear') {
     <div class="creation-recovery review-notice" role="alert">
       <p>Não foi possível confirmar a criação. Confira a lista antes de tentar novamente para evitar duplicidade.</p>
@@ -375,7 +376,7 @@
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteCreditCard()">
+        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deleteCreditCard()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
         </button>
       </div>

@@ -1,3 +1,6 @@
+import { financialErrorMessage, isUncertainFinancialWrite } from '../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../shared/financial-recovery/financial-recovery.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SessionService } from '../../core/services/session.service';
 import { RegistrationRecoveryService } from '../../core/services/registration-recovery.service';
@@ -20,12 +23,13 @@ type ModalType = 'create' | 'detail' | 'confirm-update' | 'confirm-delete' | nul
 @Component({
   selector: 'app-credit-cards',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './credit-cards.component.html',
   styleUrl: './credit-cards.component.css',
 })
 export class CreditCardsComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly session = inject(SessionService);
   readonly recovery = inject(RegistrationRecoveryService);
   private readonly creditCardService = inject(CreditCardService);
@@ -250,16 +254,25 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   // ─── Exclusão ─────────────────────────────────────────────────────────────
 
   deleteCreditCard(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const card = this.selectedCard();
     if (!card) return;
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deleteCreditCard(card.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: `Exclusão de cartão final ${card.lastFourDigits}`, pocketIds: [], cardId: card.id }, this.creditCardService.deleteCreditCard(card.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set('Ocorreu um erro ao excluir o cartão. Verifique se não há compras e estornos vinculados ao cartão. Se existir, não será possível excluir.');
+        if (isUncertainFinancialWrite(err)) {
+          this.closeModal();
+          this.financialRecovery.mark({ label: `Exclusão de cartão final ${card.lastFourDigits}`, pocketIds: [], cardId: card.id });
+          this.financialRecovery.check();
+        } else {
+          this.errorMessage.set(financialErrorMessage(err, 'card', 'Erro ao excluir. Verifique os vínculos deste recurso.'));
+          this.creditCardService.loadCreditCards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+          this.creditCardService.getBills(card.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+        }
       },
     });
   }

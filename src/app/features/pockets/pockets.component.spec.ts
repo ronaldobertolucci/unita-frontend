@@ -1,3 +1,4 @@
+import { TransactionService } from '../../core/services/transaction.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
@@ -29,6 +30,7 @@ const mockFgts: FgtsEmployerAccountDto = {
 function buildPocketService(pockets: PocketSummaryDto[] = []) {
   return {
     pockets: signal(pockets),
+    getBalance: jest.fn().mockReturnValue(of(100)),
     loadPockets: jest.fn().mockReturnValue(of(pockets)),
     getLegalEntities: jest.fn().mockReturnValue(of([])),
     getIndividualEmployers: jest.fn().mockReturnValue(of([])),
@@ -61,7 +63,7 @@ describe('PocketsComponent', () => {
 
     TestBed.configureTestingModule({
       imports: [PocketsComponent, RouterTestingModule],
-      providers: [{ provide: PocketService, useValue: pocketServiceSpy }],
+      providers: [{ provide: TransactionService, useValue: { getTransactions: jest.fn().mockReturnValue(of([])) } },{ provide: PocketService, useValue: pocketServiceSpy }],
     });
 
     fixture = TestBed.createComponent(PocketsComponent);
@@ -394,4 +396,18 @@ describe('PocketsComponent', () => {
       expect(component.getStatusLabel('UNKNOWN')).toBe('UNKNOWN');
     });
   });
+
+  it.each([
+    [mockSummaryBank, 'deleteBankAccount'], [mockSummaryBenefit, 'deleteBenefitAccount'], [mockSummaryFgts, 'deleteFgts'],
+  ] as const)('retains a protected %s on HTTP 409', (pocket, method) => {
+    setup([pocket]);
+    component.selectedPocket.set(pocket);
+    pocketServiceSpy[method].mockReturnValue(throwError(() => ({ status: 409, error: { message: 'different constraint text' } })));
+    component.deletePocket();
+    expect(component.pockets()).toEqual([pocket]);
+    expect(component.errorMessage()).toContain('operações financeiras');
+    expect(pocketServiceSpy.loadPockets).toHaveBeenCalledTimes(2);
+    expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(pocket.id);
+  });
+
 });

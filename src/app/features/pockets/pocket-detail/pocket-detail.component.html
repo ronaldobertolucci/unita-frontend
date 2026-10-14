@@ -1,4 +1,5 @@
 <div class="page">
+  <app-financial-recovery />
 
   <!-- ─── Loading inicial ─── -->
   @if (isLoading()) {
@@ -120,17 +121,22 @@
                 <div class="tx-body">
                   <span class="tx-description">{{ tx.description }}</span>
                   <span class="tx-category">{{ tx.category.name }}</span>
+                  @if (!canDeleteTransaction(tx)) {
+                    <span class="tx-category tx-protection">{{ protectionMessage(tx) }}</span>
+                  }
                 </div>
                 <span class="tx-amount tx-amount--{{ tx.direction | lowercase }}">
                   {{ tx.direction === 'INCOME' ? '+' : '−' }}&nbsp;{{ formatCurrency(tx.amount) }}
                 </span>
-                <button class="tx-delete-btn" (click)="openDeleteConfirm(tx)" aria-label="Excluir transação">
+                @if (canDeleteTransaction(tx)) {
+                <button class="tx-delete-btn" (click)="openDeleteConfirm(tx)" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" aria-label="Excluir transação">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                     <path d="M10 11v6M14 11v6"/>
                   </svg>
                 </button>
+                }
               </div>
             }
           </div>
@@ -255,7 +261,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Registrando... }
             @else { Registrar }
           </button>
@@ -296,7 +302,7 @@
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteTransaction()">
+        <button type="button" class="btn-danger" [disabled]="isSaving() || !selectedCanDelete() || financialRecovery.state() !== 'clear'" (click)="deleteTransaction()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... }
           @else { Excluir }
         </button>

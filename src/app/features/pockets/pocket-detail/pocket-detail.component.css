@@ -740,3 +740,5 @@
 
   .pocket-info-balance { font-size: 1rem; }
 }
+.tx-protection { color: var(--text-secondary); overflow-wrap: anywhere; }
+.tx-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }

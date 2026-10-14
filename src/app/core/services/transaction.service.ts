@@ -17,13 +17,17 @@ export class TransactionService {
   readonly transactions = this._transactions.asReadonly();
 
   loadTransactions(pocketId: number, startDate?: string, endDate?: string): Observable<TransactionDto[]> {
+    return this.getTransactions(pocketId, startDate, endDate).pipe(tap(data => this._transactions.set(data)));
+  }
+
+  // Reads for reconciliation must not replace the currently open pocket's statement.
+  getTransactions(pocketId: number, startDate?: string, endDate?: string): Observable<TransactionDto[]> {
     let params = new HttpParams();
     if (startDate) params = params.set('startDate', startDate);
     if (endDate) params = params.set('endDate', endDate);
 
     return this.session.scoped(() => this.http
-      .get<TransactionDto[]>(`${this.baseUrl}/pockets/${pocketId}/transactions`, { params }))
-      .pipe(tap(data => this._transactions.set(data)));
+      .get<TransactionDto[]>(`${this.baseUrl}/pockets/${pocketId}/transactions`, { params }));
   }
 
   createTransaction(pocketId: number, payload: CreateTransactionPayload): Observable<TransactionDto> {

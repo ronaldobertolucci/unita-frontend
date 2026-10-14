@@ -1,3 +1,6 @@
+import { financialErrorMessage, isUncertainFinancialWrite } from '../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../shared/financial-recovery/financial-recovery.component';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SessionService } from '../../core/services/session.service';
 import { RegistrationRecoveryService } from '../../core/services/registration-recovery.service';
@@ -53,12 +56,13 @@ const TYPE_LABELS: Record<PocketType, string> = {
 @Component({
   selector: 'app-pockets',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './pockets.component.html',
   styleUrl: './pockets.component.css',
 })
 export class PocketsComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly session = inject(SessionService);
   readonly recovery = inject(RegistrationRecoveryService);
   private readonly pocketService    = inject(PocketService);
@@ -533,6 +537,7 @@ export class PocketsComponent implements OnInit, OnDestroy {
   // ─── Exclusão ─────────────────────────────────────────────────────────────
 
   deletePocket(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const pocket = this.selectedPocket();
     if (!pocket) return;
     this.isSaving.set(true);
@@ -543,11 +548,18 @@ export class PocketsComponent implements OnInit, OnDestroy {
     else if (pocket.type === 'BENEFIT_ACCOUNT')  delete$ = this.pocketService.deleteBenefitAccount(pocket.id);
     else                                         delete$ = this.pocketService.deleteFgts(pocket.id);
 
-    delete$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: `Exclusão: ${pocket.label}`, pocketIds: [pocket.id] }, delete$).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  () => { this.isSaving.set(false); this.closeModal(); },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao excluir. Verifique se não há transações vinculadas.'));
+        if (isUncertainFinancialWrite(err)) {
+          this.closeModal();
+          this.financialRecovery.mark({ label: `Exclusão: ${pocket.label}`, pocketIds: [pocket.id],  });
+          this.financialRecovery.check();
+        } else {
+          this.errorMessage.set(financialErrorMessage(err, 'pocket', 'Erro ao excluir. Verifique os vínculos deste recurso.'));
+          this.financialRecovery.refreshPockets([pocket.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+        }
       },
     });
   }

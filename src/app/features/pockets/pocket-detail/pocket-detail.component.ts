@@ -1,3 +1,6 @@
+import { financialErrorMessage, isUncertainFinancialWrite, transactionProtectionMessage } from '../../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 import { Component, OnDestroy, OnInit, computed, inject, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -15,12 +18,13 @@ type ModalType = 'create' | 'confirm-delete' | null;
 @Component({
   selector: 'app-pocket-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './pocket-detail.component.html',
   styleUrl: './pocket-detail.component.css'
 })
 export class PocketDetailComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -74,6 +78,18 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
 
   // ─── Computed ────────────────────────────────────────────────────
   readonly transactions = this.transactionService.transactions;
+  private readonly blockedTransactionIds = signal(new Set<number>());
+  canDeleteTransaction(tx: TransactionDto): boolean {
+    return tx.canDelete !== false && !this.blockedTransactionIds().has(tx.id);
+  }
+  protectionMessage(tx: TransactionDto): string {
+    return transactionProtectionMessage({ ...tx, canDelete: false });
+  }
+  readonly selectedCanDelete = computed(() => {
+    const selected = this.selectedTransaction();
+    const current = this.transactions().find(tx => tx.id === selected?.id) ?? selected;
+    return !!current && this.canDeleteTransaction(current);
+  });
 
   readonly groupedTransactions = computed(() => {
     const map = new Map<string, TransactionDto[]>();
@@ -193,6 +209,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
   }
 
   openDeleteConfirm(tx: TransactionDto): void {
+    if (!this.canDeleteTransaction(tx) || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.selectedTransaction.set(tx);
     this.errorMessage.set(null);
     this.activeModal.set('confirm-delete');
@@ -212,6 +229,7 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
 
   // ─── Ações ───────────────────────────────────────────────────────
   onCreateTransaction(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.createForm.markAllAsTouched();
     if (this.createForm.invalid) return;
 
@@ -219,13 +237,13 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
     this.errorMessage.set(null);
     const { amount, transactionDate, description, categoryId } = this.createForm.value;
 
-    this.transactionService.createTransaction(this.pocketId, {
+    this.financialRecovery.trackWrite({ label: `Registro: ${description}`, pocketIds: [this.pocketId] }, this.transactionService.createTransaction(this.pocketId, {
       direction: this.createDirection(),
       amount: amount!,
       transactionDate: transactionDate!,
       description: description!,
       categoryId: categoryId!
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.fetchTransactions();
         this.refreshPocketBalance();
@@ -234,37 +252,51 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(err?.error?.message ?? 'Erro ao registrar transação.');
+        this.handleWriteError(err, `Registro: ${description}`, 'Erro ao registrar transação.');
       }
     });
   }
 
   deleteTransaction(): void {
     const tx = this.selectedTransaction();
-    if (!tx) return;
+    if (!tx || !this.selectedCanDelete() || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
 
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.transactionService.deleteTransaction(this.pocketId, tx.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: `Exclusão: ${tx.description}`, pocketIds: [this.pocketId] }, this.transactionService.deleteTransaction(this.pocketId, tx.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
+        this.fetchTransactions();
         this.refreshPocketBalance();
         this.isSaving.set(false);
         this.closeModal();
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(err?.error?.message ?? 'Erro ao excluir transação.');
+        this.handleWriteError(err, `Exclusão: ${tx.description}`, 'Erro ao excluir transação.');
       }
     });
   }
 
+  private handleWriteError(error: any, label: string, fallback: string): void {
+    if (error.status === 409 && this.selectedTransaction()) {
+      this.blockedTransactionIds.update(ids => new Set([...ids, this.selectedTransaction()!.id]));
+    }
+    if (isUncertainFinancialWrite(error)) {
+      this.closeModal();
+      this.financialRecovery.mark({ label, pocketIds: [this.pocketId] });
+      this.financialRecovery.check();
+    } else {
+      this.errorMessage.set(financialErrorMessage(error, 'transaction', fallback));
+    }
+    this.fetchTransactions();
+    this.refreshPocketBalance();
+  }
+
   private refreshPocketBalance(): void {
-    this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const updated = this.pocketService.pockets().find(p => p.id === this.pocketId);
-        if (updated) this.pocket.set(updated);
-      }
+    this.pocketService.getBalance(this.pocketId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: balance => this.pocket.update(p => p ? { ...p, balance } : p),
+      error: () => {},
     });
   }
 

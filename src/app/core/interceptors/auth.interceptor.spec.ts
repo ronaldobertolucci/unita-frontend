@@ -94,11 +94,27 @@ describe('Unita HTTP policy and bounded session recovery', () => {
     backend.expectOne('/api/auth/me').flush({ code: 'INVALID_TOKEN' }, { status: 401, statusText: 'Unauthorized' });
     backend.expectNone('/api/auth/refresh'); expect(session.isAuthenticated()).toBe(false);
   });
-  it.each([['POST', '/api/transfers'], ['POST', '/api/pockets/1/transactions'], ['POST', '/api/assets/1/transactions/buy'], ['PUT', '/api/credit-cards/1/bills/2/pay']])('repeats %s %s only after a contracted pre-controller 401, preserving the body', async (method, url) => {
+  it.each([['POST', '/api/assets/1/transactions/buy']])('repeats %s %s only after a contracted pre-controller 401, preserving the body', async (method, url) => {
     const body = { amount: 10, description: 'synthetic write' }; http.request(method, url, { body }).subscribe();
     backend.expectOne(url).flush({ code: 'SESSION_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
     await flushCoordination(); backend.expectOne('/api/auth/refresh').flush({ ...syntheticSession(), token: 'renewed' });
     await flushCoordination(); const retry = backend.expectOne(url); expect(retry.request.body).toEqual(body); retry.flush({});
+  });
+  it.each([
+    ['POST', '/api/transfers'], ['POST', '/api/transfers/fgts/withdrawal'],
+    ['POST', '/api/pockets/1/transactions'], ['PUT', '/api/credit-cards/1/bills/2/pay'],
+    ['DELETE', '/api/pockets/1/transactions/2'], ['DELETE', '/api/pockets/bank-accounts/1'],
+    ['DELETE', '/api/pockets/benefit-accounts/1'], ['DELETE', '/api/pockets/fgts/1'], ['DELETE', '/api/credit-cards/1'],
+  ])('recovers authentication without repeating %s %s', async (method, url) => {
+    const error = jest.fn();
+    http.request(method, url, { body: { amount: 80 } }).subscribe({ error });
+    backend.expectOne(url).flush({ code: 'SESSION_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
+    await flushCoordination();
+    backend.expectOne('/api/auth/refresh').flush({ ...syntheticSession(), token: 'renewed' });
+    await flushCoordination();
+    backend.expectNone(url);
+    expect(error).toHaveBeenCalledWith(expect.objectContaining({ status: 401 }));
+    expect(session.isAuthenticated()).toBe(true);
   });
   it.each([0, 401, 403, 429, 500])('never repeats a financial write on unrelated HTTP %s', status => {
     http.post('/api/transfers', { amount: 10 }).subscribe({ error: () => {} }); const request = backend.expectOne('/api/transfers');

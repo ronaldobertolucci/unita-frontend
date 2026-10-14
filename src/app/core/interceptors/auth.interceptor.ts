@@ -25,6 +25,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const version = session.version();
   let attempted = req.context.get(AUTH_RECOVERY_ATTEMPTED) || !hadAccess;
   let sentToken: string;
+  const financialWrite =
+    (req.method === 'POST' && /\/(transfers(?:\/fgts\/withdrawal)?|pockets\/\d+\/transactions)$/.test(req.url.split('?')[0])) ||
+    (req.method === 'PUT' && /\/credit-cards\/\d+\/bills\/\d+\/pay$/.test(req.url.split('?')[0])) ||
+    (req.method === 'DELETE' && /\/(pockets\/\d+\/transactions\/\d+|pockets\/(bank-accounts|benefit-accounts|fgts)\/\d+|credit-cards\/\d+)$/.test(req.url.split('?')[0]));
   const send = (token: string) => {
     sentToken = token;
     return next(req.clone({
@@ -43,12 +47,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       }
       attempted = true;
-      // Unita's recognized 401s reject in the authentication filters, before
-      // controllers. Network failures or unknown origins never repeat writes.
-      return from(auth.accessToken(version, sentToken)).pipe(switchMap(send), catchError(repeated => {
-        if (repeated instanceof HttpErrorResponse && classifyAuthError('protected', repeated).canRecoverSession) auth.endRecovery();
-        return throwError(() => repeated);
-      }));
+      // Recover access, but US-02 financial writes always require a new user action.
+      return from(auth.accessToken(version, sentToken)).pipe(
+        switchMap(token => financialWrite ? throwError(() => error) : send(token)),
+        catchError(repeated => {
+          if (financialWrite && repeated === error) return throwError(() => error);
+          if (repeated instanceof HttpErrorResponse && classifyAuthError('protected', repeated).canRecoverSession) auth.endRecovery();
+          return throwError(() => repeated);
+        }),
+      );
     })
   ));
 };

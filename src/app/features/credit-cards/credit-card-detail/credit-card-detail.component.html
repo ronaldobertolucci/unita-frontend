@@ -1,4 +1,5 @@
 <div class="page">
+  <app-financial-recovery />
 
   <!-- ─── Loading ─── -->
   @if (isLoading()) {
@@ -103,7 +104,7 @@
                 }
                 @if (bill.status === 'CLOSED') {
                   <button class="btn-bill-action" (click)="reopenBill(bill)">Reabrir</button>
-                  <button class="btn-bill-action btn-bill-action--primary" (click)="openPayModal(bill)">Pagar fatura</button>
+                  <button class="btn-bill-action btn-bill-action--primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="openPayModal(bill)">Pagar fatura</button>
                 }
               </div>
             }
@@ -419,7 +420,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving() || eligiblePockets().length === 0">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || eligiblePockets().length === 0 || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Pagando... } @else { Confirmar pagamento }
           </button>
         </div>

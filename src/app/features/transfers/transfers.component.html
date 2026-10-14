@@ -1,4 +1,5 @@
 <div class="page">
+  <app-financial-recovery />
 
   <!-- ─── Abas ─── -->
   <div class="tabs">
@@ -113,7 +114,7 @@
         </div>
 
         <div class="modal-actions">
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="financialRecovery.state() !== 'clear' || isSaving()">
             @if (isSaving()) { <span class="spinner"></span> Transferindo... } @else { Transferir }
           </button>
         </div>
@@ -222,7 +223,7 @@
         </div>
 
         <div class="modal-actions">
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="financialRecovery.state() !== 'clear' || isSaving()">
             @if (isSaving()) { <span class="spinner"></span> Transferindo... } @else { Transferir }
           </button>
         </div>
@@ -293,7 +294,7 @@
         </div>
 
         <div class="modal-actions">
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="financialRecovery.state() !== 'clear' || isSaving()">
             @if (isSaving()) { <span class="spinner"></span> Sacando... } @else { Sacar }
           </button>
         </div>

@@ -1,3 +1,6 @@
+import { financialErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -21,12 +24,13 @@ type ModalType =
 @Component({
   selector: 'app-credit-card-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './credit-card-detail.component.html',
   styleUrl: './credit-card-detail.component.css',
 })
 export class CreditCardDetailComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -185,25 +189,40 @@ readonly expenseCategories = computed(() =>
   }
 
   payBill(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.payForm.invalid) {
       this.payForm.markAllAsTouched();
       return;
     }
     this.isSaving.set(true);
     this.errorMessage.set(null);
-    const bill = this.selectedBill()!;
+    const bill = this.selectedBill();
+    if (!bill || bill.status === 'PAID') { this.isSaving.set(false); return; }
+    const pocketId = Number(this.payForm.value.pocketId);
 
-    this.creditCardService.payBill(this.cardId, bill.id, {
-      pocketId: this.payForm.value.pocketId!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId }, this.creditCardService.payBill(this.cardId, bill.id, {
+      pocketId,
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => {
         this.replaceBill(updated);
+        this.financialRecovery.refreshPockets([pocketId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+          error: () => this.inlineError.set({ billId: bill.id, message: 'Fatura paga. Não foi possível atualizar o pocket. Confira o saldo e o extrato antes de uma nova operação.' }),
+        });
         this.isSaving.set(false);
         this.closeModal();
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao pagar fatura.'));
+        if (isUncertainFinancialWrite(err)) {
+          this.closeModal();
+          this.financialRecovery.mark({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId });
+          this.financialRecovery.check();
+        } else {
+          this.errorMessage.set(financialErrorMessage(err, 'transaction', 'Erro ao pagar fatura.'));
+          this.loadBills();
+          this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+          if (err.status === 404) this.payForm.reset();
+        }
       },
     });
   }

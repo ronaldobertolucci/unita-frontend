@@ -41,6 +41,7 @@ function buildCreditCardService(cards: CreditCardDto[] = []) {
   return {
     creditCards: signal(cards),
     loadCreditCards: jest.fn().mockReturnValue(of(cards)),
+    getBills: jest.fn().mockReturnValue(of([])),
     getCreditCard: jest.fn().mockReturnValue(of(mockCard)),
     createCreditCard: jest.fn(),
     updateCreditCard: jest.fn(),
@@ -317,4 +318,16 @@ describe('CreditCardsComponent', () => {
       expect(component.formatCurrency(5000)).toContain('5.000');
     });
   });
+
+  it('retains a card with payments on HTTP 409 and refreshes the list and history', () => {
+    setup([mockCard]);
+    component.selectedCard.set(mockCard);
+    creditCardServiceSpy.deleteCreditCard.mockReturnValue(throwError(() => ({ status: 409 })));
+    component.deleteCreditCard();
+    expect(creditCardServiceSpy.creditCards()).toEqual([mockCard]);
+    expect(component.errorMessage()).toContain('pagamentos de fatura');
+    expect(creditCardServiceSpy.loadCreditCards).toHaveBeenCalledTimes(2);
+    expect(creditCardServiceSpy.getBills).toHaveBeenCalledWith(mockCard.id);
+  });
+
 });

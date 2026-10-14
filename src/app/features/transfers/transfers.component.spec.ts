@@ -1,12 +1,18 @@
+import { TransactionService } from '../../core/services/transaction.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { TransfersComponent } from './transfers.component';
 import { TransferService } from '../../core/services/transfer.service';
 import { PocketService } from '../../core/services/pocket.service';
 import { GroupService } from '../../core/services/group.service';
 import { AuthService } from '../../core/services/auth.service';
 import { RouterTestingModule } from '@angular/router/testing';
+
+const mockTransferResult = {
+  sourceTransaction: { id: 101, amount: 100, direction: 'EXPENSE' as const, transactionDate: '2026-10-13', description: 'Teste', category: { id: 2, name: 'Transferência Enviada', type: 'NEUTRAL' as const, isSystem: true }, operationType: 'TRANSFER' as const, operationId: 5, canDelete: false },
+  targetTransaction: { id: 102, amount: 100, direction: 'INCOME' as const, transactionDate: '2026-10-13', description: 'Teste', category: { id: 3, name: 'Transferência Recebida', type: 'NEUTRAL' as const, isSystem: true }, operationType: 'TRANSFER' as const, operationId: 5, canDelete: false },
+};
 
 const mockPockets = [
   { id: 1, type: 'BANK_ACCOUNT',          label: 'Nubank',   balance: 1000 },
@@ -35,7 +41,8 @@ function buildTransferService() {
 function buildPocketService(pockets = mockPockets) {
   return {
     pockets: signal(pockets),
-    loadPockets: jest.fn().mockReturnValue(of(void 0)),
+    getBalance: jest.fn().mockReturnValue(of(100)),
+    loadPockets: jest.fn().mockReturnValue(of(pockets)),
   };
 }
 
@@ -66,7 +73,7 @@ describe('TransfersComponent', () => {
 
     TestBed.configureTestingModule({
       imports: [TransfersComponent, RouterTestingModule],
-      providers: [
+      providers: [{ provide: TransactionService, useValue: { getTransactions: jest.fn().mockReturnValue(of([mockTransferResult.sourceTransaction, mockTransferResult.targetTransaction])) } },
         { provide: TransferService, useValue: transferServiceSpy },
         { provide: PocketService,   useValue: pocketServiceSpy },
         { provide: GroupService,    useValue: groupServiceSpy },
@@ -301,7 +308,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should call transfer with correct payload on success', () => {
-      transferServiceSpy.transfer.mockReturnValue(of(void 0));
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 100, description: 'Teste' });
       component.submitOwnTransfer();
       expect(transferServiceSpy.transfer).toHaveBeenCalledWith({
@@ -310,7 +317,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should reload pockets and show success message on success', () => {
-      transferServiceSpy.transfer.mockReturnValue(of(void 0));
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 100, description: 'Teste' });
       component.submitOwnTransfer();
       expect(pocketServiceSpy.loadPockets).toHaveBeenCalledTimes(2);
@@ -318,7 +325,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should reset form on success', () => {
-      transferServiceSpy.transfer.mockReturnValue(of(void 0));
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 100, description: 'Teste' });
       component.submitOwnTransfer();
       expect(component.ownForm.get('sourcePocketId')?.value).toBeNull();
@@ -345,7 +352,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should call transfer with correct payload on success', () => {
-      transferServiceSpy.transfer.mockReturnValue(of(void 0));
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 50, description: 'Reembolso' });
       component.submitGroupTransfer();
       expect(transferServiceSpy.transfer).toHaveBeenCalledWith({
@@ -354,7 +361,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should reset groupPockets and show success message on success', () => {
-      transferServiceSpy.transfer.mockReturnValue(of(void 0));
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.groupPockets.set(mockGroupPockets);
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 50, description: 'Reembolso' });
       component.submitGroupTransfer();
@@ -383,7 +390,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should call fgtsWithdrawal with correct payload on success', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(transferServiceSpy.fgtsWithdrawal).toHaveBeenCalledWith({
@@ -392,14 +399,14 @@ describe('TransfersComponent', () => {
     });
 
     it('should not call transfer() — only fgtsWithdrawal()', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(transferServiceSpy.transfer).not.toHaveBeenCalled();
     });
 
     it('should reload pockets and show success message on success', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(pocketServiceSpy.loadPockets).toHaveBeenCalledTimes(2);
@@ -407,7 +414,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should reset form on success', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(component.fgtsForm.get('sourcePocketId')?.value).toBeNull();
@@ -417,7 +424,7 @@ describe('TransfersComponent', () => {
     });
 
     it('should stop saving after success', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(component.isSaving()).toBe(false);
@@ -432,12 +439,81 @@ describe('TransfersComponent', () => {
     });
 
     it('should clear previous messages before submitting', () => {
-      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(void 0));
+      transferServiceSpy.fgtsWithdrawal.mockReturnValue(of(mockTransferResult));
       component['errorMessage'].set('erro anterior');
       component['successMessage'].set('sucesso anterior');
       component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 1500, description: 'Saque aniversário' });
       component.submitFgtsWithdrawal();
       expect(component.errorMessage()).toBeNull();
     });
+  });
+
+  describe('US-02 submission and reconciliation', () => {
+    it('submits only once while the request is pending, including across tabs', () => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(new Subject());
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.fgtsForm.setValue({ sourcePocketId: 4, targetPocketId: 1, amount: 80, description: 'Saque' });
+      component.submitOwnTransfer();
+      component.submitOwnTransfer();
+      component.submitFgtsWithdrawal();
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+      expect(transferServiceSpy.fgtsWithdrawal).not.toHaveBeenCalled();
+    });
+
+    it('uses returned transaction IDs to refresh balances and statements on both personal sides', () => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      const txService = TestBed.inject(TransactionService);
+      expect(txService.getTransactions).toHaveBeenCalledWith(1);
+      expect(txService.getTransactions).toHaveBeenCalledWith(2);
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(1);
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(2);
+      expect(component.lastResult()?.sourceTransaction.operationId).toBe(5);
+      expect(component.errorMessage()).toBeNull();
+    });
+
+    it('never reads the other group member statement or balance', () => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 80, description: 'Teste' });
+      component.submitGroupTransfer();
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledTimes(1);
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(1);
+      expect(pocketServiceSpy.getBalance).not.toHaveBeenCalledWith(5);
+    });
+
+    it.each([0, 408, 500])('requires explicit reconciliation after HTTP %s, keeping the form and blocking another send', status => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(throwError(() => ({ status })));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(component.ownForm.value.amount).toBe(80);
+      component.setTab('fgts');
+      component.submitOwnTransfer();
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+      fixture.destroy();
+      expect(component.financialRecovery.state()).toBe('review');
+    });
+  });
+
+
+  it('requires reconciliation if navigation interrupts a transfer response', () => {
+    setup();
+    transferServiceSpy.transfer.mockReturnValue(new Subject());
+    component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Interrompida' });
+    component.submitOwnTransfer();
+    expect(component.financialRecovery.state()).toBe('sending');
+    fixture.destroy();
+    expect(component.financialRecovery.state()).toBe('review');
+    fixture = TestBed.createComponent(TransfersComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Interrompida' });
+    component.submitOwnTransfer();
+    expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
   });
 });

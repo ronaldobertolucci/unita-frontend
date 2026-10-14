@@ -1,3 +1,7 @@
+import { TransferResultDto } from '../../core/models/transaction.model';
+import { financialErrorMessage, isUncertainFinancialWrite } from '../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../shared/financial-recovery/financial-recovery.component';
 import { Component, inject, signal, computed, OnInit, OnDestroy, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -15,12 +19,13 @@ type TransferTab = 'own' | 'group' | 'fgts';
 @Component({
   selector: 'app-transfers',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule],
   templateUrl: './transfers.component.html',
   styleUrl: './transfers.component.css',
 })
 export class TransfersComponent implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly fb = inject(FormBuilder);
   private readonly transferService = inject(TransferService);
   private readonly pocketService = inject(PocketService);
@@ -34,6 +39,7 @@ export class TransfersComponent implements OnInit, OnDestroy {
   readonly isLoadingGroupPockets = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
+  readonly lastResult = signal<TransferResultDto | null>(null);
   readonly selectedSourceId = signal<number | null>(null);
 
   // Pockets do grupo selecionado (carregados sob demanda)
@@ -172,6 +178,7 @@ export class TransfersComponent implements OnInit, OnDestroy {
   }
 
   submitOwnTransfer(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.ownForm.invalid) {
       this.ownForm.markAllAsTouched();
       return;
@@ -180,26 +187,31 @@ export class TransfersComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
 
     const { sourcePocketId, targetPocketId, amount, description } = this.ownForm.value;
-    this.transferService.transfer({
-      sourcePocketId: sourcePocketId!,
-      targetPocketId: targetPocketId!,
+    this.financialRecovery.trackWrite({
+      label: `${description} · ${this.formatAmount(amount!)}`,
+      pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
+    }, this.transferService.transfer({
+      sourcePocketId: Number(sourcePocketId),
+      targetPocketId: Number(targetPocketId),
       amount: amount!,
       description: description!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: result => {
+        this.lastResult.set(result);
+        this.refreshAfterTransfer(sourcePocketId!, targetPocketId!, result);
         this.ownForm.reset();
         this.successMessage.set('Transferência realizada com sucesso!');
         this.isSaving.set(false);
       },
       error: err => {
-        this.errorMessage.set(translateApiError(err?.error?.message));
+        this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
         this.isSaving.set(false);
       },
     });
   }
 
   submitGroupTransfer(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.groupForm.invalid) {
       this.groupForm.markAllAsTouched();
       return;
@@ -208,27 +220,32 @@ export class TransfersComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
 
     const { sourcePocketId, targetPocketId, amount, description } = this.groupForm.value;
-    this.transferService.transfer({
-      sourcePocketId: sourcePocketId!,
-      targetPocketId: targetPocketId!,
+    this.financialRecovery.trackWrite({
+      label: `${description} · ${this.formatAmount(amount!)}`,
+      pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
+    }, this.transferService.transfer({
+      sourcePocketId: Number(sourcePocketId),
+      targetPocketId: Number(targetPocketId),
       amount: amount!,
       description: description!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: result => {
+        this.lastResult.set(result);
+        this.refreshAfterTransfer(sourcePocketId!, targetPocketId!, result);
         this.groupForm.reset();
         this.groupPockets.set([]);
         this.successMessage.set('Transferência realizada com sucesso!');
         this.isSaving.set(false);
       },
       error: err => {
-        this.errorMessage.set(translateApiError(err?.error?.message));
+        this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
         this.isSaving.set(false);
       },
     });
   }
 
   submitFgtsWithdrawal(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.fgtsForm.invalid) {
       this.fgtsForm.markAllAsTouched();
       return;
@@ -237,27 +254,66 @@ export class TransfersComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
 
     const { sourcePocketId, targetPocketId, amount, description } = this.fgtsForm.value;
-    this.transferService.fgtsWithdrawal({
-      sourcePocketId: sourcePocketId!,
-      targetPocketId: targetPocketId!,
+    this.financialRecovery.trackWrite({
+      label: `${description} · ${this.formatAmount(amount!)}`,
+      pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
+    }, this.transferService.fgtsWithdrawal({
+      sourcePocketId: Number(sourcePocketId),
+      targetPocketId: Number(targetPocketId),
       amount: amount!,
       description: description!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: result => {
+        this.lastResult.set(result);
+        this.refreshAfterTransfer(sourcePocketId!, targetPocketId!, result);
         this.fgtsForm.reset();
         this.successMessage.set('Saque de FGTS realizado com sucesso!');
         this.isSaving.set(false);
       },
       error: err => {
-        this.errorMessage.set(translateApiError(err?.error?.message));
+        this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
         this.isSaving.set(false);
       },
     });
   }
 
+  private refreshAfterTransfer(sourceId: number, targetId: number, result: TransferResultDto): void {
+    this.financialRecovery.refreshPockets([sourceId, targetId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: pockets => {
+        const missing = pockets.some(p => !p.transactions.some(tx => tx.id ===
+          (p.id === Number(sourceId) ? result.sourceTransaction.id : result.targetTransaction.id)));
+        if (missing) this.errorMessage.set('Operação realizada. Confira os extratos: os lançamentos ainda não foram localizados na consulta.');
+      },
+      error: () => this.errorMessage.set('Operação realizada. Não foi possível atualizar os saldos e extratos. Consulte os pockets antes de uma nova operação.'),
+    });
+  }
+
+  private handleTransferError(error: any, sourceId: number, targetId: number, amount: number, description: string): void {
+    if (isUncertainFinancialWrite(error)) {
+      this.financialRecovery.mark({
+        label: `${description} · ${this.formatAmount(amount)}`,
+        pocketIds: [sourceId, targetId],
+      });
+      this.financialRecovery.check();
+      this.errorMessage.set(null);
+    } else {
+      this.errorMessage.set(financialErrorMessage(error, 'transaction', 'Erro ao realizar operação.'));
+      this.financialRecovery.refreshPockets([sourceId, targetId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+      if (error.status === 404) {
+        this.ownForm.patchValue({ sourcePocketId: null, targetPocketId: null });
+        this.fgtsForm.patchValue({ sourcePocketId: null, targetPocketId: null });
+        this.groupForm.patchValue({ sourcePocketId: null, targetPocketId: null, targetMemberId: null });
+        this.groupPockets.set([]);
+      }
+    }
+  }
+
   getPocketLabel(id: number): string {
     return this.pockets().find(p => p.id === id)?.label ?? '';
+  }
+
+  private formatAmount(amount: number): string {
+    return Number(amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   private clearMessages(): void {

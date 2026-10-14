@@ -1,6 +1,7 @@
+import { TransactionService } from '../../../core/services/transaction.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, computed } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 
@@ -45,6 +46,7 @@ const mockPurchase: CreditCardPurchaseDto = {
 
 function buildCreditCardService() {
   return {
+    loadCreditCards: jest.fn().mockReturnValue(of([mockCard])),
     getCreditCard: jest.fn().mockReturnValue(of(mockCard)),
     getBills: jest.fn().mockReturnValue(of([mockBillOpen, mockBillClosed, mockBillPaid])),
     closeBill: jest.fn().mockReturnValue(of({ ...mockBillOpen, status: 'CLOSED' as const })),
@@ -59,6 +61,7 @@ function buildCreditCardService() {
 function buildPocketService(pockets: PocketSummaryDto[] = []) {
   return {
     pockets: signal(pockets),
+    getBalance: jest.fn().mockReturnValue(of(100)),
     loadPockets: jest.fn().mockReturnValue(of(pockets)),
   };
 }
@@ -89,7 +92,7 @@ describe('CreditCardDetailComponent', () => {
 
     TestBed.configureTestingModule({
       imports: [CreditCardDetailComponent, RouterTestingModule],
-      providers: [
+      providers: [{ provide: TransactionService, useValue: { getTransactions: jest.fn().mockReturnValue(of([])) } },
         { provide: CreditCardService, useValue: creditCardServiceSpy },
         { provide: PocketService, useValue: pocketServiceSpy },
         { provide: CategoryService, useValue: categoryServiceSpy },
@@ -454,4 +457,33 @@ describe('CreditCardDetailComponent', () => {
       expect(component.paidBillsVisible()).toBe(true);
     });
   });
+
+  it('prevents double payment and refreshes the paying pocket after success', () => {
+    setup();
+    const response = new Subject<CreditCardBillDto>();
+    creditCardServiceSpy.payBill.mockReturnValue(response);
+    component.openPayModal(mockBillClosed);
+    component.payForm.setValue({ pocketId: 5 });
+    component.payBill();
+    component.payBill();
+    expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+    response.next({ ...mockBillClosed, status: 'PAID' });
+    response.complete();
+    expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(5);
+    expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
+  });
+
+  it('blocks resending an uncertain payment even after closing and reopening the modal', () => {
+    setup();
+    creditCardServiceSpy.payBill.mockReturnValue(throwError(() => ({ status: 0 })));
+    component.openPayModal(mockBillClosed);
+    component.payForm.setValue({ pocketId: 5 });
+    component.payBill();
+    expect(component.financialRecovery.state()).toBe('review');
+    component.openPayModal(mockBillClosed);
+    component.payForm.setValue({ pocketId: 5 });
+    component.payBill();
+    expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+  });
+
 });

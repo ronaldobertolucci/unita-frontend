@@ -107,4 +107,16 @@ describe('TransferService', () => {
       httpMock.expectOne(`${baseUrl}/groups/10/share/pockets`).flush(mockGroupPockets);
     });
   });
+
+  it.each(['transfer', 'fgtsWithdrawal'] as const)('preserves the returned operation metadata from %s', method => {
+    const kind = method === 'transfer' ? 'TRANSFER' : 'FGTS_WITHDRAWAL';
+    const source = { id: 101, amount: 80, direction: 'EXPENSE', transactionDate: '2026-10-13', description: 'Teste',
+      category: { id: 2, name: 'Transferência Enviada', type: 'NEUTRAL', global: true }, operationType: kind, operationId: 5, canDelete: false };
+    const target = { ...source, id: 102, direction: 'INCOME' };
+    const next = jest.fn();
+    service[method]({ sourcePocketId: 10, targetPocketId: 20, amount: 80, description: 'Teste' }).subscribe(next);
+    httpMock.expectOne(`${baseUrl}/${method === 'transfer' ? 'transfers' : 'transfers/fgts/withdrawal'}`)
+      .flush({ sourceTransaction: source, targetTransaction: target }, { status: 201, statusText: 'Created' });
+    expect(next).toHaveBeenCalledWith({ sourceTransaction: source, targetTransaction: target });
+  });
 });

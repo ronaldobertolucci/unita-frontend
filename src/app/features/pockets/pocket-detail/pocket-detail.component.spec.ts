@@ -13,6 +13,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 const mockPocket: PocketSummaryDto = { id: 1, type: 'BANK_ACCOUNT', label: 'Banco X – Corrente', active: true, balance: 1500 };
 
 const mockTransaction: TransactionDto = {
+  operationType: 'UNLINKED', operationId: null, canDelete: true,
   id: 10,
   amount: 100,
   direction: 'EXPENSE',
@@ -22,6 +23,7 @@ const mockTransaction: TransactionDto = {
 };
 
 const mockTransaction2: TransactionDto = {
+  operationType: 'UNLINKED', operationId: null, canDelete: true,
   id: 11,
   amount: 500,
   direction: 'INCOME',
@@ -39,6 +41,7 @@ const mockCategories = [
 function buildPocketService(pockets: PocketSummaryDto[] = [mockPocket]) {
   return {
     pockets: signal(pockets),
+    getBalance: jest.fn().mockReturnValue(of(1500)),
     loadPockets: jest.fn().mockReturnValue(of(pockets)),
   };
 }
@@ -46,6 +49,7 @@ function buildPocketService(pockets: PocketSummaryDto[] = [mockPocket]) {
 function buildTransactionService(transactions: TransactionDto[] = []) {
   return {
     transactions: signal(transactions),
+    getTransactions: jest.fn().mockReturnValue(of(transactions)),
     loadTransactions: jest.fn().mockReturnValue(of(transactions)),
     createTransaction: jest.fn(),
     deleteTransaction: jest.fn(),
@@ -462,4 +466,52 @@ describe('PocketDetailComponent', () => {
       expect(component.getPocketTypeLabel('UNKNOWN')).toBe('');
     });
   });
+
+  describe('US-02 protection', () => {
+    it.each(['TRANSFER', 'FGTS_WITHDRAWAL', 'BILL_PAYMENT'] as const)('hides deletion and explains %s', operationType => {
+      const protectedTx = { ...mockTransaction, operationType, operationId: 5, canDelete: false };
+      setup([mockPocket], [protectedTx]);
+      expect(fixture.nativeElement.querySelector('.tx-delete-btn')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('exclusão indisponível');
+      component.openDeleteConfirm(protectedTx);
+      component.selectedTransaction.set(protectedTx);
+      component.deleteTransaction();
+      expect(transactionServiceSpy.deleteTransaction).not.toHaveBeenCalled();
+    });
+
+    it('keeps UNLINKED eligible without presenting it as manual', () => {
+      setup([mockPocket], [{ ...mockTransaction, operationType: 'UNLINKED', operationId: null, canDelete: true }]);
+      expect(fixture.nativeElement.querySelector('.tx-delete-btn')).not.toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('manual');
+    });
+
+    it('keeps the statement and balance on 409, refreshes with current filters and blocks another delete', () => {
+      setup([mockPocket], [mockTransaction]);
+      component.filterForm.setValue({ startDate: '2025-01-01', endDate: '2025-01-31' });
+      transactionServiceSpy.deleteTransaction.mockReturnValue(throwError(() => ({ status: 409, error: { message: 'arbitrary backend text' } })));
+      component.openDeleteConfirm(mockTransaction);
+      component.deleteTransaction();
+      expect(component.transactions()).toEqual([mockTransaction]);
+      expect(component.pocket()?.balance).toBe(1500);
+      expect(component.errorMessage()).toContain('operação financeira');
+      expect(transactionServiceSpy.loadTransactions).toHaveBeenLastCalledWith(1, '2025-01-01', '2025-01-31');
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(1);
+      component.deleteTransaction();
+      expect(transactionServiceSpy.deleteTransaction).toHaveBeenCalledTimes(1);
+      component.closeModal();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.tx-delete-btn')).toBeNull();
+    });
+
+    it('consults both statement and balance after an eligible deletion', () => {
+      setup([mockPocket], [mockTransaction]);
+      transactionServiceSpy.deleteTransaction.mockReturnValue(of(undefined));
+      pocketServiceSpy.getBalance.mockReturnValue(of(1600));
+      component.openDeleteConfirm(mockTransaction);
+      component.deleteTransaction();
+      expect(transactionServiceSpy.loadTransactions).toHaveBeenCalledTimes(2);
+      expect(component.pocket()?.balance).toBe(1600);
+    });
+  });
+
 });

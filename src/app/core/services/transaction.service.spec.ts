@@ -9,6 +9,7 @@ const base = environment.apiUrl;
 const pocketId = 1;
 
 const mockTransaction: TransactionDto = {
+  operationType: 'UNLINKED', operationId: null, canDelete: true,
   id: 1,
   amount: 100,
   direction: 'EXPENSE',
@@ -18,6 +19,7 @@ const mockTransaction: TransactionDto = {
 };
 
 const mockTransaction2: TransactionDto = {
+  operationType: 'UNLINKED', operationId: null, canDelete: true,
   id: 2,
   amount: 500,
   direction: 'INCOME',

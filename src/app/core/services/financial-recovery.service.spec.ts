@@ -1,0 +1,101 @@
+import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { FinancialRecoveryService } from './financial-recovery.service';
+import { TransactionService } from './transaction.service';
+import { SessionService } from './session.service';
+import { syntheticSession } from '../testing/session.mock';
+import { environment } from '../../../environments/environment';
+
+describe('Financial recovery with the actual HTTP read services', () => {
+  let service: FinancialRecoveryService;
+  let backend: HttpTestingController;
+  const base = environment.apiUrl;
+  const ownPocket = { id: 10, type: 'BANK_ACCOUNT', label: 'Minha conta', balance: 20, active: true };
+  const tx = { id: 101, amount: 80, direction: 'EXPENSE', transactionDate: '2026-10-13', description: 'Transferência familiar',
+    category: { id: 2, name: 'Transferência Enviada', type: 'NEUTRAL', global: true }, operationType: 'TRANSFER', operationId: 5, canDelete: false };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const session = TestBed.inject(SessionService);
+    session.accept(syntheticSession(), session.version());
+    service = TestBed.inject(FinancialRecoveryService);
+    backend = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => backend.verify());
+
+  it('consults only owned pockets, preserves metadata and waits for explicit reconciliation', () => {
+    service.mark({ label: 'Transferência de R$ 80', pocketIds: [10, 20] });
+    service.confirm();
+    expect(service.state()).toBe('pending');
+    service.check();
+    backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
+    backend.expectOne(`${base}/pockets/10/balance`).flush(20);
+    backend.expectOne(`${base}/pockets/10/transactions`).flush([tx]);
+    backend.expectNone(`${base}/pockets/20/balance`);
+    backend.expectNone(`${base}/pockets/20/transactions`);
+    expect(service.state()).toBe('review');
+    expect(service.pockets()[0].transactions[0]).toEqual(tx);
+    service.confirm();
+    expect(service.state()).toBe('clear');
+  });
+
+  it('keeps the block after a failed read and allows only a new read', () => {
+    service.mark({ label: 'Saque FGTS', pocketIds: [10] });
+    service.check();
+    backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
+    backend.expectOne(`${base}/pockets/10/balance`).flush(20);
+    backend.expectOne(`${base}/pockets/10/transactions`).error(new ProgressEvent('error'));
+    expect(service.state()).toBe('pending');
+    service.confirm();
+    expect(service.state()).toBe('pending');
+    service.check();
+    backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
+    backend.expectOne(`${base}/pockets/10/balance`).flush(20);
+    backend.expectOne(`${base}/pockets/10/transactions`).flush([tx]);
+    expect(service.state()).toBe('review');
+  });
+
+  it('refreshes bill history and the payment account before offering reconciliation', () => {
+    service.mark({ label: 'Pagamento de fatura', pocketIds: [10], cardId: 7 });
+    service.check();
+    backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
+    backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
+    backend.expectOne(`${base}/pockets/10/balance`).flush(20);
+    backend.expectOne(`${base}/pockets/10/transactions`).flush([{ ...tx, operationType: 'BILL_PAYMENT', operationId: 3 }]);
+    backend.expectOne(`${base}/credit-cards/7/bills`).flush([{ id: 3, status: 'PAID', dueDate: '2026-10-13', totalAmount: 80 }]);
+    expect(service.bills()[0].status).toBe('PAID');
+    expect(service.state()).toBe('review');
+  });
+
+  it('never replaces the statement of the pocket currently open on screen during reconciliation', () => {
+    const transactions = TestBed.inject(TransactionService);
+    transactions.loadTransactions(99).subscribe();
+    backend.expectOne(`${base}/pockets/99/transactions`).flush([{ ...tx, id: 999 }]);
+    service.mark({ label: 'Transferência', pocketIds: [10] });
+    service.check();
+    backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
+    backend.expectOne(`${base}/pockets/10/balance`).flush(20);
+    backend.expectOne(`${base}/pockets/10/transactions`).flush([tx]);
+    expect(transactions.transactions().map(item => item.id)).toEqual([999]);
+  });
+
+  it('cancels reads and clears private review data when the user changes', () => {
+    service.mark({ label: 'Transferência', pocketIds: [10] });
+    service.check();
+    const pending = backend.expectOne(`${base}/pockets/my`);
+    TestBed.inject(SessionService).invalidate('logout');
+    expect(pending.cancelled).toBe(true);
+    expect(service.operation()).toBeNull();
+    expect(service.pockets()).toEqual([]);
+    expect(service.state()).toBe('clear');
+  });
+
+  it('does not retry a write after an ambiguous server error', () => {
+    const error = jest.fn();
+    TestBed.inject(TransactionService).deleteTransaction(10, 101).subscribe({ error });
+    backend.expectOne(`${base}/pockets/10/transactions/101`).flush({}, { status: 500, statusText: 'Error' });
+    expect(error).toHaveBeenCalledWith(expect.any(HttpErrorResponse));
+    backend.expectNone(`${base}/pockets/10/transactions/101`);
+  });
+});
