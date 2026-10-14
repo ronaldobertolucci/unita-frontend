@@ -127,4 +127,43 @@ describe('Financial recovery with the actual HTTP read services', () => {
     expect(error).toHaveBeenCalledWith(expect.any(HttpErrorResponse));
     backend.expectNone(`${base}/pockets/10/transactions/101`);
   });
+  it('reads the refund list, statement and destination state before explicit reconciliation', () => {
+    const refund = { id: 31, description: 'Devolução', amount: 50, refundDate: '2026-10-14', purchaseId: 81,
+      category: { id: 2, name: 'Estornos', type: 'INCOME', global: false } };
+    service.mark({ label: 'Estorno', pocketIds: [], cardId: 7, billId: 22, reviewRefunds: true });
+    service.check();
+    backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
+    backend.expectOne(`${base}/pockets/my`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/bills`).flush([{ id: 22, status: 'OPEN', totalAmount: -40 }]);
+    backend.expectOne(`${base}/credit-cards/7/bills/22`).flush({ id: 22, status: 'OPEN', totalAmount: -40 });
+    backend.expectOne(`${base}/credit-cards/7/bills/22/refunds`).flush([refund]);
+    expect(service.state()).toBe('checking');
+    service.confirm();
+    expect(service.state()).toBe('checking');
+    backend.expectOne(`${base}/credit-cards/7/bills/22/installments`).flush({ installments: [], refunds: [refund] });
+    expect(service.state()).toBe('review');
+    expect(service.refunds()).toEqual([refund]);
+    expect(service.refundStatement()?.refunds[0].purchaseId).toBe(81);
+    expect(service.bills()[0].totalAmount).toBe(-40);
+    service.confirm();
+    expect(service.state()).toBe('clear');
+    expect(service.refunds()).toEqual([]);
+    expect(service.refundStatement()).toBeNull();
+  });
+
+  it('keeps an uncertain refund blocked when its statement cannot be consulted', () => {
+    service.mark({ label: 'Estorno', pocketIds: [], cardId: 7, billId: 22, reviewRefunds: true });
+    service.check();
+    backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
+    backend.expectOne(`${base}/pockets/my`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/bills`).flush([{ id: 22 }]);
+    backend.expectOne(`${base}/credit-cards/7/bills/22`).flush({ id: 22 });
+    backend.expectOne(`${base}/credit-cards/7/bills/22/refunds`).flush([]);
+    backend.expectOne(`${base}/credit-cards/7/bills/22/installments`).error(new ProgressEvent('error'));
+    service.confirm();
+    expect(service.state()).toBe('pending');
+    expect(service.refunds()).toEqual([]);
+    expect(service.refundStatement()).toBeNull();
+  });
+
 });

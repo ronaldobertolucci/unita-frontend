@@ -68,6 +68,7 @@ const mockRefund: CreditCardRefundDto = {
   description: 'Estorno X',
   amount: 50,
   refundDate: '2025-03-10',
+  purchaseId: null,
   category: { id: 1, name: 'Alimentação', type: 'EXPENSE', isSystem: false },
 };
 
@@ -327,4 +328,18 @@ describe('CreditCardService', () => {
       expect(called).toBe(true);
     });
   });
+  it('sends an optional purchaseId and preserves nullable references from refund reads', () => {
+    service.createRefund(1, 11, { description: 'Vinculado', amount: 50, refundDate: '2026-10-14', categoryId: 9, purchaseId: 81 }).subscribe();
+    const post = http.expectOne(`${base}/credit-cards/1/bills/11/refunds`);
+    expect(post.request.method).toBe('POST');
+    expect(post.request.body).toEqual({ description: 'Vinculado', amount: 50, refundDate: '2026-10-14', categoryId: 9, purchaseId: 81 });
+    post.flush({ ...mockRefund, purchaseId: 81 });
+    let refunds: CreditCardRefundDto[] = [];
+    service.getRefunds(1, 11).subscribe(list => refunds = list);
+    const get = http.expectOne(`${base}/credit-cards/1/bills/11/refunds`);
+    expect(get.request.method).toBe('GET');
+    get.flush([{ ...mockRefund, purchaseId: 81 }, { ...mockRefund, id: 301, purchaseId: null }]);
+    expect(refunds.map(r => r.purchaseId)).toEqual([81, null]);
+  });
+
 });

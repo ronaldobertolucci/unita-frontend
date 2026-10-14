@@ -49,17 +49,30 @@
       }
     </div>
 
+    @if (bill()!.totalAmount <= 0 && bill()!.status !== 'PAID') {
+      <p class="composition-notice">{{ bill()!.totalAmount < 0 ? 'Saldo credor' : 'Fatura zerada' }} · Pagamento indisponível. O saldo permanece nesta fatura, sem depósito na conta ou transferência automática.</p>
+    }
+    @if (savedRefundBill(); as destination) {
+      <div class="review-notice" role="status">
+        Estorno registrado na fatura com vencimento em {{ formatDate(destination.dueDate) }}.
+        Total atualizado: {{ formatCurrency(destination.totalAmount) }}{{ destination.totalAmount < 0 ? ' (saldo credor)' : '' }}.
+        <a class="review-link" [routerLink]="['/credit-cards', cardId, 'bills', destination.id]">Conferir fatura de destino</a>
+      </div>
+    }
     @if (!activeModal()) { <ng-container *ngTemplateOutlet="errorBanner" /> }
     @if (!canChangeComposition()) {
-      <p class="composition-notice">{{ bill()!.status === 'CLOSED' ? 'Reabra esta fatura explicitamente para alterar sua composição. Se o destino estiver fechado, reabra-o separadamente na tela do cartão.' : bill()!.status === 'PAID' ? 'Faturas pagas não permitem movimentações, exclusões ou reabertura.' : 'Atualize a composição antes de fazer alterações.' }}</p>
+      <p class="composition-notice">{{ bill()!.paymentId != null && bill()!.status !== 'PAID' ? 'Esta fatura possui pagamento vinculado e está protegida. Solicite análise operacional antes de alterar sua composição.' : bill()!.status === 'CLOSED' ? 'Reabra esta fatura explicitamente para alterar sua composição ou escolha outra fatura aberta para receber um crédito.' : bill()!.status === 'PAID' ? 'Faturas pagas preservam seu histórico. Para registrar um crédito posterior, escolha outra fatura aberta deste cartão.' : 'Atualize a composição antes de fazer alterações.' }}</p>
     }
-    @if (bill()!.status === 'CLOSED') {
+    @if (!compositionReady()) {
+      <button type="button" class="btn-ghost btn-ghost--sm" [disabled]="isLoading() || isSaving()" (click)="refreshPage()">Atualizar dados</button>
+    }
+    @if (bill()!.status === 'CLOSED' && bill()!.paymentId == null) {
       <div class="action-bar">
         <button class="btn-ghost btn-ghost--sm" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="reopenBill()">Reabrir fatura</button>
       </div>
     }
     <!-- ─── Barra de ações ─── -->
-    @if (canChangeComposition()) {
+    @if (canCreateRefund()) {
       <div class="action-bar">
         <button class="btn-ghost btn-ghost--sm" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="openCreateRefundModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,8 +98,11 @@
         <p>Adicione compras a partir da tela do cartão ou registre estornos aqui.</p>
       </div>
     } @else {
-      <div class="items-list">
-        @for (item of displayItems(); track item.type + '-' + item.id) {
+      @for (section of statementSections(); track section.title) {
+        <section class="statement-section" [attr.aria-label]="section.title">
+          <h3 class="statement-section-title">{{ section.title }}</h3>
+          <div class="items-list">
+        @for (item of section.items; track item.type + '-' + item.id) {
           <div class="item-row">
 
             <div class="item-icon item-icon--{{ item.type === 'refund' ? 'income' : 'expense' }}">
@@ -109,7 +125,8 @@
                 @if (item.type === 'installment') {
                   Parcela {{ item.installmentNumber }}/{{ item.totalInstallments }} · {{ formatDate(item.date) }}
                 } @else {
-                  Estorno · {{ formatDate(item.date) }}
+                  Crédito de estorno · {{ formatDate(item.date) }}
+                  · {{ item.purchaseId == null ? 'Sem compra vinculada' : 'Compra #' + item.purchaseId }}
                 }
               </span>
             </div>
@@ -143,7 +160,9 @@
 
           </div>
         }
-      </div>
+          </div>
+        </section>
+      }
     }
 
   }
@@ -155,10 +174,10 @@
 ══════════════════════════════════════════════════════════════════ -->
 @if (activeModal() === 'create-refund') {
   <div class="modal-overlay" (click)="closeModal()">
-    <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="refundTitle" (click)="$event.stopPropagation()">
 
       <div class="modal-header">
-        <h3>Novo estorno</h3>
+        <h3 id="refundTitle">Novo estorno</h3>
         <button class="modal-close" (click)="closeModal()" aria-label="Fechar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -168,51 +187,69 @@
 
       <ng-container *ngTemplateOutlet="errorBanner" />
 
+      <app-financial-recovery />
+      <p class="composition-notice">O estorno reduz somente a fatura de destino. A compra, suas parcelas e pagamentos anteriores são preservados; não há devolução direta à conta.</p>
+      @if (checkingRefundReferences()) { <p class="composition-notice" role="status">Consultando opções atuais…</p> }
+      @if (!refundReferencesReady() && !checkingRefundReferences()) {
+        <button type="button" class="btn-ghost btn-ghost--sm" (click)="refreshRefundReferences()">Atualizar opções</button>
+      }
       <form [formGroup]="refundForm" (ngSubmit)="submitRefund()" novalidate>
-
-        <div class="field-row">
-          <div class="field" [class.field--invalid]="refAmount.invalid && refAmount.touched">
-            <label for="refAmt">Valor (R$)</label>
-            <input id="refAmt" type="number" formControlName="amount" placeholder="0,00" step="0.01" min="0.01" />
-            @if (refAmount.invalid && refAmount.touched) {
-              <span class="field-error">
-                @if (refAmount.hasError('required')) { Obrigatório }
-                @else { Maior que zero }
-              </span>
-            }
+        <fieldset class="refund-fields" [disabled]="isSaving() || checkingRefundReferences() || !refundReferencesReady() || financialRecovery.state() !== 'clear'">
+          <div class="field" [class.field--invalid]="refundFieldError('creditCardBillId')">
+            <label for="refBill">Fatura de destino (aberta)</label>
+            <select id="refBill" formControlName="creditCardBillId">
+              <option [ngValue]="null" disabled>Selecione a fatura</option>
+              @for (destination of openBills(); track destination.id) {
+                <option [ngValue]="destination.id">Vencimento {{ formatDate(destination.dueDate) }} · {{ formatCurrency(destination.totalAmount) }}</option>
+              }
+            </select>
+            @if (refundFieldError('creditCardBillId'); as error) { <span class="field-error">{{ error }}</span> }
+            @if (openBills().length === 0) { <span class="field-error">Nenhuma fatura aberta disponível. Reabra explicitamente uma fatura fechada e sem pagamento na tela do cartão.</span> }
           </div>
-          <div class="field" [class.field--invalid]="refDate.invalid && refDate.touched">
-            <label for="refDateInp">Data</label>
-            <input id="refDateInp" type="date" formControlName="refundDate" />
-            @if (refDate.invalid && refDate.touched) {
-              <span class="field-error">Data é obrigatória</span>
-            }
+          <div class="field" [class.field--invalid]="refundFieldError('purchaseId')">
+            <label for="refPurchase">Compra de referência (opcional)</label>
+            <select id="refPurchase" formControlName="purchaseId">
+              <option [ngValue]="null">Sem compra vinculada</option>
+              @for (purchase of purchases(); track purchase.id) {
+                <option [ngValue]="purchase.id">#{{ purchase.id }} · {{ purchase.description }} · {{ formatDate(purchase.purchaseDate) }} · {{ formatCurrency(purchase.totalValue) }}</option>
+              }
+            </select>
+            @if (refundFieldError('purchaseId'); as error) { <span class="field-error">{{ error }}</span> }
+            <span class="field-hint">O limite da compra considera os estornos vinculados em todas as faturas, inclusive fechadas e pagas.</span>
           </div>
-        </div>
-
-        <div class="field" [class.field--invalid]="refDescription.invalid && refDescription.touched">
-          <label for="refDesc">Descrição</label>
-          <input id="refDesc" type="text" formControlName="description" placeholder="Ex: Estorno de compra..." autocomplete="off" />
-          @if (refDescription.invalid && refDescription.touched) {
-            <span class="field-error">
-              @if (refDescription.hasError('required')) { Descrição é obrigatória }
-              @else { Máximo de 255 caracteres }
-            </span>
-          }
-        </div>
-
-        <div class="field">
-          <label>Categoria</label>
-          <input type="text" value="Reembolsos" disabled />
-        </div>
-
+          <div class="field-row">
+            <div class="field" [class.field--invalid]="refundFieldError('amount')">
+              <label for="refAmt">Valor (R$)</label>
+              <input id="refAmt" type="text" inputmode="decimal" formControlName="amount" placeholder="0,00" autocomplete="off" />
+              @if (refundFieldError('amount'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
+            <div class="field" [class.field--invalid]="refundFieldError('refundDate')">
+              <label for="refDateInp">Data do crédito</label>
+              <input id="refDateInp" type="date" formControlName="refundDate" />
+              @if (refundFieldError('refundDate'); as error) { <span class="field-error">{{ error }}</span> }
+            </div>
+          </div>
+          <div class="field" [class.field--invalid]="refundFieldError('description')">
+            <label for="refDesc">Descrição</label>
+            <input id="refDesc" type="text" formControlName="description" maxlength="255" placeholder="Ex: Devolução parcial" autocomplete="off" />
+            @if (refundFieldError('description'); as error) { <span class="field-error">{{ error }}</span> }
+          </div>
+          <div class="field" [class.field--invalid]="refundFieldError('categoryId')">
+            <label for="refCategory">Categoria</label>
+            <select id="refCategory" formControlName="categoryId">
+              <option [ngValue]="null" disabled>Selecione a categoria</option>
+              @for (category of refundCategories(); track category.id) { <option [ngValue]="category.id">{{ category.name }}</option> }
+            </select>
+            @if (refundFieldError('categoryId'); as error) { <span class="field-error">{{ error }}</span> }
+            @if (refundCategories().length === 0) { <span class="field-error">Cadastre uma categoria de receita ou neutra antes de registrar.</span> }
+          </div>
+        </fieldset>
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
+          <button type="button" class="btn-secondary" [disabled]="isSaving()" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="!canCreateRefund() || !refundReferencesReady() || checkingRefundReferences() || isLoading() || isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Registrando... } @else { Registrar }
           </button>
         </div>
-
       </form>
     </div>
   </div>
@@ -271,7 +308,7 @@
       </div>
 
       <h3>Excluir estorno?</h3>
-      <p>O estorno <strong>{{ selectedRefundDescription() }}</strong> será removido permanentemente.</p>
+      <p>O estorno <strong>{{ selectedRefundDescription() }}</strong> será removido desta fatura. Somente o crédito será excluído; a compra e seus pagamentos serão preservados.</p>
 
       <ng-container *ngTemplateOutlet="errorBanner" />
 

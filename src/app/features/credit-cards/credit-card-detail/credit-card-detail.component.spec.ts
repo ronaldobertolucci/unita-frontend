@@ -352,7 +352,7 @@ describe('CreditCardDetailComponent', () => {
       component.bills.set([bill]);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).not.toContain('Pagar fatura');
-      expect(fixture.nativeElement.textContent).toContain(totalAmount === 0 ? 'Fatura zerada' : 'Fatura com crédito');
+      expect(fixture.nativeElement.textContent).toContain(totalAmount === 0 ? 'Fatura zerada' : 'Saldo credor');
       component.openPayModal(bill);
       expect(component.activeModal()).toBeNull();
       component.selectedBill.set(bill);
@@ -609,6 +609,17 @@ describe('CreditCardDetailComponent', () => {
       component.submitPurchase();
       expect(creditCardServiceSpy.updatePurchase).not.toHaveBeenCalled();
     });
+  });
+
+  it('blocks payment of nonpositive totals and bills with legacy payments', () => {
+    setup();
+    for (const bill of [{ ...mockBillClosed, totalAmount: 0 }, { ...mockBillClosed, totalAmount: -40 },
+      { ...mockBillClosed, paymentId: 33 }]) {
+      expect(component.canPay(bill)).toBe(false);
+      component.openPayModal(bill);
+    }
+    expect(component.activeModal()).toBeNull();
+    expect(creditCardServiceSpy.payBill).not.toHaveBeenCalled();
   });
 
 });

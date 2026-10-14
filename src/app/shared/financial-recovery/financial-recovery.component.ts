@@ -41,6 +41,20 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
               } @empty { <li>Nenhuma compra disponível neste cartão.</li> }
             </ul>
           }
+          @if (recovery.operation()?.reviewRefunds) {
+            <p>Estornos consultados. Compare a descrição, a data, o valor e a compra vinculada. Um novo envio pode criar outro crédito; dados iguais não comprovam duplicidade.</p>
+            <ul class="review-history">
+              @for (refund of recovery.refunds(); track refund.id) {
+                <li><span>#{{ refund.id }} · {{ refund.refundDate | date:'dd/MM/yyyy':'UTC' }} · {{ refund.description }} · {{ refund.purchaseId == null ? 'Sem compra vinculada' : 'Compra #' + refund.purchaseId }}</span><strong>+ {{ formatCurrency(refund.amount) }}</strong></li>
+              } @empty { <li>Nenhum estorno disponível nesta fatura.</li> }
+            </ul>
+            <p>Parcelas do extrato da fatura</p>
+            <ul class="review-history">
+              @for (installment of recovery.refundStatement()?.installments ?? []; track installment.id) {
+                <li><span>{{ installment.description }} · Parcela {{ installment.installmentNumber }}/{{ installment.totalInstallments }}</span><strong>{{ formatCurrency(installment.amount) }}</strong></li>
+              } @empty { <li>Nenhuma parcela disponível nesta fatura.</li> }
+            </ul>
+          }
           <p>A consulta mostra o estado atual. Ela não comprova, sozinha, o resultado de uma operação sem resposta. Contas removidas ou indisponíveis não aparecem.</p>
         }
         <div class="review-actions">

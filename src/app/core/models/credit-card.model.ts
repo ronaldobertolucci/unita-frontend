@@ -60,6 +60,7 @@ export interface CreditCardRefundDto {
   amount: number;
   refundDate: string;         // yyyy-MM-dd
   category: InstallmentCategory;
+  purchaseId: number | null;
 }
 
 export interface BillStatementDto {
@@ -83,6 +84,7 @@ export interface BillRefundItem {
   amount: number;
   refundDate: string;
   category: InstallmentCategory;
+  purchaseId: number | null;
 }
 
 export interface CardBrandDto {
@@ -133,6 +135,7 @@ export interface CreateRefundPayload {
   amount: number;
   refundDate: string;
   categoryId: number;
+  purchaseId?: number | null;
 }
 
 export interface PayBillPayload {

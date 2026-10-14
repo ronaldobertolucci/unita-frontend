@@ -393,6 +393,8 @@
   padding: 1.75rem;
   width: 100%;
   max-width: 420px;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -655,3 +657,11 @@
   .item-body { flex-basis: calc(100% - 52px); }
   .item-amount { margin-left: auto; }
 }
+
+.refund-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.refund-fields:disabled { opacity: 0.65; }
+.field-hint { color: var(--text-muted); font-size: 0.775rem; line-height: 1.5; }
+.bill-header-breakdown { flex-wrap: wrap; }
+
+.statement-section { margin-bottom: 1.25rem; }
+.statement-section-title { font-family: var(--font-display); font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }

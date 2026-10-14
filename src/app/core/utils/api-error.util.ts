@@ -1,5 +1,8 @@
 const ERROR_MAP: Record<string, string> = {
   'Invalid input data': 'Verifique os campos informados antes de enviar novamente.',
+  'amount: accumulated refunds must not exceed purchase totalValue': 'O total de estornos vinculados, incluindo outras faturas, não pode ultrapassar o valor original da compra. Confira os estornos e corrija o valor.',
+  'Purchase is referenced by refunds and cannot be changed or deleted': 'Esta compra possui estornos vinculados e não pode ser corrigida ou excluída. Estornos em faturas fechadas ou pagas permanecem protegidos.',
+  'Resource is linked to a protected financial operation and cannot be deleted': 'Este recurso está vinculado a uma operação financeira protegida e não pode ser excluído.',
   'installments: count must equal installmentsCount': 'Informe exatamente a quantidade de parcelas indicada na compra.',
   'installments: numbers must be sequential from 1 to installmentsCount without duplicates': 'O plano deve conter cada número de parcela uma única vez, de 1 até a quantidade informada.',
   'installments: sum must equal totalValue': 'A soma das parcelas deve ser exatamente igual ao valor total da compra.',

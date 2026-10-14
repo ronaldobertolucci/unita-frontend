@@ -216,12 +216,12 @@ export class CreditCardDetailComponent implements OnInit {
   // ─── Ações de fatura ─────────────────────────────────────────────────────
 
   closeBill(bill: CreditCardBillDto): void {
-    if (bill.status !== 'OPEN') return;
+    if (bill.status !== 'OPEN' || bill.paymentId != null) return;
     this.changeBillState(bill, () => this.creditCardService.closeBill(this.cardId, bill.id));
   }
 
   reopenBill(bill: CreditCardBillDto): void {
-    if (bill.status !== 'CLOSED') return;
+    if (bill.status !== 'CLOSED' || bill.paymentId != null) return;
     this.changeBillState(bill, () => this.creditCardService.reopenBill(this.cardId, bill.id));
   }
 
@@ -250,7 +250,7 @@ export class CreditCardDetailComponent implements OnInit {
   }
 
   canPay(bill: CreditCardBillDto | null): boolean {
-    return bill?.status === 'CLOSED' && bill.totalAmount > 0;
+    return bill?.status === 'CLOSED' && bill.paymentId == null && bill.totalAmount > 0;
   }
 
   private refreshBillState(billId: number): Observable<unknown> {

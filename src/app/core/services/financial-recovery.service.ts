@@ -5,7 +5,7 @@ import { PocketService } from './pocket.service';
 import { TransactionService } from './transaction.service';
 import { CreditCardService } from './credit-card.service';
 import { TransactionDto } from '../models/transaction.model';
-import { CreditCardBillDto, CreditCardPurchaseDto } from '../models/credit-card.model';
+import { BillStatementDto, CreditCardBillDto, CreditCardPurchaseDto, CreditCardRefundDto } from '../models/credit-card.model';
 import { isUncertainFinancialWrite } from '../utils/financial-operation.util';
 
 interface PendingOperation {
@@ -14,6 +14,7 @@ interface PendingOperation {
   cardId?: number;
   billId?: number;
   reviewPurchases?: boolean;
+  reviewRefunds?: boolean;
   purchaseId?: number;
   message?: string;
 }
@@ -35,6 +36,8 @@ export class FinancialRecoveryService {
   readonly pockets = signal<PocketReview[]>([]);
   readonly bills = signal<CreditCardBillDto[]>([]);
   readonly purchases = signal<CreditCardPurchaseDto[]>([]);
+  readonly refunds = signal<CreditCardRefundDto[]>([]);
+  readonly refundStatement = signal<BillStatementDto | null>(null);
 
   constructor() {
     this.session.registerCleanup(() => this.clear(), inject(DestroyRef));
@@ -45,6 +48,8 @@ export class FinancialRecoveryService {
     this.pockets.set([]);
     this.bills.set([]);
     this.purchases.set([]);
+    this.refunds.set([]);
+    this.refundStatement.set(null);
     this.state.set('pending');
   }
 
@@ -88,11 +93,16 @@ export class FinancialRecoveryService {
     if (!operation || this.state() === 'checking' || this.state() === 'sending') return;
     const version = this.session.version();
     this.state.set('checking');
-    const emptyCard = { bills: [] as CreditCardBillDto[], purchases: [] as CreditCardPurchaseDto[] };
+    const emptyCard = { bills: [] as CreditCardBillDto[], purchases: [] as CreditCardPurchaseDto[],
+      refunds: [] as CreditCardRefundDto[], statement: null as BillStatementDto | null };
     const cards = operation.cardId === undefined ? of(emptyCard) :
       this.injector.get(CreditCardService).loadCreditCards().pipe(switchMap(list =>
         list.some(card => card.id === operation.cardId)
-          ? forkJoin({ bills: this.readBills(operation), purchases: this.readPurchases(operation) })
+          ? forkJoin({ bills: this.readBills(operation), purchases: this.readPurchases(operation),
+            refunds: operation.reviewRefunds && operation.billId !== undefined
+              ? this.injector.get(CreditCardService).getRefunds(operation.cardId!, operation.billId) : of([]),
+            statement: operation.reviewRefunds && operation.billId !== undefined
+              ? this.injector.get(CreditCardService).getBillStatement(operation.cardId!, operation.billId) : of(null) })
           : of(emptyCard)));
     this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), card: cards }))
       .pipe(finalize(() => {
@@ -102,6 +112,8 @@ export class FinancialRecoveryService {
           this.pockets.set(data.pockets);
           this.bills.set(data.card.bills);
           this.purchases.set(data.card.purchases);
+          this.refunds.set(data.card.refunds);
+          this.refundStatement.set(data.card.statement);
           this.state.set('review');
         },
         error: () => {},
@@ -137,5 +149,7 @@ export class FinancialRecoveryService {
     this.pockets.set([]);
     this.bills.set([]);
     this.purchases.set([]);
+    this.refunds.set([]);
+    this.refundStatement.set(null);
   }
 }

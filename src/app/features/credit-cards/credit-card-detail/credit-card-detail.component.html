@@ -81,6 +81,7 @@
               <div class="bill-right">
                 <div class="bill-amount-wrap">
                   <span class="bill-amount">{{ formatCurrency(bill.totalAmount) }}</span>
+                  @if (bill.totalAmount < 0) { <span class="bill-label">Saldo credor</span> }
                   <span class="bill-status-badge bill-status-badge--{{ bill.status | lowercase }}">
                     {{ getBillStatusLabel(bill.status) }}
                   </span>
@@ -100,14 +101,14 @@
             @if (bill.status !== 'PAID') {
               <div class="bill-actions">
                 @if (bill.status === 'OPEN') {
-                  <button class="btn-bill-action" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="closeBill(bill)">Fechar fatura</button>
+                  <button class="btn-bill-action" [disabled]="bill.paymentId != null || isSaving() || financialRecovery.state() !== 'clear'" (click)="closeBill(bill)">Fechar fatura</button>
                 }
                 @if (bill.status === 'CLOSED') {
-                  <button class="btn-bill-action" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="reopenBill(bill)">Reabrir</button>
+                  <button class="btn-bill-action" [disabled]="bill.paymentId != null || isSaving() || financialRecovery.state() !== 'clear'" (click)="reopenBill(bill)">Reabrir</button>
                   @if (canPay(bill)) {
                   <button class="btn-bill-action btn-bill-action--primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="openPayModal(bill)">Pagar fatura</button>
                   } @else {
-                    <span class="bill-period">{{ bill.totalAmount < 0 ? 'Fatura com crédito · pagamento indisponível' : 'Fatura zerada · pagamento indisponível' }}</span>
+                    <span class="bill-period">{{ bill.paymentId != null ? 'Fatura com pagamento vinculado · confira o histórico' : bill.totalAmount < 0 ? 'Saldo credor nesta fatura · pagamento indisponível' : 'Fatura zerada · pagamento indisponível' }}</span>
                   }
                 }
               </div>
@@ -191,7 +192,7 @@
       @if (errorMessage()) { <div class="modal-error" role="alert">{{ errorMessage() }}</div> }
       @if (checkingComposition()) { <p class="field-empty-hint" role="status">Consultando dados atuais…</p> }
       @if (editingPurchaseId()) {
-        <p class="plan-hint">A correção substitui todas as parcelas e recalcula o calendário a partir da data da compra, inclusive parcelas movidas. Somente faturas abertas e sem pagamento permitem a alteração.</p>
+        <p class="plan-hint">A correção substitui todas as parcelas e recalcula o calendário a partir da data da compra, inclusive parcelas movidas. Somente faturas abertas e sem pagamento permitem a alteração. Compras com estornos vinculados não podem ser corrigidas ou excluídas.</p>
         @if (!canEditPurchase()) { <p class="field-error">A compra está indisponível ou contém faturas protegidas. Confira o histórico e as faturas.</p> }
       }
       <form [formGroup]="purchaseForm" (ngSubmit)="submitPurchase()" novalidate>
