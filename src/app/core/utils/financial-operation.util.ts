@@ -26,7 +26,7 @@ export function financialErrorMessage(error: any, resource: 'transaction' | 'poc
       pocket: 'Este pocket contém lançamentos vinculados a operações financeiras e não pode ser excluído.',
       card: 'Este cartão possui pagamentos de fatura vinculados e não pode ser excluído.',
     };
-    return messages[resource];
+    return resource === 'card' ? translateApiError(error?.error?.message, messages.card) : messages[resource];
   }
   if (error?.status === 404) return 'Recurso indisponível. Atualize a seleção.';
   if (error?.status === 401) return 'Recupere sua sessão e confira os dados antes de enviar novamente.';

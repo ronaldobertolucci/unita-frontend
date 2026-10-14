@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 
@@ -62,6 +62,10 @@ const mockRefundDto: CreditCardRefundDto = {
 
 function buildCreditCardService() {
   return {
+    getBills: jest.fn().mockReturnValue(of([mockBillOpen])),
+    getInstallments: jest.fn().mockReturnValue(of([{ ...mockInstallmentItem, creditCardBillId: 10, installmentDate: '2025-04-01', billDueDate: '2025-04-22' }])),
+    updateInstallment: jest.fn().mockReturnValue(of({ ...mockInstallmentItem, creditCardBillId: 10, installmentDate: '2025-04-01', billDueDate: '2025-04-22' })),
+    reopenBill: jest.fn().mockReturnValue(of(mockBillOpen)),
     getBill: jest.fn().mockReturnValue(of(mockBillOpen)),
     getBillStatement: jest.fn().mockReturnValue(of(mockStatement)),
     getPurchases: jest.fn().mockReturnValue(of([mockPurchase])),
@@ -266,6 +270,7 @@ describe('CreditCardBillDetailComponent', () => {
     it('should delete purchase, reload statement and close modal', () => {
       creditCardServiceSpy.getBill.mockReturnValue(of(mockBillOpen));
       component.selectedPurchaseId.set(100);
+      creditCardServiceSpy.getPurchases.mockReturnValue(of([]));
       component.deletePurchase();
       expect(creditCardServiceSpy.deletePurchase).toHaveBeenCalledWith(1, 100);
       expect(creditCardServiceSpy.getBillStatement).toHaveBeenCalledTimes(2); // init + reload
@@ -366,4 +371,107 @@ describe('CreditCardBillDetailComponent', () => {
       expect(component.getBillStatusLabel('PAID')).toBe('Paga');
     });
   });
+  describe('US-05 lifecycle', () => {
+    beforeEach(() => setup());
+
+    it.each(['OPEN', 'CLOSED', 'PAID'] as const)('permits movement from %s only to OPEN, preserving amount', source => {
+      component.bill.set({ ...mockBillOpen, status: source });
+      for (const destination of ['OPEN', 'CLOSED', 'PAID'] as const) {
+        component.bills.set([mockBillOpen, { ...mockBillOpen, id: 11, status: destination }]);
+        creditCardServiceSpy.updateInstallment.mockClear();
+        component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
+        component.moveForm.setValue({ creditCardBillId: 11 });
+        component.moveInstallment();
+        if (source === 'OPEN' && destination === 'OPEN') {
+          expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledWith(1, 100, 200, { amount: 100, creditCardBillId: 11 });
+        } else {
+          expect(creditCardServiceSpy.updateInstallment).not.toHaveBeenCalled();
+        }
+        component.bill.set({ ...mockBillOpen, status: source });
+      }
+    });
+
+    it('allows same-bill movement and reloads the date returned by the server', () => {
+      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ ...mockInstallmentItem, creditCardBillId: 10, installmentDate: '2025-03-15', billDueDate: '2025-04-22' }]));
+      component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
+      component.moveInstallment();
+      expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledWith(1, 100, 200, { amount: 100, creditCardBillId: 10 });
+      expect(component.displayItems().find(i => i.id === 200)?.date).toBe('2025-03-15');
+      expect(creditCardServiceSpy.getBills).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['CLOSED', 'PAID'] as const)('blocks refunds and purchase deletion with %s bills', status => {
+      component.bill.set({ ...mockBillOpen, status });
+      component.bills.set([{ ...mockBillOpen, status }]);
+      component.openCreateRefundModal();
+      component.submitRefund();
+      component.openDeleteRefundConfirm(300, 'Estorno X');
+      component.selectedRefundId.set(300);
+      component.deleteRefund();
+      component.selectedPurchaseId.set(100);
+      component.deletePurchase();
+      expect(creditCardServiceSpy.createRefund).not.toHaveBeenCalled();
+      expect(creditCardServiceSpy.deleteRefund).not.toHaveBeenCalled();
+      expect(creditCardServiceSpy.deletePurchase).not.toHaveBeenCalled();
+    });
+
+    it('blocks purchase deletion if any installment is protected or its bill is unknown', () => {
+      component.purchaseInstallments.update(lists => ({ ...lists, 100: [...lists[100], { ...lists[100][0], id: 201, creditCardBillId: 11 }] }));
+      expect(component.canDeletePurchase(100)).toBe(false);
+      component.bills.update(list => [...list, { ...mockBillPaid, id: 11 }]);
+      expect(component.canDeletePurchase(100)).toBe(false);
+    });
+
+    it('resolves identical purchase descriptions by installment ID', () => {
+      component.purchases.update(list => [{ ...mockPurchase, id: 101 }, ...list]);
+      component.purchaseInstallments.update(lists => ({ ...lists, 101: [{ ...lists[100][0], id: 201 }] }));
+      expect(component.displayItems().find(i => i.id === 200)?.purchaseId).toBe(100);
+    });
+
+    it('reopens CLOSED explicitly and never reopens PAID', () => {
+      component.bill.set({ ...mockBillOpen, status: 'CLOSED' });
+      component.reopenBill();
+      expect(creditCardServiceSpy.reopenBill).toHaveBeenCalledWith(1, 10);
+      expect(component.canChangeComposition()).toBe(true);
+      component.bill.set(mockBillPaid);
+      component.reopenBill();
+      expect(creditCardServiceSpy.reopenBill).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads composition on conflict without repeating the movement', () => {
+      creditCardServiceSpy.updateInstallment.mockReturnValue(throwError(() => ({ status: 409, error: { message: 'Bill composition is protected. Only open bills without a payment can be changed' } })));
+      component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
+      component.moveInstallment();
+      expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledTimes(1);
+      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledTimes(2);
+      expect(component.errorMessage()).toContain('protegida');
+    });
+  });
+
+  it('prevents double click and dismissal while movement is pending', () => {
+    setup();
+    const response = new Subject<any>();
+    creditCardServiceSpy.updateInstallment.mockReturnValue(response);
+    component.openMoveModal(component.displayItems().find(i => i.type === 'installment')!);
+    component.moveInstallment();
+    component.moveInstallment();
+    component.closeModal();
+    expect(creditCardServiceSpy.updateInstallment).toHaveBeenCalledTimes(1);
+    expect(component.activeModal()).toBe('move-installment');
+    response.next({ ...mockInstallmentItem, creditCardBillId: 10, installmentDate: '2025-04-01' });
+    response.complete();
+    expect(component.activeModal()).toBeNull();
+  });
+
+  it('renders explicit reopening and disables composition actions in CLOSED', () => {
+    setup();
+    component.bill.set({ ...mockBillOpen, status: 'CLOSED' });
+    component.bills.set([{ ...mockBillOpen, status: 'CLOSED' }]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Reabrir fatura');
+    expect(fixture.nativeElement.textContent).not.toContain('Novo estorno');
+    const buttons = fixture.nativeElement.querySelectorAll('.item-delete-btn');
+    expect([...buttons].every((button: any) => button.disabled)).toBe(true);
+  });
+
 });

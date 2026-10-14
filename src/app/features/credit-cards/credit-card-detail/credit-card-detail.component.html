@@ -179,6 +179,12 @@
 
       <ng-container *ngTemplateOutlet="errorBanner" />
 
+      @if (reviewedPurchases(); as recorded) {
+        <p class="field-error">Confira a lista consultada antes de decidir criar outra compra. Não há reenvio automático.</p>
+        @for (purchase of recorded; track purchase.id) {
+          <p class="bill-dates">{{ purchase.description }} · {{ formatDate(purchase.purchaseDate) }} · {{ formatCurrency(purchase.totalValue) }}</p>
+        }
+      }
       <form [formGroup]="purchaseStep1Form" (ngSubmit)="submitPurchaseStep1()" novalidate>
 
         <div class="field-row">
@@ -265,6 +271,15 @@
 
       <ng-container *ngTemplateOutlet="errorBanner" />
 
+      @if (reviewedInstallments(); as recorded) {
+        <p class="field-error">Confira as parcelas consultadas antes de decidir por um novo envio.</p>
+        @for (installment of recorded; track installment.id) {
+          <p class="bill-dates">Parcela {{ installment.installmentNumber }} · {{ formatCurrency(installment.amount) }} · Vencimento {{ formatDate(installment.billDueDate) }}</p>
+        }
+        @if (currentInstallmentRecorded()) {
+          <button type="button" class="btn-secondary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="acceptRecordedInstallment()">Reconheço esta parcela; continuar sem reenviar</button>
+        }
+      }
       <form [formGroup]="installmentForm" (ngSubmit)="submitInstallment()" novalidate>
 
         <div class="field" [class.field--invalid]="instAmount.invalid && instAmount.touched">
@@ -304,7 +319,7 @@
               Excluir compra
             </button>
           }
-          <button type="submit" class="btn-primary btn-primary--full" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
+          <button type="submit" class="btn-primary btn-primary--full" [disabled]="checkingComposition() || currentInstallmentRecorded() || isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) {
               <span class="spinner"></span> Salvando...
             } @else if (currentInstallmentIndex() === currentPurchase()!.installmentsCount) {

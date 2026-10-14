@@ -292,7 +292,7 @@ describe('CreditCardsComponent', () => {
 
     it('should call deleteCreditCard and close modal on success', () => {
       creditCardServiceSpy.deleteCreditCard.mockReturnValue(of(undefined));
-      component.selectedCard.set(mockCard);
+      component.openDetailModal(mockCard);
       component.deleteCreditCard();
       expect(creditCardServiceSpy.deleteCreditCard).toHaveBeenCalledWith(1);
       expect(component.activeModal()).toBeNull();
@@ -302,7 +302,7 @@ describe('CreditCardsComponent', () => {
       creditCardServiceSpy.deleteCreditCard.mockReturnValue(
         throwError(() => ({ error: { message: 'Erro interno' } }))
       );
-      component.selectedCard.set(mockCard);
+      component.openDetailModal(mockCard);
       component.deleteCreditCard();
       expect(component.errorMessage()).toBeTruthy();
       expect(component.isSaving()).toBe(false);
@@ -321,13 +321,32 @@ describe('CreditCardsComponent', () => {
 
   it('retains a card with payments on HTTP 409 and refreshes the list and history', () => {
     setup([mockCard]);
-    component.selectedCard.set(mockCard);
+    component.openDetailModal(mockCard);
     creditCardServiceSpy.deleteCreditCard.mockReturnValue(throwError(() => ({ status: 409 })));
     component.deleteCreditCard();
     expect(creditCardServiceSpy.creditCards()).toEqual([mockCard]);
     expect(component.errorMessage()).toContain('pagamentos de fatura');
     expect(creditCardServiceSpy.loadCreditCards).toHaveBeenCalledTimes(2);
     expect(creditCardServiceSpy.getBills).toHaveBeenCalledWith(mockCard.id);
+  });
+
+  it.each(['CLOSED', 'PAID'])('blocks deletion even for an empty %s bill', status => {
+    setup([mockCard]);
+    creditCardServiceSpy.getBills.mockReturnValue(of([{ id: 10, status, totalAmount: 0 }]));
+    component.openDetailModal(mockCard);
+    component.openDeleteConfirm();
+    component.deleteCreditCard();
+    expect(component.canDeleteCard()).toBe(false);
+    expect(creditCardServiceSpy.deleteCreditCard).not.toHaveBeenCalled();
+  });
+
+  it('keeps deletion disabled if bills could not be read', () => {
+    setup([mockCard]);
+    creditCardServiceSpy.getBills.mockReturnValue(throwError(() => ({ status: 503 })));
+    component.openDetailModal(mockCard);
+    component.deleteCreditCard();
+    expect(component.canDeleteCard()).toBe(false);
+    expect(creditCardServiceSpy.deleteCreditCard).not.toHaveBeenCalled();
   });
 
 });

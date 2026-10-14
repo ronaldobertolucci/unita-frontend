@@ -286,8 +286,10 @@
           </div>
         </div>
 
+        @if (checkingDeletion()) { <p class="field-error">Verificando as faturas antes de permitir exclusão...</p> }
+        @else if (deletionBills() && !canDeleteCard()) { <p class="field-error">Este cartão possui faturas fechadas ou pagas, inclusive vazias, e não pode ser excluído.</p> }
         <div class="modal-actions modal-actions--between">
-          <button type="button" class="btn-action btn-action--danger" (click)="openDeleteConfirm()">
+          <button type="button" class="btn-action btn-action--danger" [disabled]="!canDeleteCard() || isSaving()" (click)="openDeleteConfirm()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -376,7 +378,7 @@
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deleteCreditCard()">
+        <button type="button" class="btn-danger" [disabled]="!canDeleteCard() || isSaving() || financialRecovery.state() !== 'clear'" (click)="deleteCreditCard()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
         </button>
       </div>

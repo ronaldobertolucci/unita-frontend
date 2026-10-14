@@ -55,6 +55,8 @@ function buildCreditCardService() {
     payBill: jest.fn().mockReturnValue(of({ ...mockBillClosed, status: 'PAID' as const })),
     createPurchase: jest.fn().mockReturnValue(of(mockPurchase)),
     deletePurchase: jest.fn().mockReturnValue(of(undefined)),
+    getPurchases: jest.fn().mockReturnValue(of([mockPurchase])),
+    getInstallments: jest.fn().mockReturnValue(of([])),
     createInstallment: jest.fn().mockReturnValue(of({ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 10, billDueDate: '2025-04-22', category: mockCategory })),
   };
 }
@@ -201,6 +203,7 @@ describe('CreditCardDetailComponent', () => {
     beforeEach(() => setup());
 
     it('should update bill status in signal on success', () => {
+      creditCardServiceSpy.getBills.mockReturnValue(of([{ ...mockBillOpen, status: 'CLOSED' }, mockBillClosed, mockBillPaid]));
       component.closeBill(mockBillOpen);
       expect(creditCardServiceSpy.closeBill).toHaveBeenCalledWith(1, 10);
       expect(component.bills().find(b => b.id === 10)?.status).toBe('CLOSED');
@@ -221,6 +224,7 @@ describe('CreditCardDetailComponent', () => {
     beforeEach(() => setup());
 
     it('should update bill status to OPEN on success', () => {
+      creditCardServiceSpy.getBills.mockReturnValue(of([mockBillOpen, { ...mockBillClosed, status: 'OPEN' }, mockBillPaid]));
       component.reopenBill(mockBillClosed);
       expect(creditCardServiceSpy.reopenBill).toHaveBeenCalledWith(1, 11);
       expect(component.bills().find(b => b.id === 11)?.status).toBe('OPEN');
@@ -562,6 +566,36 @@ describe('CreditCardDetailComponent', () => {
       expect(component.bills().find(b => b.id === 11)?.status).toBe('PAID');
       component.payBill();
       expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('US-05 legacy purchase recovery', () => {
+    it('reads installments before deleting the whole purchase and blocks a protected installment', () => {
+      setup();
+      component.currentPurchase.set(mockPurchase);
+      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 11, billDueDate: '2025-03-22' }]));
+      component.deletePurchaseFromStep2();
+      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledWith(1, 100);
+      expect(creditCardServiceSpy.deletePurchase).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('protegida');
+    });
+
+    it('consults an installment after losing its POST response and requires a decision before continuing', () => {
+      setup();
+      component.currentPurchase.set(mockPurchase);
+      component.activeModal.set('create-purchase-step2');
+      component.installmentForm.setValue({ amount: 100, categoryId: 1 });
+      creditCardServiceSpy.getInstallments.mockReturnValue(of([{ id: 200, installmentNumber: 1, amount: 100, creditCardBillId: 10, billDueDate: '2025-04-22' }]));
+      creditCardServiceSpy.createInstallment.mockReturnValue(throwError(() => ({ status: 0 })));
+      component.submitInstallment();
+      expect(creditCardServiceSpy.getInstallments).toHaveBeenCalledWith(1, 100);
+      expect(component.currentInstallmentRecorded()).toBe(true);
+      expect(component.currentInstallmentIndex()).toBe(1);
+      component.financialRecovery.confirm();
+      component.submitInstallment();
+      expect(creditCardServiceSpy.createInstallment).toHaveBeenCalledTimes(1);
+      component.acceptRecordedInstallment();
+      expect(component.currentInstallmentIndex()).toBe(2);
     });
   });
 

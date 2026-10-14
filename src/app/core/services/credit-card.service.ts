@@ -98,14 +98,14 @@ export class CreditCardService {
   closeBill(cardId: number, billId: number): Observable<CreditCardBillDto> {
     return this.session.scoped(() => this.http.put<CreditCardBillDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/close`,
-      {}
+      null
     ));
   }
 
   reopenBill(cardId: number, billId: number): Observable<CreditCardBillDto> {
     return this.session.scoped(() => this.http.put<CreditCardBillDto>(
       `${this.base}/credit-cards/${cardId}/bills/${billId}/reopen`,
-      {}
+      null
     ));
   }
 

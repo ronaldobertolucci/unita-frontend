@@ -1,4 +1,10 @@
 const ERROR_MAP: Record<string, string> = {
+  'Bill composition is protected. Only open bills without a payment can be changed': 'Esta fatura está protegida. Somente faturas abertas e sem pagamento permitem alterações. Reabra uma fatura fechada explicitamente antes de corrigir sua composição.',
+  'Individual installment deletion is not allowed. Delete the eligible purchase instead': 'Não é possível excluir uma parcela isolada. Exclua a compra inteira quando todas as parcelas estiverem em faturas abertas.',
+  'Moving an installment must preserve its amount': 'A movimentação deve preservar o valor atual da parcela.',
+  'Credit card contains protected bills and cannot be deleted': 'Este cartão possui faturas fechadas ou pagas e não pode ser excluído, mesmo que estejam vazias.',
+  'Credit card contains bill payments and cannot be deleted': 'Este cartão possui pagamentos de fatura vinculados e não pode ser excluído.',
+
   'Only closed bills can be paid': 'Somente faturas fechadas podem ser pagas. Confira o estado atualizado da fatura.',
   'Only bills with a positive total can be paid': 'Faturas zeradas ou com crédito não podem ser pagas.',
   'Only open bills can be closed': 'Somente faturas abertas podem ser fechadas.',

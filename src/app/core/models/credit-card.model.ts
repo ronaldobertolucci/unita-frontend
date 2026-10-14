@@ -35,6 +35,7 @@ export interface CreditCardInstallmentDto {
   installmentNumber: number;
   amount: number;
   creditCardBillId: number;
+  installmentDate: string;    // yyyy-MM-dd, definida pelo backend
   billDueDate: string;        // yyyy-MM-dd
   category: InstallmentCategory;
   // campos extras usados no BillStatement

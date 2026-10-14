@@ -3,7 +3,7 @@ import { FinancialRecoveryService } from '../../../core/services/financial-recov
 import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 import { Component, OnInit, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, finalize, Observable, tap } from 'rxjs';
+import { forkJoin, finalize, Observable, tap, switchMap, throwError } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -11,7 +11,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CreditCardService } from '../../../core/services/credit-card.service';
 import { PocketService } from '../../../core/services/pocket.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { CreditCardDto, CreditCardBillDto, BillStatus, CreditCardPurchaseDto } from '../../../core/models/credit-card.model';
+import { CreditCardDto, CreditCardBillDto, BillStatus, CreditCardPurchaseDto, CreditCardInstallmentDto } from '../../../core/models/credit-card.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
 
 type ModalType =
@@ -73,6 +73,24 @@ export class CreditCardDetailComponent implements OnInit {
   );
 
   // ─── Estado do fluxo de criação de compra ────────────────────────────────
+
+  readonly reviewedInstallments = signal<CreditCardInstallmentDto[] | null>(null);
+  readonly reviewedPurchases = signal<CreditCardPurchaseDto[] | null>(null);
+  readonly checkingComposition = signal(false);
+  readonly currentInstallmentRecorded = computed(() => this.reviewedInstallments()?.some(i => i.installmentNumber === this.currentInstallmentIndex()) ?? false);
+
+  acceptRecordedInstallment(): void {
+    if (!this.currentInstallmentRecorded() || this.financialRecovery.state() !== 'clear' || this.isSaving()) return;
+    const purchase = this.currentPurchase();
+    if (!purchase) return;
+    if (this.currentInstallmentIndex() === purchase.installmentsCount) {
+      this.loadBills();
+      this.closeModal();
+    } else {
+      this.currentInstallmentIndex.update(index => index + 1);
+      this.errorMessage.set(null);
+    }
+  }
 
   readonly currentPurchase = signal<CreditCardPurchaseDto | null>(null);
   readonly currentInstallmentIndex = signal(1);
@@ -181,7 +199,7 @@ readonly expenseCategories = computed(() =>
     this.inlineError.set(null);
     const operation = { label: `Alteração da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [], cardId: this.cardId, billId: bill.id };
     this.financialRecovery.trackWrite(operation, request()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: updated => { this.replaceBill(updated); this.isSaving.set(false); },
+      next: updated => { this.replaceBill(updated); this.loadBills(); this.isSaving.set(false); },
       error: err => {
         this.inlineError.set({ billId: bill.id, message: financialWriteErrorMessage(err, 'Erro ao alterar fatura.') });
         if (isUncertainFinancialWrite(err)) {
@@ -273,12 +291,18 @@ readonly expenseCategories = computed(() =>
   // ─── Criação de compra ────────────────────────────────────────────────────
 
   openCreatePurchaseModal(): void {
+    if (this.isSaving() || this.checkingComposition() || this.financialRecovery.state() !== 'clear') return;
+    this.currentPurchase.set(null);
+    this.currentInstallmentIndex.set(1);
+    this.reviewedInstallments.set(null);
+    this.reviewedPurchases.set(null);
     this.purchaseStep1Form.reset({ purchaseDate: this.todayString() });
     this.errorMessage.set(null);
     this.activeModal.set('create-purchase-step1');
   }
 
   submitPurchaseStep1(): void {
+    if (this.checkingComposition()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.purchaseStep1Form.invalid) {
       this.purchaseStep1Form.markAllAsTouched();
@@ -310,6 +334,7 @@ readonly expenseCategories = computed(() =>
   }
 
   submitInstallment(): void {
+    if (this.checkingComposition() || this.currentInstallmentRecorded()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.installmentForm.invalid) {
       this.installmentForm.markAllAsTouched();
@@ -368,7 +393,16 @@ readonly expenseCategories = computed(() =>
     const purchase = this.currentPurchase();
     if (!purchase) return;
     this.isSaving.set(true);
-    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.deletePurchase(this.cardId, purchase.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    forkJoin({
+      bills: this.creditCardService.getBills(this.cardId),
+      installments: this.creditCardService.getInstallments(this.cardId, purchase.id),
+    }).pipe(switchMap(({ bills, installments }) => {
+      this.bills.set(bills);
+      if (!installments.every(i => bills.some(b => b.id === i.creditCardBillId && b.status === 'OPEN'))) {
+        return throwError(() => ({ status: 409, error: { message: 'Bill composition is protected. Only open bills without a payment can be changed' } }));
+      }
+      return this.financialRecovery.trackWrite({ label: 'Exclusão de compra inteira', pocketIds: [], cardId: this.cardId }, this.creditCardService.deletePurchase(this.cardId, purchase.id));
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.loadBills();
         this.currentPurchase.set(null);
@@ -387,7 +421,19 @@ readonly expenseCategories = computed(() =>
 
   private handleCompositionError(error: any, fallback: string): void {
     this.errorMessage.set(financialWriteErrorMessage(error, fallback));
-    if (error?.status === 409 || isUncertainFinancialWrite(error)) this.loadBills();
+    if (error?.status === 409 || error?.status === 404 || isUncertainFinancialWrite(error)) {
+      this.loadBills();
+      this.checkingComposition.set(true);
+      const purchase = this.currentPurchase();
+      const read: Observable<unknown> = purchase
+        ? this.creditCardService.getInstallments(this.cardId, purchase.id).pipe(tap(list => this.reviewedInstallments.set(list)))
+        : this.creditCardService.getPurchases(this.cardId).pipe(tap(list => this.reviewedPurchases.set(list)));
+      read.pipe(finalize(() => this.checkingComposition.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        error: () => {
+          this.financialRecovery.mark({ label: 'Conferência de compra ou parcela', pocketIds: [], cardId: this.cardId, message: 'Não foi possível consultar a composição. Confira o histórico antes de decidir por um novo envio.' });
+        },
+      });
+    }
     if (isUncertainFinancialWrite(error)) {
       this.financialRecovery.mark({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId, message: financialWriteErrorMessage(error, fallback) });
       this.financialRecovery.check();

@@ -641,3 +641,17 @@
 
   .modal-actions--center { flex-wrap: wrap; }
 }
+.composition-notice {
+  color: var(--text-secondary);
+  font-size: 0.845rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+.item-delete-btn:disabled, .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.item-delete-btn:hover:disabled { color: var(--text-muted); background: none; }
+.item-move-btn:hover:not(:disabled) { color: var(--accent); background: var(--accent-dim); }
+@media (max-width: 480px) {
+  .item-row { flex-wrap: wrap; gap: 0.5rem; }
+  .item-body { flex-basis: calc(100% - 52px); }
+  .item-amount { margin-left: auto; }
+}

@@ -14,7 +14,7 @@ import { RouterLink } from '@angular/router';
 import { CreditCardService, CARD_BRANDS } from '../../core/services/credit-card.service';
 import { LegalEntityService } from '../../core/services/legal-entity.service';
 import { translateApiError } from '../../core/utils/api-error.util';
-import { CreditCardDto, CardBrandDto } from '../../core/models/credit-card.model';
+import { CreditCardDto, CreditCardBillDto, CardBrandDto } from '../../core/models/credit-card.model';
 import { LegalEntityDto } from '../../core/models/legal-entity.model';
 import { PageContextService } from '../../core/services/page-context.service';
 
@@ -51,6 +51,30 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   readonly creditCards = this.creditCardService.creditCards;
   readonly cardBrands: CardBrandDto[] = CARD_BRANDS;
   readonly legalEntities = signal<LegalEntityDto[]>([]);
+  readonly deletionBills = signal<CreditCardBillDto[] | null>(null);
+  readonly checkingDeletion = signal(false);
+
+  canDeleteCard(): boolean {
+    return !this.checkingDeletion() && this.deletionBills() !== null && this.deletionBills()!.every(b => b.status === 'OPEN');
+  }
+
+  private loadDeletionBills(cardId: number): void {
+    this.deletionBills.set(null);
+    this.checkingDeletion.set(true);
+    this.creditCardService.getBills(cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: bills => {
+        if (this.selectedCard()?.id !== cardId) return;
+        this.deletionBills.set(bills);
+        this.checkingDeletion.set(false);
+      },
+      error: () => {
+        if (this.selectedCard()?.id !== cardId) return;
+        this.checkingDeletion.set(false);
+        this.errorMessage.set('Não foi possível verificar as faturas. Abra os detalhes novamente antes de excluir.');
+      },
+    });
+  }
+
   readonly selectedCard = signal<CreditCardDto | null>(null);
 
   // ─── Formulários ─────────────────────────────────────────────────────────
@@ -122,6 +146,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   openDetailModal(card: CreditCardDto): void {
     this.selectedCard.set(card);
     this.errorMessage.set(null);
+    this.loadDeletionBills(card.id);
     this.editForm.patchValue({
       creditLimit: card.creditLimit,
       closingDay: card.closingDay,
@@ -131,6 +156,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   }
 
   openDeleteConfirm(): void {
+    if (!this.canDeleteCard()) return;
     this.errorMessage.set(null);
     this.activeModal.set('confirm-delete');
   }
@@ -139,6 +165,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
     this.activeModal.set(null);
     this.errorMessage.set(null);
     this.selectedCard.set(null);
+    this.deletionBills.set(null);
   }
 
   // ─── Carregamento de referências ──────────────────────────────────────────
@@ -254,6 +281,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
   // ─── Exclusão ─────────────────────────────────────────────────────────────
 
   deleteCreditCard(): void {
+    if (!this.canDeleteCard()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const card = this.selectedCard();
     if (!card) return;
@@ -271,7 +299,7 @@ export class CreditCardsComponent implements OnInit, OnDestroy {
         } else {
           this.errorMessage.set(financialErrorMessage(err, 'card', 'Erro ao excluir. Verifique os vínculos deste recurso.'));
           this.creditCardService.loadCreditCards().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
-          this.creditCardService.getBills(card.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+          this.loadDeletionBills(card.id);
         }
       },
     });

@@ -1,6 +1,10 @@
 <div class="page">
   <app-financial-recovery />
 
+  @if (!bill() && !isLoading()) {
+    <ng-container *ngTemplateOutlet="errorBanner" />
+    <a [routerLink]="['/credit-cards', cardId]" class="back-link">Voltar às faturas</a>
+  }
   <!-- ─── Loading ─── -->
   @if (isLoading()) {
     <div class="loading-state">
@@ -45,10 +49,19 @@
       }
     </div>
 
-    <!-- ─── Barra de ações ─── -->
-    @if (!isPaid) {
+    @if (!activeModal()) { <ng-container *ngTemplateOutlet="errorBanner" /> }
+    @if (!canChangeComposition()) {
+      <p class="composition-notice">{{ bill()!.status === 'CLOSED' ? 'Reabra esta fatura explicitamente para alterar sua composição. Se o destino estiver fechado, reabra-o separadamente na tela do cartão.' : bill()!.status === 'PAID' ? 'Faturas pagas não permitem movimentações, exclusões ou reabertura.' : 'Atualize a composição antes de fazer alterações.' }}</p>
+    }
+    @if (bill()!.status === 'CLOSED') {
       <div class="action-bar">
-        <button class="btn-ghost btn-ghost--sm" (click)="openCreateRefundModal()">
+        <button class="btn-ghost btn-ghost--sm" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="reopenBill()">Reabrir fatura</button>
+      </div>
+    }
+    <!-- ─── Barra de ações ─── -->
+    @if (canChangeComposition()) {
+      <div class="action-bar">
+        <button class="btn-ghost btn-ghost--sm" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="openCreateRefundModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="1 4 1 10 7 10"/>
             <path d="M3.51 15a9 9 0 1 0 .49-3.85"/>
@@ -73,7 +86,7 @@
       </div>
     } @else {
       <div class="items-list">
-        @for (item of displayItems(); track item.type + '-' + (item.purchaseId ?? item.refundId)) {
+        @for (item of displayItems(); track item.type + '-' + item.id) {
           <div class="item-row">
 
             <div class="item-icon item-icon--{{ item.type === 'refund' ? 'income' : 'expense' }}">
@@ -105,13 +118,21 @@
               {{ item.type === 'refund' ? '+' : '−' }}&nbsp;{{ formatCurrency(item.amount) }}
             </span>
 
-            @if (!isPaid) {
-              <button
+            @if (item.type === 'installment') {
+              <button class="item-delete-btn item-move-btn" (click)="openMoveModal(item)"
+                [disabled]="!canChangeComposition() || item.purchaseId == null || isSaving() || financialRecovery.state() !== 'clear'"
+                title="Mover parcela entre faturas abertas" aria-label="Mover parcela">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></svg>
+              </button>
+            }
+            <button
                 class="item-delete-btn"
                 (click)="item.type === 'installment'
                   ? openDeletePurchaseConfirm(item.purchaseId!, item.description, item.totalInstallments!)
                   : openDeleteRefundConfirm(item.refundId!, item.description)"
-                aria-label="Excluir"
+                [disabled]="isSaving() || financialRecovery.state() !== 'clear' || (item.type === 'installment' ? !canDeletePurchase(item.purchaseId) : !canChangeComposition())"
+                [title]="item.type === 'installment' ? 'Excluir compra inteira: todas as parcelas devem estar em faturas abertas' : 'Excluir estorno: somente em fatura aberta'"
+                [attr.aria-label]="item.type === 'installment' ? 'Excluir compra inteira' : 'Excluir estorno'"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
@@ -119,7 +140,6 @@
                   <path d="M10 11v6M14 11v6"/>
                 </svg>
               </button>
-            }
 
           </div>
         }
@@ -218,14 +238,14 @@
       <p>
         A compra <strong>{{ selectedPurchaseDescription() }}</strong> e todas as suas
         <strong>{{ selectedPurchaseTotalInstallments() }} parcela(s)</strong>
-        serão removidas permanentemente desta fatura.
+        serão removidas permanentemente de todas as faturas envolvidas.
       </p>
 
       <ng-container *ngTemplateOutlet="errorBanner" />
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchase()">
+        <button type="button" class="btn-danger" [disabled]="!canDeletePurchase(selectedPurchaseId() ?? undefined) || isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchase()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
         </button>
       </div>
@@ -279,3 +299,31 @@
     </div>
   }
 </ng-template>
+@if (activeModal() === 'move-installment') {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Mover parcela</h3>
+        <button class="modal-close" (click)="closeModal()" aria-label="Fechar">×</button>
+      </div>
+      <ng-container *ngTemplateOutlet="errorBanner" />
+      <p class="composition-notice">O valor de {{ formatCurrency(selectedInstallment()!.installment.amount) }} será preservado. Ao mudar de fatura, a data da parcela passará ao início do período da fatura de destino. Na mesma fatura, a data permanece.</p>
+      <form [formGroup]="moveForm" (ngSubmit)="moveInstallment()">
+        <div class="field">
+          <label for="moveBill">Fatura de destino (aberta)</label>
+          <select id="moveBill" formControlName="creditCardBillId">
+            @for (destination of openBills(); track destination.id) {
+              <option [ngValue]="destination.id">Vencimento {{ formatDate(destination.dueDate) }}{{ destination.id === billId ? ' (atual)' : '' }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="moveForm.invalid || !canChangeComposition() || isSaving() || financialRecovery.state() !== 'clear'">
+            @if (isSaving()) { <span class="spinner"></span> Movendo... } @else { Mover parcela }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin, of, switchMap, map } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -10,6 +11,7 @@ import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../../
 import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
 import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 import {
+  CreditCardInstallmentDto,
   CreditCardBillDto,
   BillInstallmentItem,
   BillRefundItem,
@@ -19,6 +21,7 @@ import {
 // ─── Tipos locais ─────────────────────────────────────────────────────────────
 
 type ModalType =
+  | 'move-installment'
   | 'create-refund'
   | 'confirm-delete-purchase'
   | 'confirm-delete-refund'
@@ -26,6 +29,7 @@ type ModalType =
 
 /** Item unificado para exibição na lista da fatura */
 interface BillDisplayItem {
+  id: number;
   type: 'installment' | 'refund';
   date: string;
   description: string;
@@ -69,6 +73,13 @@ export class CreditCardBillDetailComponent implements OnInit {
   readonly bill = signal<CreditCardBillDto | null>(null);
   readonly installments = signal<BillInstallmentItem[]>([]);
   readonly refunds = signal<BillRefundItem[]>([]);
+  readonly bills = signal<CreditCardBillDto[]>([]);
+  readonly purchaseInstallments = signal<Record<number, CreditCardInstallmentDto[]>>({});
+  readonly compositionReady = signal(false);
+  readonly selectedInstallment = signal<{ purchaseId: number; installment: CreditCardInstallmentDto } | null>(null);
+  readonly moveForm = this.fb.group({ creditCardBillId: [null as number | null, Validators.required] });
+  readonly openBills = computed(() => this.bills().filter(b => b.status === 'OPEN').sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+  readonly canChangeComposition = computed(() => this.compositionReady() && !this.isLoading() && this.bill()?.status === 'OPEN');
   readonly purchases = signal<CreditCardPurchaseDto[]>([]);
 
   // ─── Estado de exclusão ───────────────────────────────────────────────────
@@ -107,8 +118,9 @@ export class CreditCardBillDetailComponent implements OnInit {
     const installmentItems: BillDisplayItem[] = this.installments().map(inst => {
       const purchase = this.findPurchaseForInstallment(inst);
       return {
+        id: inst.id,
         type: 'installment',
-        date: inst.purchaseDate,
+        date: this.purchaseInstallments()[purchase?.id ?? -1]?.find(i => i.id === inst.id)?.installmentDate ?? inst.purchaseDate,
         description: inst.description,
         amount: inst.amount,
         installmentNumber: inst.installmentNumber,
@@ -118,6 +130,7 @@ export class CreditCardBillDetailComponent implements OnInit {
     });
 
     const refundItems: BillDisplayItem[] = this.refunds().map(ref => ({
+      id: ref.id,
       type: 'refund',
       date: ref.refundDate,
       description: ref.description,
@@ -142,53 +155,100 @@ export class CreditCardBillDetailComponent implements OnInit {
   private loadPageData(): void {
     this.isLoading.set(true);
 
-    // Carrega a fatura
-    this.creditCardService.getBill(this.cardId, this.billId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: bill => this.bill.set(bill),
-      error: () => this.router.navigate(['/credit-cards', this.cardId]),
-    });
-
-    // Carrega categorias se necessário
+    this.compositionReady.set(false);
+    this.purchaseInstallments.set({});
     if (this.categoryService.categories().length === 0) {
-      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe();
+      this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
     }
-
-    // Carrega compras e statement em paralelo
-    let pending = 2;
-    const done = () => { if (--pending === 0) this.isLoading.set(false); };
-
-    this.creditCardService.getPurchases(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: purchases => { this.purchases.set(purchases); done(); },
-      error: () => done(),
-    });
-
-    this.loadStatement(done);
-  }
-
-  private loadStatement(callback?: () => void): void {
-    this.creditCardService.getBillStatement(this.cardId, this.billId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: statement => {
+    forkJoin({
+      bill: this.creditCardService.getBill(this.cardId, this.billId),
+      bills: this.creditCardService.getBills(this.cardId),
+      purchases: this.creditCardService.getPurchases(this.cardId),
+      statement: this.creditCardService.getBillStatement(this.cardId, this.billId),
+    }).pipe(
+      switchMap(data => (data.purchases.length
+        ? forkJoin(data.purchases.map(p => this.creditCardService.getInstallments(this.cardId, p.id)))
+        : of([] as CreditCardInstallmentDto[][])).pipe(
+          map(lists => ({ ...data, lists })),
+        )),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: ({ bill, bills, purchases, statement, lists }) => {
+        this.bill.set(bill);
+        this.bills.set(bills);
+        this.purchases.set(purchases);
         this.installments.set(statement.installments);
         this.refunds.set(statement.refunds);
-        callback?.();
+        this.purchaseInstallments.set(Object.fromEntries(purchases.map((p, index) => [p.id, lists[index]])));
+        this.compositionReady.set(true);
+        this.isLoading.set(false);
       },
-      error: () => callback?.(),
+      error: () => {
+        this.isLoading.set(false);
+        this.errorMessage.set('Não foi possível atualizar a composição. Atualize os dados antes de alterar a fatura.');
+      },
     });
   }
 
-  // ─── Helpers de correspondência ───────────────────────────────────────────
-
   private findPurchaseForInstallment(inst: BillInstallmentItem): CreditCardPurchaseDto | undefined {
-    return this.purchases().find(p =>
-      p.description === inst.description &&
-      p.purchaseDate === inst.purchaseDate &&
-      p.installmentsCount === inst.totalInstallments
-    );
+    return this.purchases().find(p => this.purchaseInstallments()[p.id]?.some(i => i.id === inst.id));
+  }
+
+  canDeletePurchase(purchaseId: number | undefined): boolean {
+    if (!this.compositionReady() || this.isLoading() || purchaseId == null) return false;
+    const installments = this.purchaseInstallments()[purchaseId];
+    return !!installments && installments.every(i => this.bills().some(b => b.id === i.creditCardBillId && b.status === 'OPEN'));
+  }
+
+  openMoveModal(item: BillDisplayItem): void {
+    if (!this.canChangeComposition() || this.isSaving() || this.financialRecovery.state() !== 'clear' || item.purchaseId == null) return;
+    const installment = this.purchaseInstallments()[item.purchaseId]?.find(i => i.id === item.id);
+    if (!installment) return;
+    this.selectedInstallment.set({ purchaseId: item.purchaseId, installment });
+    this.moveForm.reset({ creditCardBillId: installment.creditCardBillId });
+    this.errorMessage.set(null);
+    this.activeModal.set('move-installment');
+  }
+
+  moveInstallment(): void {
+    if (!this.canChangeComposition() || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
+    const selection = this.selectedInstallment();
+    const destinationId = Number(this.moveForm.value.creditCardBillId);
+    const current = selection && this.purchaseInstallments()[selection.purchaseId]?.find(i => i.id === selection.installment.id);
+    if (!selection || !current || !this.openBills().some(b => b.id === current.creditCardBillId) || !this.openBills().some(b => b.id === destinationId)) return;
+    this.isSaving.set(true);
+    this.errorMessage.set(null);
+    this.financialRecovery.trackWrite({ label: 'Movimentação de parcela', pocketIds: [], cardId: this.cardId, billId: this.billId },
+      this.creditCardService.updateInstallment(this.cardId, selection.purchaseId, selection.installment.id, {
+        amount: current.amount,
+        creditCardBillId: destinationId,
+      })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => {
+          this.isSaving.set(false);
+          this.closeModal();
+          this.loadPageData();
+        },
+        error: err => {
+          this.isSaving.set(false);
+          this.handleWriteError(err, 'Erro ao mover parcela.');
+        },
+      });
+  }
+
+  reopenBill(): void {
+    if (this.bill()?.status !== 'CLOSED' || this.isLoading() || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
+    this.isSaving.set(true);
+    this.financialRecovery.trackWrite({ label: 'Reabertura de fatura', pocketIds: [], cardId: this.cardId, billId: this.billId },
+      this.creditCardService.reopenBill(this.cardId, this.billId)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => { this.isSaving.set(false); this.loadPageData(); },
+        error: err => { this.isSaving.set(false); this.handleWriteError(err, 'Erro ao reabrir fatura.'); },
+      });
   }
 
   // ─── Criação de estorno ───────────────────────────────────────────────────
 
   openCreateRefundModal(): void {
+    if (!this.canChangeComposition() || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.refundForm.reset({ refundDate: this.todayString() });
     this.refundForm.get('categoryId')!.setValue(this.reimbursementCategoryId());
     this.refundForm.get('categoryId')!.disable();
@@ -197,6 +257,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   submitRefund(): void {
+    if (!this.canChangeComposition()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.refundForm.invalid) {
       this.refundForm.markAllAsTouched();
@@ -228,6 +289,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   // ─── Exclusão de compra ───────────────────────────────────────────────────
 
   openDeletePurchaseConfirm(purchaseId: number, description: string, totalInstallments: number): void {
+    if (!this.canDeletePurchase(purchaseId) || this.isSaving()) return;
     this.selectedPurchaseId.set(purchaseId);
     this.selectedPurchaseDescription.set(description);
     this.selectedPurchaseTotalInstallments.set(totalInstallments);
@@ -238,15 +300,14 @@ export class CreditCardBillDetailComponent implements OnInit {
   deletePurchase(): void {
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const purchaseId = this.selectedPurchaseId();
-    if (!purchaseId) return;
+    if (!purchaseId || !this.canDeletePurchase(purchaseId)) return;
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
     this.financialRecovery.trackWrite({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId }, this.creditCardService.deletePurchase(this.cardId, purchaseId)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purchases.update(list => list.filter(p => p.id !== purchaseId));
-        this.loadStatement();
-        this.refreshBill();
+        this.loadPageData();
         this.isSaving.set(false);
         this.closeModal();
       },
@@ -266,6 +327,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   // ─── Exclusão de estorno ──────────────────────────────────────────────────
 
   openDeleteRefundConfirm(refundId: number, description: string): void {
+    if (!this.canChangeComposition() || this.isSaving()) return;
     this.selectedRefundId.set(refundId);
     this.selectedRefundDescription.set(description);
     this.errorMessage.set(null);
@@ -273,6 +335,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   deleteRefund(): void {
+    if (!this.canChangeComposition()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const refundId = this.selectedRefundId();
     if (!refundId) return;
@@ -295,7 +358,7 @@ export class CreditCardBillDetailComponent implements OnInit {
 
   private handleWriteError(error: any, fallback: string): void {
     this.errorMessage.set(financialWriteErrorMessage(error, fallback));
-    if (error?.status === 409 || isUncertainFinancialWrite(error)) this.loadPageData();
+    if (error?.status === 409 || error?.status === 404 || isUncertainFinancialWrite(error)) this.loadPageData();
     if (isUncertainFinancialWrite(error)) {
       this.financialRecovery.mark({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId, message: financialWriteErrorMessage(error, fallback) });
       this.financialRecovery.check();
@@ -305,6 +368,8 @@ export class CreditCardBillDetailComponent implements OnInit {
   // ─── Fechar modal genérico ────────────────────────────────────────────────
 
   closeModal(): void {
+    if (this.isSaving()) return;
+    this.selectedInstallment.set(null);
     this.activeModal.set(null);
     this.errorMessage.set(null);
     this.selectedPurchaseId.set(null);

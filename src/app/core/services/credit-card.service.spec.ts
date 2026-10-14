@@ -57,6 +57,7 @@ const mockInstallment: CreditCardInstallmentDto = {
   installmentNumber: 1,
   amount: 100,
   creditCardBillId: 10,
+  installmentDate: '2025-03-01',
   billDueDate: '2025-03-22',
   category: { id: 1, name: 'Alimentação', type: 'EXPENSE', isSystem: false },
 };
@@ -207,7 +208,10 @@ describe('CreditCardService', () => {
       const closed = { ...mockBill, status: 'CLOSED' as const };
       let result: CreditCardBillDto | undefined;
       service.closeBill(1, 10).subscribe(r => result = r);
-      http.expectOne(`${base}/credit-cards/1/bills/10/close`).flush(closed);
+      const req = http.expectOne(`${base}/credit-cards/1/bills/10/close`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toBeNull();
+      req.flush(closed);
       expect(result!.status).toBe('CLOSED');
     });
   });
@@ -219,7 +223,10 @@ describe('CreditCardService', () => {
       const reopened = { ...mockBill, status: 'OPEN' as const };
       let result: CreditCardBillDto | undefined;
       service.reopenBill(1, 10).subscribe(r => result = r);
-      http.expectOne(`${base}/credit-cards/1/bills/10/reopen`).flush(reopened);
+      const req = http.expectOne(`${base}/credit-cards/1/bills/10/reopen`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toBeNull();
+      req.flush(reopened);
       expect(result!.status).toBe('OPEN');
     });
   });
