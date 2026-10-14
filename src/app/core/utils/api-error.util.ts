@@ -1,4 +1,8 @@
 const ERROR_MAP: Record<string, string> = {
+  'Only closed bills can be paid': 'Somente faturas fechadas podem ser pagas. Confira o estado atualizado da fatura.',
+  'Only bills with a positive total can be paid': 'Faturas zeradas ou com crédito não podem ser pagas.',
+  'Only open bills can be closed': 'Somente faturas abertas podem ser fechadas.',
+  'Only closed bills can be reopened': 'Somente faturas fechadas podem ser reabertas.',
   'taxAmount must not exceed grossAmount': 'O imposto não pode ser maior que o valor bruto.',
   'Asset has already been fully redeemed': 'Este investimento já foi resgatado integralmente.',
   'User not found': 'Usuário não encontrado. Verifique o e-mail informado.',

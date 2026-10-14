@@ -1,4 +1,5 @@
 <div class="page">
+  <app-financial-recovery />
 
   <!-- ─── Loading ─── -->
   @if (isLoading()) {
@@ -187,7 +188,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Registrando... } @else { Registrar }
           </button>
         </div>
@@ -224,7 +225,7 @@
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deletePurchase()">
+        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchase()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
         </button>
       </div>
@@ -256,7 +257,7 @@
 
       <div class="modal-actions modal-actions--center">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deleteRefund()">
+        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deleteRefund()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir }
         </button>
       </div>

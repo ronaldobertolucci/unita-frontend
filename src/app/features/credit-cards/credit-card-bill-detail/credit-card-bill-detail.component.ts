@@ -6,7 +6,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { CreditCardService } from '../../../core/services/credit-card.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { translateApiError } from '../../../core/utils/api-error.util';
+import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
+import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
+import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
 import {
   CreditCardBillDto,
   BillInstallmentItem,
@@ -41,11 +43,12 @@ interface BillDisplayItem {
 @Component({
   selector: 'app-credit-card-bill-detail',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [FinancialRecoveryComponent, CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './credit-card-bill-detail.component.html',
   styleUrl: './credit-card-bill-detail.component.css',
 })
 export class CreditCardBillDetailComponent implements OnInit {
+  readonly financialRecovery = inject(FinancialRecoveryService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -194,6 +197,7 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   submitRefund(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.refundForm.invalid) {
       this.refundForm.markAllAsTouched();
       return;
@@ -202,12 +206,12 @@ export class CreditCardBillDetailComponent implements OnInit {
     this.errorMessage.set(null);
     const v = this.refundForm.getRawValue();
 
-    this.creditCardService.createRefund(this.cardId, this.billId, {
+    this.financialRecovery.trackWrite({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId }, this.creditCardService.createRefund(this.cardId, this.billId, {
       description: v.description!,
       amount: v.amount!,
       refundDate: v.refundDate!,
       categoryId: v.categoryId!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: refund => {
         this.refunds.update(list => [...list, refund]);
         this.refreshBill();
@@ -216,7 +220,7 @@ export class CreditCardBillDetailComponent implements OnInit {
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar estorno.'));
+        this.handleWriteError(err, 'Erro ao criar estorno.');
       },
     });
   }
@@ -232,12 +236,13 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   deletePurchase(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const purchaseId = this.selectedPurchaseId();
     if (!purchaseId) return;
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deletePurchase(this.cardId, purchaseId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId }, this.creditCardService.deletePurchase(this.cardId, purchaseId)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purchases.update(list => list.filter(p => p.id !== purchaseId));
         this.loadStatement();
@@ -247,7 +252,7 @@ export class CreditCardBillDetailComponent implements OnInit {
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao excluir compra.'));
+        this.handleWriteError(err, 'Erro ao excluir compra.');
       },
     });
   }
@@ -268,12 +273,13 @@ export class CreditCardBillDetailComponent implements OnInit {
   }
 
   deleteRefund(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const refundId = this.selectedRefundId();
     if (!refundId) return;
     this.isSaving.set(true);
     this.errorMessage.set(null);
 
-    this.creditCardService.deleteRefund(this.cardId, this.billId, refundId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId }, this.creditCardService.deleteRefund(this.cardId, this.billId, refundId)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.refunds.update(list => list.filter(r => r.id !== refundId));
         this.refreshBill();
@@ -282,9 +288,18 @@ export class CreditCardBillDetailComponent implements OnInit {
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao excluir estorno.'));
+        this.handleWriteError(err, 'Erro ao excluir estorno.');
       },
     });
+  }
+
+  private handleWriteError(error: any, fallback: string): void {
+    this.errorMessage.set(financialWriteErrorMessage(error, fallback));
+    if (error?.status === 409 || isUncertainFinancialWrite(error)) this.loadPageData();
+    if (isUncertainFinancialWrite(error)) {
+      this.financialRecovery.mark({ label: 'Alteração da composição da fatura', pocketIds: [], cardId: this.cardId, billId: this.billId, message: financialWriteErrorMessage(error, fallback) });
+      this.financialRecovery.check();
+    }
   }
 
   // ─── Fechar modal genérico ────────────────────────────────────────────────

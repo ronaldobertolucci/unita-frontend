@@ -47,6 +47,7 @@ const mockPurchase: CreditCardPurchaseDto = {
 function buildCreditCardService() {
   return {
     loadCreditCards: jest.fn().mockReturnValue(of([mockCard])),
+    getBill: jest.fn().mockReturnValue(of({ ...mockBillClosed, status: 'PAID' as const })),
     getCreditCard: jest.fn().mockReturnValue(of(mockCard)),
     getBills: jest.fn().mockReturnValue(of([mockBillOpen, mockBillClosed, mockBillPaid])),
     closeBill: jest.fn().mockReturnValue(of({ ...mockBillOpen, status: 'CLOSED' as const })),
@@ -484,6 +485,84 @@ describe('CreditCardDetailComponent', () => {
     component.payForm.setValue({ pocketId: 5 });
     component.payBill();
     expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+  });
+
+  describe('US-03 bill concurrency', () => {
+    it.each([0, -100])('hides payment and rejects direct submission for total %s', totalAmount => {
+      setup();
+      const bill = { ...mockBillClosed, totalAmount };
+      component.bills.set([bill]);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).not.toContain('Pagar fatura');
+      expect(fixture.nativeElement.textContent).toContain(totalAmount === 0 ? 'Fatura zerada' : 'Fatura com crédito');
+      component.openPayModal(bill);
+      expect(component.activeModal()).toBeNull();
+      component.selectedBill.set(bill);
+      component.payForm.setValue({ pocketId: 5 });
+      component.payBill();
+      expect(creditCardServiceSpy.payBill).not.toHaveBeenCalled();
+    });
+
+    it('does not submit an open bill even through a stale modal', () => {
+      setup();
+      component.selectedBill.set(mockBillOpen);
+      component.payForm.setValue({ pocketId: 5 });
+      component.payBill();
+      expect(creditCardServiceSpy.payBill).not.toHaveBeenCalled();
+    });
+
+    it.each(['OPEN', 'PAID'] as const)('reconsults a domain 409 and displays actual status %s without assuming success', status => {
+      setup();
+      creditCardServiceSpy.payBill.mockReturnValue(throwError(() => ({ status: 409, error: { error: 'Conflict', message: 'Only closed bills can be paid' } })));
+      creditCardServiceSpy.getBill.mockReturnValue(of({ ...mockBillClosed, status }));
+      component.openPayModal(mockBillClosed);
+      component.payForm.setValue({ pocketId: 5 });
+      component.payBill();
+      expect(creditCardServiceSpy.getBill).toHaveBeenCalledWith(1, 11);
+      expect(component.bills().find(b => b.id === 11)?.status).toBe(status);
+      expect(component.selectedBill()?.status).toBe(status);
+      expect(component.errorMessage()).toContain('Somente faturas fechadas');
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(5);
+      component.payBill();
+      expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+    });
+
+    it('reconsults the exact bill and the list after payment success', () => {
+      setup();
+      component.openPayModal(mockBillClosed);
+      component.payForm.setValue({ pocketId: 5 });
+      component.payBill();
+      expect(creditCardServiceSpy.getBill).toHaveBeenCalledWith(1, 11);
+      expect(creditCardServiceSpy.getBills).toHaveBeenCalledTimes(2);
+    });
+
+    it('prevents repeated close or reopen while a bill write is pending', () => {
+      setup();
+      const response = new Subject<CreditCardBillDto>();
+      creditCardServiceSpy.closeBill.mockReturnValue(response);
+      component.closeBill(mockBillOpen);
+      component.closeBill(mockBillOpen);
+      component.reopenBill(mockBillClosed);
+      expect(creditCardServiceSpy.closeBill).toHaveBeenCalledTimes(1);
+      expect(creditCardServiceSpy.reopenBill).not.toHaveBeenCalled();
+      response.next({ ...mockBillOpen, status: 'CLOSED' });
+      response.complete();
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('consults the current bill after a lock timeout and keeps payment blocked for reconciliation', () => {
+      setup();
+      creditCardServiceSpy.payBill.mockReturnValue(throwError(() => ({ status: 503, error: { error: 'Concurrency Timeout' } })));
+      component.openPayModal(mockBillClosed);
+      component.payForm.setValue({ pocketId: 5 });
+      component.payBill();
+      fixture.detectChanges();
+      expect(component.financialRecovery.operation()?.message).toContain('tempo de espera');
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(component.bills().find(b => b.id === 11)?.status).toBe('PAID');
+      component.payBill();
+      expect(creditCardServiceSpy.payBill).toHaveBeenCalledTimes(1);
+    });
   });
 
 });

@@ -10,7 +10,8 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
   template: `
     @if (recovery.state() !== 'clear' && recovery.state() !== 'sending') {
       <section class="review-notice" aria-live="polite" aria-label="Conferência de operação financeira">
-        <p>Não foi possível confirmar o resultado: {{ recovery.operation()?.label }}.</p>
+        @if (recovery.operation()?.message; as message) { <p>{{ message }}</p> }
+        <p>{{ recovery.operation()?.message ? 'Operação em conferência' : 'Não foi possível confirmar o resultado' }}: {{ recovery.operation()?.label }}.</p>
         <p>Confira os saldos, os extratos e, quando houver, a fatura antes de enviar uma nova operação. Se continuar em dúvida, procure suporte para conciliar o resultado.</p>
         @if (recovery.state() === 'review') {
           @for (pocket of recovery.pockets(); track pocket.id) {

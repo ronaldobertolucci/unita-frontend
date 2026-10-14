@@ -353,6 +353,7 @@ describe('TransfersComponent', () => {
 
     it('should call transfer with correct payload on success', () => {
       transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      component.groupPockets.set(mockGroupPockets);
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 50, description: 'Reembolso' });
       component.submitGroupTransfer();
       expect(transferServiceSpy.transfer).toHaveBeenCalledWith({
@@ -363,6 +364,7 @@ describe('TransfersComponent', () => {
     it('should reset groupPockets and show success message on success', () => {
       transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
       component.groupPockets.set(mockGroupPockets);
+      component.groupPockets.set(mockGroupPockets);
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 50, description: 'Reembolso' });
       component.submitGroupTransfer();
       expect(component.groupPockets()).toEqual([]);
@@ -371,6 +373,7 @@ describe('TransfersComponent', () => {
 
     it('should set errorMessage and stop saving on failure', () => {
       transferServiceSpy.transfer.mockReturnValue(throwError(() => ({ error: { message: 'Saldo insuficiente' } })));
+      component.groupPockets.set(mockGroupPockets);
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 50, description: 'Reembolso' });
       component.submitGroupTransfer();
       expect(component.errorMessage()).toBeTruthy();
@@ -478,6 +481,7 @@ describe('TransfersComponent', () => {
     it('never reads the other group member statement or balance', () => {
       setup();
       transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      component.groupPockets.set(mockGroupPockets);
       component.groupForm.setValue({ sourcePocketId: 1, groupId: 10, targetMemberId: 2, targetPocketId: 5, amount: 80, description: 'Teste' });
       component.submitGroupTransfer();
       expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledTimes(1);
@@ -516,4 +520,79 @@ describe('TransfersComponent', () => {
     component.submitOwnTransfer();
     expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
   });
+  describe('US-03 financial concurrency', () => {
+    it.each([['transfer', 1, 2], ['fgts', 4, 1]] as const)('refreshes after an insufficient balance rejection for %s without resending', (kind, source, target) => {
+      setup();
+      const request = kind === 'transfer' ? transferServiceSpy.transfer : transferServiceSpy.fgtsWithdrawal;
+      request.mockReturnValue(throwError(() => ({ status: 400, error: { error: 'Bad Request', message: 'Insufficient balance in source pocket' } })));
+      const form = kind === 'transfer' ? component.ownForm : component.fgtsForm;
+      form.setValue({ sourcePocketId: source, targetPocketId: target, amount: 80, description: 'Teste' });
+      kind === 'transfer' ? component.submitOwnTransfer() : component.submitFgtsWithdrawal();
+      expect(component.errorMessage()).toContain('Saldo insuficiente');
+      expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(source);
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(source);
+      expect(form.value.amount).toBe(80);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps sends disabled until balances and statements finish refreshing', () => {
+      setup();
+      const balances = new Subject<number>();
+      pocketServiceSpy.getBalance.mockReturnValue(balances);
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(component.isSaving()).toBe(true);
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+      balances.next(20);
+      balances.complete();
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('blocks sends when refreshing a confirmed transfer fails', () => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(of(mockTransferResult));
+      pocketServiceSpy.getBalance.mockReturnValue(throwError(() => ({ status: 500 })));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(component.financialRecovery.state()).toBe('pending');
+      component.financialRecovery.confirm();
+      expect(component.financialRecovery.state()).toBe('pending');
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([503, 500, 0])('consults but does not replay a transfer after HTTP %s', status => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(throwError(() => ({ status, error: { error: status === 503 ? 'Concurrency Timeout' : 'Internal Server Error' } })));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(component.financialRecovery.state()).toBe('review');
+      expect(component.financialRecovery.operation()?.message).toContain(status === 503 ? 'tempo de espera' : status === 500 ? 'indisponível' : 'resposta');
+      component.submitOwnTransfer();
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows rollback as a concurrency conflict rather than protected deletion', () => {
+      setup();
+      transferServiceSpy.transfer.mockReturnValue(throwError(() => ({ status: 409, error: { error: 'Concurrency Conflict' } })));
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 80, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(component.errorMessage()).toContain('desfeita');
+      expect(TestBed.inject(TransactionService).getTransactions).toHaveBeenCalledWith(1);
+      expect(transferServiceSpy.transfer).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an amount beyond the displayed balance before writing', () => {
+      setup();
+      component.ownForm.setValue({ sourcePocketId: 1, targetPocketId: 2, amount: 1001, description: 'Teste' });
+      component.submitOwnTransfer();
+      expect(transferServiceSpy.transfer).not.toHaveBeenCalled();
+      expect(component.errorMessage()).toContain('Saldo exibido insuficiente');
+    });
+  });
+
 });

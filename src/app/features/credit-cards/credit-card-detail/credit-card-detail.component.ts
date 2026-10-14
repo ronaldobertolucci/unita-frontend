@@ -1,8 +1,9 @@
-import { financialErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
+import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../../core/utils/financial-operation.util';
 import { FinancialRecoveryService } from '../../../core/services/financial-recovery.service';
 import { FinancialRecoveryComponent } from '../../../shared/financial-recovery/financial-recovery.component';
-import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin, finalize, Observable, tap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -10,7 +11,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CreditCardService } from '../../../core/services/credit-card.service';
 import { PocketService } from '../../../core/services/pocket.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { translateApiError } from '../../../core/utils/api-error.util';
 import { CreditCardDto, CreditCardBillDto, BillStatus, CreditCardPurchaseDto } from '../../../core/models/credit-card.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
 
@@ -39,6 +39,12 @@ export class CreditCardDetailComponent implements OnInit {
   private readonly categoryService = inject(CategoryService);
 
   private cardId!: number;
+
+  private readonly syncReviewedBills = effect(() => {
+    if (this.financialRecovery.operation()?.cardId === this.cardId && this.financialRecovery.state() === 'review') {
+      this.bills.set(this.financialRecovery.bills());
+    }
+  });
 
   // ─── Estado ──────────────────────────────────────────────────────────────
 
@@ -160,28 +166,54 @@ readonly expenseCategories = computed(() =>
   // ─── Ações de fatura ─────────────────────────────────────────────────────
 
   closeBill(bill: CreditCardBillDto): void {
-    this.inlineError.set(null);
-    this.creditCardService.closeBill(this.cardId, bill.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: updated => this.replaceBill(updated),
-      error: err => this.inlineError.set({
-        billId: bill.id,
-        message: translateApiError(err?.error?.message, 'Erro ao fechar fatura.'),
-      }),
-    });
+    if (bill.status !== 'OPEN') return;
+    this.changeBillState(bill, () => this.creditCardService.closeBill(this.cardId, bill.id));
   }
 
   reopenBill(bill: CreditCardBillDto): void {
+    if (bill.status !== 'CLOSED') return;
+    this.changeBillState(bill, () => this.creditCardService.reopenBill(this.cardId, bill.id));
+  }
+
+  private changeBillState(bill: CreditCardBillDto, request: () => Observable<CreditCardBillDto>): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
+    this.isSaving.set(true);
     this.inlineError.set(null);
-    this.creditCardService.reopenBill(this.cardId, bill.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: updated => this.replaceBill(updated),
-      error: err => this.inlineError.set({
-        billId: bill.id,
-        message: translateApiError(err?.error?.message, 'Erro ao reabrir fatura.'),
-      }),
+    const operation = { label: `Alteração da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [], cardId: this.cardId, billId: bill.id };
+    this.financialRecovery.trackWrite(operation, request()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: updated => { this.replaceBill(updated); this.isSaving.set(false); },
+      error: err => {
+        this.inlineError.set({ billId: bill.id, message: financialWriteErrorMessage(err, 'Erro ao alterar fatura.') });
+        if (isUncertainFinancialWrite(err)) {
+          this.financialRecovery.mark({ ...operation, message: financialWriteErrorMessage(err, 'Erro ao alterar fatura.') });
+          this.financialRecovery.check();
+        }
+        this.refreshBillState(bill.id).pipe(finalize(() => this.isSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+          error: () => {
+            if (this.financialRecovery.state() === 'clear') {
+              this.financialRecovery.mark({ ...operation, message: 'Não foi possível atualizar a fatura após a rejeição. Consulte o estado atual antes de enviar novamente.' });
+            }
+          },
+        });
+      },
     });
   }
 
+  canPay(bill: CreditCardBillDto | null): boolean {
+    return bill?.status === 'CLOSED' && bill.totalAmount > 0;
+  }
+
+  private refreshBillState(billId: number): Observable<unknown> {
+    return forkJoin({ bill: this.creditCardService.getBill(this.cardId, billId), bills: this.creditCardService.getBills(this.cardId) }).pipe(
+      tap(({ bill, bills }) => {
+        this.bills.set([...bills.filter(item => item.id !== bill.id), bill]);
+        if (this.selectedBill()?.id === billId) this.selectedBill.set(bill);
+      }),
+    );
+  }
+
   openPayModal(bill: CreditCardBillDto): void {
+    if (!this.canPay(bill) || this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.selectedBill.set(bill);
     this.payForm.reset();
     this.errorMessage.set(null);
@@ -197,30 +229,41 @@ readonly expenseCategories = computed(() =>
     this.isSaving.set(true);
     this.errorMessage.set(null);
     const bill = this.selectedBill();
-    if (!bill || bill.status === 'PAID') { this.isSaving.set(false); return; }
+    if (!bill || !this.canPay(bill)) { this.isSaving.set(false); return; }
     const pocketId = Number(this.payForm.value.pocketId);
+    if (!this.eligiblePockets().some(pocket => pocket.id === pocketId)) {
+      this.isSaving.set(false);
+      this.errorMessage.set('Selecione uma conta própria disponível para pagamento.');
+      return;
+    }
 
-    this.financialRecovery.trackWrite({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId }, this.creditCardService.payBill(this.cardId, bill.id, {
+    this.financialRecovery.trackWrite({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId, billId: bill.id }, this.creditCardService.payBill(this.cardId, bill.id, {
       pocketId,
     })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: updated => {
         this.replaceBill(updated);
-        this.financialRecovery.refreshPockets([pocketId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-          error: () => this.inlineError.set({ billId: bill.id, message: 'Fatura paga. Não foi possível atualizar o pocket. Confira o saldo e o extrato antes de uma nova operação.' }),
-        });
-        this.isSaving.set(false);
         this.closeModal();
+        forkJoin({ bill: this.refreshBillState(bill.id), pockets: this.financialRecovery.refreshPockets([pocketId]) })
+          .pipe(finalize(() => this.isSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+            error: () => {
+              this.financialRecovery.mark({ label: 'Atualização após pagamento de fatura', pocketIds: [pocketId], cardId: this.cardId, billId: bill.id, message: 'Fatura paga. Não foi possível atualizar todos os dados. Confira a fatura, o saldo e o extrato antes de uma nova operação.' });
+              this.financialRecovery.check();
+            },
+          });
       },
       error: err => {
-        this.isSaving.set(false);
+        const message = financialWriteErrorMessage(err, 'Erro ao pagar fatura.');
         if (isUncertainFinancialWrite(err)) {
+          this.isSaving.set(false);
           this.closeModal();
-          this.financialRecovery.mark({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId });
+          this.financialRecovery.mark({ label: `Pagamento da fatura com vencimento em ${this.formatDate(bill.dueDate)}`, pocketIds: [pocketId], cardId: this.cardId, billId: bill.id, message });
           this.financialRecovery.check();
         } else {
-          this.errorMessage.set(financialErrorMessage(err, 'transaction', 'Erro ao pagar fatura.'));
-          this.loadBills();
-          this.pocketService.loadPockets().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+          this.errorMessage.set(message);
+          forkJoin({ bill: this.refreshBillState(bill.id), pockets: this.financialRecovery.refreshPockets([pocketId]) })
+            .pipe(finalize(() => this.isSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+              error: () => this.financialRecovery.mark({ label: 'Conferência após pagamento rejeitado', pocketIds: [pocketId], cardId: this.cardId, billId: bill.id, message: 'A operação foi rejeitada, mas não foi possível atualizar todos os dados. Consulte o estado atual antes de enviar novamente.' }),
+            });
           if (err.status === 404) this.payForm.reset();
         }
       },
@@ -236,6 +279,7 @@ readonly expenseCategories = computed(() =>
   }
 
   submitPurchaseStep1(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.purchaseStep1Form.invalid) {
       this.purchaseStep1Form.markAllAsTouched();
       return;
@@ -244,12 +288,12 @@ readonly expenseCategories = computed(() =>
     this.errorMessage.set(null);
     const v = this.purchaseStep1Form.value;
 
-    this.creditCardService.createPurchase(this.cardId, {
+    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.createPurchase(this.cardId, {
       description: v.description!,
       totalValue: v.totalValue!,
       purchaseDate: v.purchaseDate!,
       installmentsCount: v.installmentsCount!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: purchase => {
         this.currentPurchase.set(purchase);
         this.currentInstallmentIndex.set(1);
@@ -260,12 +304,13 @@ readonly expenseCategories = computed(() =>
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar compra.'));
+        this.handleCompositionError(err, 'Erro ao criar compra.');
       },
     });
   }
 
   submitInstallment(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     if (this.installmentForm.invalid) {
       this.installmentForm.markAllAsTouched();
       return;
@@ -276,11 +321,11 @@ readonly expenseCategories = computed(() =>
     const index = this.currentInstallmentIndex();
     const v = this.installmentForm.value;
 
-    this.creditCardService.createInstallment(this.cardId, purchase.id, {
+    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.createInstallment(this.cardId, purchase.id, {
       installmentNumber: index,
       amount: v.amount!,
       categoryId: v.categoryId!,
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    })).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.isSaving.set(false);
         const isLast = index === purchase.installmentsCount;
@@ -297,7 +342,7 @@ readonly expenseCategories = computed(() =>
       },
       error: err => {
         this.isSaving.set(false);
-        this.errorMessage.set(translateApiError(err?.error?.message, 'Erro ao criar parcela.'));
+        this.handleCompositionError(err, 'Erro ao criar parcela.');
       },
     });
   }
@@ -319,10 +364,11 @@ readonly expenseCategories = computed(() =>
   }
 
   deletePurchaseFromStep2(): void {
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     const purchase = this.currentPurchase();
     if (!purchase) return;
     this.isSaving.set(true);
-    this.creditCardService.deletePurchase(this.cardId, purchase.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.financialRecovery.trackWrite({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId }, this.creditCardService.deletePurchase(this.cardId, purchase.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.loadBills();
         this.currentPurchase.set(null);
@@ -331,11 +377,21 @@ readonly expenseCategories = computed(() =>
         this.activeModal.set(null);
         this.errorMessage.set(null);
       },
-      error: () => {
+      error: err => {
         this.isSaving.set(false);
+        this.handleCompositionError(err, 'Erro ao excluir compra.');
         this.activeModal.set('create-purchase-step2');
       },
     });
+  }
+
+  private handleCompositionError(error: any, fallback: string): void {
+    this.errorMessage.set(financialWriteErrorMessage(error, fallback));
+    if (error?.status === 409 || isUncertainFinancialWrite(error)) this.loadBills();
+    if (isUncertainFinancialWrite(error)) {
+      this.financialRecovery.mark({ label: 'Alteração de compra ou parcela', pocketIds: [], cardId: this.cardId, message: financialWriteErrorMessage(error, fallback) });
+      this.financialRecovery.check();
+    }
   }
 
   // ─── Fechar modal ─────────────────────────────────────────────────────────

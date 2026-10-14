@@ -100,11 +100,15 @@
             @if (bill.status !== 'PAID') {
               <div class="bill-actions">
                 @if (bill.status === 'OPEN') {
-                  <button class="btn-bill-action" (click)="closeBill(bill)">Fechar fatura</button>
+                  <button class="btn-bill-action" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="closeBill(bill)">Fechar fatura</button>
                 }
                 @if (bill.status === 'CLOSED') {
-                  <button class="btn-bill-action" (click)="reopenBill(bill)">Reabrir</button>
+                  <button class="btn-bill-action" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="reopenBill(bill)">Reabrir</button>
+                  @if (canPay(bill)) {
                   <button class="btn-bill-action btn-bill-action--primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="openPayModal(bill)">Pagar fatura</button>
+                  } @else {
+                    <span class="bill-period">{{ bill.totalAmount < 0 ? 'Fatura com crédito · pagamento indisponível' : 'Fatura zerada · pagamento indisponível' }}</span>
+                  }
                 }
               </div>
             }
@@ -221,7 +225,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Criando... } @else { Próximo }
           </button>
         </div>
@@ -289,7 +293,7 @@
 
         <div class="modal-actions">
           @if (errorMessage()) {
-            <button type="button" class="btn-action btn-action--danger" [disabled]="isSaving()" (click)="deletePurchaseFromStep2()">
+            <button type="button" class="btn-action btn-action--danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchaseFromStep2()">
               @if (isSaving()) { <span class="spinner spinner--light"></span> } @else {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
@@ -300,7 +304,7 @@
               Excluir compra
             </button>
           }
-          <button type="submit" class="btn-primary btn-primary--full" [disabled]="isSaving()">
+          <button type="submit" class="btn-primary btn-primary--full" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
             @if (isSaving()) {
               <span class="spinner"></span> Salvando...
             } @else if (currentInstallmentIndex() === currentPurchase()!.installmentsCount) {
@@ -340,9 +344,9 @@
       </p>
 
       <div class="modal-actions modal-actions--center">
-        <button type="button" class="btn-secondary" (click)="cancelCloseStep2()" [disabled]="isSaving()">Continuar cadastrando</button>
-        <button type="button" class="btn-ghost btn-ghost--warn" (click)="confirmCloseStep2()" [disabled]="isSaving()">Sair assim mesmo</button>
-        <button type="button" class="btn-danger" [disabled]="isSaving()" (click)="deletePurchaseFromStep2()">
+        <button type="button" class="btn-secondary" (click)="cancelCloseStep2()" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">Continuar cadastrando</button>
+        <button type="button" class="btn-ghost btn-ghost--warn" (click)="confirmCloseStep2()" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">Sair assim mesmo</button>
+        <button type="button" class="btn-danger" [disabled]="isSaving() || financialRecovery.state() !== 'clear'" (click)="deletePurchaseFromStep2()">
           @if (isSaving()) { <span class="spinner spinner--light"></span> Excluindo... } @else { Excluir compra }
         </button>
       </div>
@@ -420,7 +424,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving() || eligiblePockets().length === 0 || financialRecovery.state() !== 'clear'">
+          <button type="submit" class="btn-primary" [disabled]="isSaving() || !canPay(selectedBill()) || eligiblePockets().length === 0 || financialRecovery.state() !== 'clear'">
             @if (isSaving()) { <span class="spinner"></span> Pagando... } @else { Confirmar pagamento }
           </button>
         </div>

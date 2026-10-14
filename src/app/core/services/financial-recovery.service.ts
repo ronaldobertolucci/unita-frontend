@@ -12,6 +12,8 @@ interface PendingOperation {
   label: string;
   pocketIds: number[];
   cardId?: number;
+  billId?: number;
+  message?: string;
 }
 
 export interface PocketReview {
@@ -85,7 +87,7 @@ export class FinancialRecoveryService {
     const cards = operation.cardId === undefined ? of([] as CreditCardBillDto[]) :
       this.injector.get(CreditCardService).loadCreditCards().pipe(switchMap(list =>
         list.some(card => card.id === operation.cardId)
-          ? this.injector.get(CreditCardService).getBills(operation.cardId!)
+          ? this.readBills(operation)
           : of([] as CreditCardBillDto[])));
     this.session.scoped(() => forkJoin({ pockets: this.refreshPockets(operation.pocketIds), bills: cards }))
       .pipe(finalize(() => {
@@ -98,6 +100,15 @@ export class FinancialRecoveryService {
         },
         error: () => {},
       });
+  }
+
+  private readBills(operation: PendingOperation): Observable<CreditCardBillDto[]> {
+    const cards = this.injector.get(CreditCardService);
+    const list = cards.getBills(operation.cardId!);
+    if (operation.billId === undefined) return list;
+    return forkJoin({ list, bill: cards.getBill(operation.cardId!, operation.billId) }).pipe(
+      map(({ list, bill }) => [...list.filter(item => item.id !== bill.id), bill]),
+    );
   }
 
   confirm(): void {

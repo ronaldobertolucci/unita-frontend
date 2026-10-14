@@ -1,5 +1,5 @@
 import { TransferResultDto } from '../../core/models/transaction.model';
-import { financialErrorMessage, isUncertainFinancialWrite } from '../../core/utils/financial-operation.util';
+import { financialWriteErrorMessage, isUncertainFinancialWrite } from '../../core/utils/financial-operation.util';
 import { FinancialRecoveryService } from '../../core/services/financial-recovery.service';
 import { FinancialRecoveryComponent } from '../../shared/financial-recovery/financial-recovery.component';
 import { Component, inject, signal, computed, OnInit, OnDestroy, DestroyRef } from '@angular/core';
@@ -183,10 +183,10 @@ export class TransfersComponent implements OnInit, OnDestroy {
       this.ownForm.markAllAsTouched();
       return;
     }
+    const { sourcePocketId, targetPocketId, amount, description } = this.ownForm.value;
+    if (!this.validateSelection('own', Number(sourcePocketId), Number(targetPocketId), amount!)) return;
     this.clearMessages();
     this.isSaving.set(true);
-
-    const { sourcePocketId, targetPocketId, amount, description } = this.ownForm.value;
     this.financialRecovery.trackWrite({
       label: `${description} · ${this.formatAmount(amount!)}`,
       pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
@@ -201,11 +201,9 @@ export class TransfersComponent implements OnInit, OnDestroy {
         this.refreshAfterTransfer(sourcePocketId!, targetPocketId!, result);
         this.ownForm.reset();
         this.successMessage.set('Transferência realizada com sucesso!');
-        this.isSaving.set(false);
       },
       error: err => {
         this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
-        this.isSaving.set(false);
       },
     });
   }
@@ -216,10 +214,10 @@ export class TransfersComponent implements OnInit, OnDestroy {
       this.groupForm.markAllAsTouched();
       return;
     }
+    const { sourcePocketId, targetPocketId, amount, description } = this.groupForm.value;
+    if (!this.validateSelection('group', Number(sourcePocketId), Number(targetPocketId), amount!)) return;
     this.clearMessages();
     this.isSaving.set(true);
-
-    const { sourcePocketId, targetPocketId, amount, description } = this.groupForm.value;
     this.financialRecovery.trackWrite({
       label: `${description} · ${this.formatAmount(amount!)}`,
       pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
@@ -235,11 +233,9 @@ export class TransfersComponent implements OnInit, OnDestroy {
         this.groupForm.reset();
         this.groupPockets.set([]);
         this.successMessage.set('Transferência realizada com sucesso!');
-        this.isSaving.set(false);
       },
       error: err => {
         this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
-        this.isSaving.set(false);
       },
     });
   }
@@ -250,10 +246,10 @@ export class TransfersComponent implements OnInit, OnDestroy {
       this.fgtsForm.markAllAsTouched();
       return;
     }
+    const { sourcePocketId, targetPocketId, amount, description } = this.fgtsForm.value;
+    if (!this.validateSelection('fgts', Number(sourcePocketId), Number(targetPocketId), amount!)) return;
     this.clearMessages();
     this.isSaving.set(true);
-
-    const { sourcePocketId, targetPocketId, amount, description } = this.fgtsForm.value;
     this.financialRecovery.trackWrite({
       label: `${description} · ${this.formatAmount(amount!)}`,
       pocketIds: [Number(sourcePocketId), Number(targetPocketId)],
@@ -268,13 +264,28 @@ export class TransfersComponent implements OnInit, OnDestroy {
         this.refreshAfterTransfer(sourcePocketId!, targetPocketId!, result);
         this.fgtsForm.reset();
         this.successMessage.set('Saque de FGTS realizado com sucesso!');
-        this.isSaving.set(false);
       },
       error: err => {
         this.handleTransferError(err, sourcePocketId!, targetPocketId!, amount!, description!);
-        this.isSaving.set(false);
       },
     });
+  }
+
+  private validateSelection(tab: TransferTab, sourceId: number, targetId: number, amount: number): boolean {
+    const sources = tab === 'fgts' ? this.fgtsPockets() : this.eligibleSourcePockets();
+    const source = sources.find(p => p.id === sourceId);
+    const targetAllowed = tab === 'group'
+      ? this.groupPockets().some(p => p.id === targetId && p.user.id !== this.authService.currentUser()?.id && p.user.id === Number(this.groupForm.value.targetMemberId))
+      : this.eligibleSourcePockets().some(p => p.id === targetId);
+    if (!source || !targetAllowed || sourceId === targetId) {
+      this.errorMessage.set('Revise as contas de origem e destino antes de enviar.');
+      return false;
+    }
+    if (amount > source.balance) {
+      this.errorMessage.set('Saldo exibido insuficiente no pocket de origem. Revise o valor ou atualize as contas.');
+      return false;
+    }
+    return true;
   }
 
   private refreshAfterTransfer(sourceId: number, targetId: number, result: TransferResultDto): void {
@@ -282,9 +293,14 @@ export class TransfersComponent implements OnInit, OnDestroy {
       next: pockets => {
         const missing = pockets.some(p => !p.transactions.some(tx => tx.id ===
           (p.id === Number(sourceId) ? result.sourceTransaction.id : result.targetTransaction.id)));
+        this.isSaving.set(false);
         if (missing) this.errorMessage.set('Operação realizada. Confira os extratos: os lançamentos ainda não foram localizados na consulta.');
       },
-      error: () => this.errorMessage.set('Operação realizada. Não foi possível atualizar os saldos e extratos. Consulte os pockets antes de uma nova operação.'),
+      error: () => {
+        this.isSaving.set(false);
+        this.financialRecovery.mark({ label: 'Atualização após transferência ou saque', pocketIds: [sourceId, targetId], message: 'A operação foi realizada, mas os saldos e extratos não puderam ser atualizados. Confira os dados antes de uma nova operação.' });
+        this.financialRecovery.check();
+      },
     });
   }
 
@@ -293,12 +309,20 @@ export class TransfersComponent implements OnInit, OnDestroy {
       this.financialRecovery.mark({
         label: `${description} · ${this.formatAmount(amount)}`,
         pocketIds: [sourceId, targetId],
+        message: financialWriteErrorMessage(error, 'Erro ao realizar operação.'),
       });
+      this.isSaving.set(false);
       this.financialRecovery.check();
       this.errorMessage.set(null);
     } else {
-      this.errorMessage.set(financialErrorMessage(error, 'transaction', 'Erro ao realizar operação.'));
-      this.financialRecovery.refreshPockets([sourceId, targetId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
+      this.errorMessage.set(financialWriteErrorMessage(error, 'Erro ao realizar operação.'));
+      this.financialRecovery.refreshPockets([sourceId, targetId]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => this.isSaving.set(false),
+        error: () => {
+          this.isSaving.set(false);
+          this.financialRecovery.mark({ label: 'Conferência após operação rejeitada', pocketIds: [sourceId, targetId], message: 'A operação foi rejeitada, mas não foi possível atualizar as contas. Consulte os dados antes de enviar novamente.' });
+        },
+      });
       if (error.status === 404) {
         this.ownForm.patchValue({ sourcePocketId: null, targetPocketId: null });
         this.fgtsForm.patchValue({ sourcePocketId: null, targetPocketId: null });

@@ -341,7 +341,9 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.btn-bill-action:hover {
+.btn-bill-action:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.btn-bill-action:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
 }
@@ -354,7 +356,7 @@
   box-shadow: 0 2px 10px var(--accent-glow);
 }
 
-.btn-bill-action--primary:hover {
+.btn-bill-action--primary:hover:not(:disabled) {
   background: var(--accent-hover);
   color: #060b17;
 }

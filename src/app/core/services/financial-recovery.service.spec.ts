@@ -57,13 +57,14 @@ describe('Financial recovery with the actual HTTP read services', () => {
   });
 
   it('refreshes bill history and the payment account before offering reconciliation', () => {
-    service.mark({ label: 'Pagamento de fatura', pocketIds: [10], cardId: 7 });
+    service.mark({ label: 'Pagamento de fatura', pocketIds: [10], cardId: 7, billId: 3 });
     service.check();
     backend.expectOne(`${base}/credit-cards/my`).flush([{ id: 7 }]);
     backend.expectOne(`${base}/pockets/my`).flush([ownPocket]);
     backend.expectOne(`${base}/pockets/10/balance`).flush(20);
     backend.expectOne(`${base}/pockets/10/transactions`).flush([{ ...tx, operationType: 'BILL_PAYMENT', operationId: 3 }]);
     backend.expectOne(`${base}/credit-cards/7/bills`).flush([{ id: 3, status: 'PAID', dueDate: '2026-10-13', totalAmount: 80 }]);
+    backend.expectOne(`${base}/credit-cards/7/bills/3`).flush({ id: 3, status: 'PAID', dueDate: '2026-10-13', totalAmount: 80 });
     expect(service.bills()[0].status).toBe('PAID');
     expect(service.state()).toBe('review');
   });
