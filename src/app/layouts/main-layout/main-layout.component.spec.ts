@@ -92,6 +92,14 @@ describe('MainLayoutComponent', () => {
       expect(component).toBeTruthy();
     });
 
+    it('places Recorrentes after Transferências and inside the mobile overflow menu', () => {
+      const paths = component.navItems.map(item => item.path);
+      expect(paths.indexOf('/recurring-bills')).toBe(paths.indexOf('/transfers') + 1);
+      expect(component.primaryNavItems.some(item => item.path === '/recurring-bills')).toBe(false);
+      component.toggleMoreMenu(); fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-more-panel] a[href="/recurring-bills"]')).not.toBeNull();
+    });
+
     it('should call loadInvitations on init', () => {
       expect(notificationServiceSpy.loadInvitations).toHaveBeenCalled();
     });

@@ -1,75 +1,151 @@
-<div class="recurring-page">
-  <p class="intro">Organize compromissos mensais e anuais. Valores e vencimentos são previsões.</p>
-  @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
-  @if (success()) { <p class="notice success" role="status">{{ success() }}</p> }
+<div class="page">
+  @if (error() && !editorOpen()) { <p class="notice error" role="alert">{{ error() }}</p> }
+  @if (success() && !editorOpen()) { <p class="notice success" role="status">{{ success() }}</p> }
 
   @if (recovery()?.kind === 'create') {
-    <section class="notice" aria-label="Revisão de cadastro">
+    <section class="notice recovery-notice" aria-label="Revisão de cadastro">
       <p>O cadastro pode ter sido concluído. Consulte todas as páginas da lista e confira se ele já existe antes de cadastrar novamente. Descrições iguais são permitidas.</p>
       <div class="actions">
-        <button type="button" (click)="checkRecovery()" [disabled]="loadingList()">Consultar cadastros</button>
-        <button type="button" (click)="confirmCreationReview()" [disabled]="!creationChecked() || loadingList()">Revisei a lista</button>
+        <button class="btn-secondary" type="button" (click)="checkRecovery()" [disabled]="loadingList()">Consultar cadastros</button>
+        <button class="btn-secondary" type="button" (click)="confirmCreationReview()" [disabled]="!creationChecked() || loadingList()">Revisei a lista</button>
       </div>
     </section>
   }
 
-  <section class="panel" aria-labelledby="upcoming-title">
+  <div class="toggle-group tabs__toggle" role="tablist" aria-label="Recorrências">
+    <button id="recurring-upcoming-tab" class="toggle-btn" type="button" role="tab"
+      [class.toggle-btn--active]="activeTab() === 'upcoming'" [attr.aria-selected]="activeTab() === 'upcoming'"
+      [attr.tabindex]="activeTab() === 'upcoming' ? 0 : -1" aria-controls="recurring-upcoming-panel"
+      (click)="activeTab.set('upcoming')" (keydown)="onTabKeydown($event)">Previsões do mês</button>
+    <button id="recurring-bills-tab" class="toggle-btn" type="button" role="tab"
+      [class.toggle-btn--active]="activeTab() === 'bills'" [attr.aria-selected]="activeTab() === 'bills'"
+      [attr.tabindex]="activeTab() === 'bills' ? 0 : -1" aria-controls="recurring-bills-panel"
+      (click)="activeTab.set('bills')" (keydown)="onTabKeydown($event)">Minhas recorrências</button>
+  </div>
+
+  <section id="recurring-upcoming-panel" role="tabpanel" aria-labelledby="recurring-upcoming-tab"
+    [hidden]="activeTab() !== 'upcoming'" tabindex="0">
     <div class="section-header">
-      <div><h2 id="upcoming-title">Previsões do mês</h2><p>Somente recorrências ativas, com ou sem e-mail.</p></div>
+      <div><h2 id="upcoming-title">Previsões do mês</h2><p>Valores e vencimentos previstos das recorrências ativas.</p></div>
       <div class="actions">
-        <label for="month">Mês <input id="month" type="month" min="1900-01" max="9998-12" [value]="month()" (change)="changeMonth($any($event.target).value)"></label>
-        <button type="button" (click)="loadUpcoming()" [disabled]="loadingUpcoming()">Atualizar previsões</button>
+        <label class="filter-field" for="month">Mês
+          <input id="month" type="month" min="1900-01" max="9998-12" [value]="month()" (change)="changeMonth($any($event.target).value)">
+        </label>
+        <button class="btn-action" type="button" (click)="loadUpcoming()" [disabled]="loadingUpcoming()" aria-label="Atualizar previsões" title="Atualizar previsões">
+          <ng-container *ngTemplateOutlet="refreshIcon" />
+        </button>
       </div>
     </div>
     @if (upcomingError()) { <p class="notice error" role="alert">{{ upcomingError() }}</p> }
-    @else if (loadingUpcoming()) { <p role="status" class="empty">Consultando previsões…</p> }
-    @else if (!occurrences().length) { <p class="empty">Nenhum vencimento previsto neste mês.</p> }
+    @else if (loadingUpcoming()) {
+      <div role="status" class="loading-state"><span class="spinner-lg" aria-hidden="true"></span><span class="sr-only">Consultando previsões…</span></div>
+    }
+    @else if (!occurrences().length) {
+      <div class="empty-state">
+        <div class="empty-icon"><ng-container *ngTemplateOutlet="calendarIcon" /></div>
+        <h3>Nenhum vencimento neste mês</h3>
+        <p>As previsões aparecem aqui quando há recorrências ativas com vencimento no mês selecionado.</p>
+      </div>
+    }
     @else {
-      <div class="table-wrap"><table>
-        <thead><tr><th scope="col">Descrição</th><th scope="col">Vencimento previsto</th><th scope="col">Valor previsto</th></tr></thead>
-        <tbody>@for (item of occurrences(); track item.recurringBillId) {
-          <tr><td>{{ item.description }}</td><td>{{ dateLabel(item.dueDate) }}</td><td>{{ amountLabel(item.expectedAmount) }}</td></tr>
-        }</tbody>
-      </table></div>
+      <ul class="bills-list">
+        @for (item of occurrences(); track item.recurringBillId) {
+          <li class="bill-card occurrence-card">
+            <div class="bill-icon"><ng-container *ngTemplateOutlet="calendarIcon" /></div>
+            <div class="bill-body"><span class="bill-description">{{ item.description }}</span><span class="bill-meta">Vencimento previsto · {{ dateLabel(item.dueDate) }}</span></div>
+            <span class="bill-amount" [class.bill-amount--unknown]="item.expectedAmount === null">{{ amountLabel(item.expectedAmount) }}</span>
+          </li>
+        }
+      </ul>
     }
   </section>
 
-  <section class="panel" aria-labelledby="bills-title">
+  <section id="recurring-bills-panel" role="tabpanel" aria-labelledby="recurring-bills-tab"
+    [hidden]="activeTab() !== 'bills'" tabindex="0">
     <div class="section-header">
-      <div><h2 id="bills-title">Meus cadastros</h2><p>Uma recorrência pausada continua disponível para edição.</p></div>
+      <div><h2 id="bills-title">Minhas recorrências</h2><p>Gerencie os vencimentos e as preferências de e-mail.</p></div>
       <div class="actions">
-        <label for="active-filter">Mostrar <select id="active-filter" [value]="filter()" (change)="changeFilter($any($event.target).value)">
-          <option value="all">Todos</option><option value="active">Ativos</option><option value="paused">Pausados</option>
-        </select></label>
-        <button type="button" (click)="loadList(page()?.page ?? 0)" [disabled]="loadingList()">Atualizar lista</button>
-        <button class="primary" type="button" (click)="openCreate()" [disabled]="busy() || !!recovery()">Nova recorrência</button>
+        <label class="filter-field" for="active-filter">Mostrar
+          <select id="active-filter" [value]="filter()" (change)="changeFilter($any($event.target).value)">
+            <option value="all">Todas</option><option value="active">Ativas</option><option value="paused">Pausadas</option>
+          </select>
+        </label>
+        <button class="btn-action" type="button" (click)="loadList(page()?.page ?? 0)" [disabled]="loadingList()" aria-label="Atualizar lista" title="Atualizar lista">
+          <ng-container *ngTemplateOutlet="refreshIcon" />
+        </button>
       </div>
     </div>
     @if (listError()) { <p class="notice error" role="alert">{{ listError() }}</p> }
-    @else if (loadingList()) { <p role="status" class="empty">Consultando cadastros…</p> }
-    @else if (!page()?.content?.length) { <p class="empty">Nenhum cadastro para este filtro.</p> }
+    @else if (loadingList()) {
+      <div role="status" class="loading-state"><span class="spinner-lg" aria-hidden="true"></span><span class="sr-only">Consultando cadastros…</span></div>
+    }
+    @else if (!page()?.content?.length) {
+      <div class="empty-state">
+        <div class="empty-icon"><ng-container *ngTemplateOutlet="calendarIcon" /></div>
+        <h3>{{ filter() === 'all' ? 'Nenhuma recorrência ainda' : 'Nenhuma recorrência para este filtro' }}</h3>
+        <p>Organize compromissos mensais e anuais para acompanhar os próximos vencimentos.</p>
+        @if (filter() === 'all') {
+          <button class="btn-primary" type="button" (click)="openCreate()" [disabled]="busy() || !!recovery()">Criar primeira recorrência</button>
+        }
+      </div>
+    }
     @else {
-      <div class="table-wrap"><table>
-        <thead><tr><th scope="col">Descrição</th><th scope="col">Frequência / âncora</th><th scope="col">Valor previsto</th><th scope="col">Recorrência / e-mail</th><th scope="col">Ações</th></tr></thead>
-        <tbody>@for (bill of page()!.content; track bill.id) {
-          <tr><td>{{ bill.description }}</td><td>{{ bill.frequency === 'MONTHLY' ? 'Mensal' : 'Anual' }}<small>{{ dateLabel(bill.firstDueDate) }}</small></td>
-            <td>{{ amountLabel(bill.expectedAmount) }}</td><td><span class="badge" [class.paused]="!bill.active">{{ bill.active ? 'Ativa' : 'Pausada' }}</span><small>E-mail {{ bill.emailEnabled ? 'ligado' : 'desligado' }}</small></td>
-            <td><button type="button" (click)="edit(bill.id)" [disabled]="busy() || !!recovery()" [attr.aria-label]="'Editar ' + bill.description">Editar</button></td></tr>
-        }</tbody>
-      </table></div>
+      <ul class="bills-list">
+        @for (bill of page()!.content; track bill.id) {
+          <li>
+            <button class="bill-card bill-card--interactive" type="button" (click)="edit(bill.id)" [disabled]="busy() || !!recovery()" [attr.aria-label]="'Editar ' + bill.description">
+              <span class="bill-icon" [class.bill-icon--paused]="!bill.active"><ng-container *ngTemplateOutlet="calendarIcon" /></span>
+              <span class="bill-body">
+                <span class="bill-name-row"><span class="bill-description">{{ bill.description }}</span><span class="badge" [class.badge--paused]="!bill.active">{{ bill.active ? 'Ativa' : 'Pausada' }}</span></span>
+                <span class="bill-meta">{{ bill.frequency === 'MONTHLY' ? 'Mensal' : 'Anual' }} · Âncora {{ dateLabel(bill.firstDueDate) }}</span>
+                <span class="bill-meta">E-mail {{ bill.emailEnabled ? 'ligado' : 'desligado' }}</span>
+              </span>
+              <span class="bill-amount" [class.bill-amount--unknown]="bill.expectedAmount === null">{{ amountLabel(bill.expectedAmount) }}</span>
+              <svg class="bill-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
+            </button>
+          </li>
+        }
+      </ul>
     }
     @if (page(); as result) {
-      <nav class="pagination" aria-label="Páginas de recorrentes">
-        <span>{{ result.totalElements }} cadastro(s) · Página {{ result.page + 1 }} de {{ result.totalPages || 1 }}</span>
-        <button type="button" [disabled]="loadingList() || result.page === 0" (click)="loadList(result.page - 1)">Anterior</button>
-        <button type="button" [disabled]="loadingList() || result.page + 1 >= result.totalPages" (click)="loadList(result.page + 1)">Próxima</button>
-      </nav>
+      @if (result.totalElements > 0) {
+        <nav class="pagination" aria-label="Páginas de recorrentes">
+          <span>{{ result.totalElements }} cadastro(s) · Página {{ result.page + 1 }} de {{ result.totalPages || 1 }}</span>
+          @if (result.totalPages > 1) {
+            <button class="btn-action" type="button" [disabled]="loadingList() || result.page === 0" (click)="loadList(result.page - 1)">Anterior</button>
+            <button class="btn-action" type="button" [disabled]="loadingList() || result.page + 1 >= result.totalPages" (click)="loadList(result.page + 1)">Próxima</button>
+          }
+        </nav>
+      }
     }
   </section>
+</div>
 
-  @if (editorOpen()) {
-    <section class="panel editor" aria-labelledby="editor-title">
-      <h2 id="editor-title">{{ editing() || reviewing() ? 'Editar recorrência' : 'Nova recorrência' }}</h2>
+<ng-template #calendarIcon>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="16" rx="3" /><path d="M16 3v4M8 3v4M3 11h18m-12 5 2 2 4-4" />
+  </svg>
+</ng-template>
+<ng-template #refreshIcon>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17" />
+  </svg>
+</ng-template>
+
+@if (editorOpen()) {
+  <dialog #editorDialog class="modal-overlay" aria-labelledby="editor-title"
+    (click)="closeEditor()" (cancel)="$event.preventDefault(); closeEditor()">
+    <div class="modal modal--wide" [class.modal--review]="reviewing()" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="editor-title">{{ editing() || reviewing() ? 'Editar recorrência' : 'Nova recorrência' }}</h3>
+        <button class="modal-close" type="button" aria-label="Fechar" (click)="closeEditor()" [disabled]="busy() || !!recovery()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="m18 6-12 12M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+      @if (success()) { <p class="notice success" role="status">{{ success() }}</p> }
       <p class="hint">A âncora mantém o dia original. Meses sem esse dia usam o último dia do mês. Datas passadas são permitidas.</p>
       @if (reviewing()) {
         <div class="notice" role="status">
@@ -83,35 +159,73 @@
               }</tbody>
             </table></div>
             @if (frequencyLocked()) { <p>A frequência atual será preservada; as demais alterações podem ser revisadas.</p> }
-            <div class="actions">
-              <button type="button" (click)="useLatest()" [disabled]="busy()">Usar cadastro atual</button>
-              <button type="button" (click)="keepDraft()" [disabled]="busy()">Revisar minhas alterações com esta versão</button>
+            <div class="actions review-actions">
+              <button class="btn-secondary" type="button" (click)="useLatest()" [disabled]="busy()">Usar cadastro atual</button>
+              <button class="btn-secondary" type="button" (click)="keepDraft()" [disabled]="busy()">Revisar minhas alterações com esta versão</button>
             </div>
           } @else {
-            <button type="button" (click)="checkRecovery()" [disabled]="busy()">{{ busy() ? 'Consultando…' : 'Consultar detalhe novamente' }}</button>
+            <button class="btn-secondary" type="button" (click)="checkRecovery()" [disabled]="busy()">{{ busy() ? 'Consultando…' : 'Consultar detalhe novamente' }}</button>
           }
         </div>
       }
-      <form [formGroup]="form" (ngSubmit)="save()">
+      <form [formGroup]="form" (ngSubmit)="save()" novalidate [attr.aria-busy]="busy()">
         <fieldset [disabled]="busy() || reviewing()">
           <div class="form-grid">
-            <div class="field wide"><label for="description">Descrição *</label><input id="description" formControlName="description" maxlength="255" [attr.aria-invalid]="!!fieldError('description')" aria-describedby="description-error"><p id="description-error" class="field-error">{{ fieldError('description') }}</p></div>
-            <div class="field"><label for="expectedAmount">Valor previsto (R$)</label><input id="expectedAmount" type="text" inputmode="decimal" formControlName="expectedAmount" placeholder="não informado" [attr.aria-invalid]="!!fieldError('expectedAmount')" aria-describedby="amount-help expectedAmount-error"><small id="amount-help">Opcional. Até 9999999999999,99; no máximo 2 decimais.</small><p id="expectedAmount-error" class="field-error">{{ fieldError('expectedAmount') }}</p></div>
-            <div class="field"><label for="frequency">Frequência *</label>@if (frequencyLocked()) { <input id="frequency" readonly [value]="form.controls.frequency.value === 'MONTHLY' ? 'Mensal' : 'Anual'"> } @else { <select id="frequency" formControlName="frequency"><option value="MONTHLY">Mensal</option><option value="YEARLY">Anual</option></select> }<p class="field-error">{{ fieldError('frequency') }}</p>@if (frequencyLocked()) { <small>A frequência está bloqueada após tentativa de envio.</small> }</div>
-            <div class="field"><label for="firstDueDate">Primeiro vencimento / âncora *</label><input id="firstDueDate" type="date" min="1900-01-01" max="9998-12-31" formControlName="firstDueDate" [attr.aria-invalid]="!!fieldError('firstDueDate')" aria-describedby="firstDueDate-error"><p id="firstDueDate-error" class="field-error">{{ fieldError('firstDueDate') }}</p></div>
-            <div class="field"><label for="reminderDaysBefore">Lembrar quantos dias antes? *</label><input id="reminderDaysBefore" type="number" min="0" max="30" step="1" formControlName="reminderDaysBefore" [attr.aria-invalid]="!!fieldError('reminderDaysBefore')" aria-describedby="reminderDaysBefore-error"><p id="reminderDaysBefore-error" class="field-error">{{ fieldError('reminderDaysBefore') }}</p></div>
-            <div class="field wide"><label for="notes">Notas</label><textarea id="notes" rows="3" maxlength="2000" formControlName="notes" [attr.aria-invalid]="!!fieldError('notes')" aria-describedby="notes-help notes-error"></textarea><small id="notes-help">Até 2000 caracteres. Não incluídas no e-mail.</small><p id="notes-error" class="field-error">{{ fieldError('notes') }}</p></div>
+            <div class="field wide" [class.field--invalid]="!!fieldError('description')">
+              <label for="description">Descrição *</label>
+              <input id="description" autofocus placeholder="Ex: Internet, aluguel ou seguro" formControlName="description" maxlength="255" [attr.aria-invalid]="!!fieldError('description')" aria-describedby="description-error">
+              <p id="description-error" class="field-error">{{ fieldError('description') }}</p>
+            </div>
+            <div class="field" [class.field--invalid]="!!fieldError('expectedAmount')">
+              <label for="expectedAmount">Valor previsto (R$)</label>
+              <input id="expectedAmount" type="text" inputmode="decimal" formControlName="expectedAmount" placeholder="não informado" [attr.aria-invalid]="!!fieldError('expectedAmount')" aria-describedby="amount-help expectedAmount-error">
+              <small id="amount-help">Opcional. Até 9.999.999.999.999,99, com até 2 decimais.</small>
+              <p id="expectedAmount-error" class="field-error">{{ fieldError('expectedAmount') }}</p>
+            </div>
+            <div class="field" [class.field--invalid]="!!fieldError('frequency')">
+              <label for="frequency">Frequência *</label>
+              @if (frequencyLocked()) {
+                <input id="frequency" readonly [value]="form.controls.frequency.value === 'MONTHLY' ? 'Mensal' : 'Anual'">
+              } @else {
+                <select id="frequency" formControlName="frequency" [attr.aria-invalid]="!!fieldError('frequency')" aria-describedby="frequency-error">
+                  <option value="MONTHLY">Mensal</option><option value="YEARLY">Anual</option>
+                </select>
+              }
+              <p id="frequency-error" class="field-error">{{ fieldError('frequency') }}</p>
+              @if (frequencyLocked()) { <small>A frequência está bloqueada após tentativa de envio.</small> }
+            </div>
+            <div class="field" [class.field--invalid]="!!fieldError('firstDueDate')">
+              <label for="firstDueDate">Primeiro vencimento / âncora *</label>
+              <input id="firstDueDate" type="date" min="1900-01-01" max="9998-12-31" formControlName="firstDueDate" [attr.aria-invalid]="!!fieldError('firstDueDate')" aria-describedby="firstDueDate-error">
+              <p id="firstDueDate-error" class="field-error">{{ fieldError('firstDueDate') }}</p>
+            </div>
+            <div class="field" [class.field--invalid]="!!fieldError('reminderDaysBefore')">
+              <label for="reminderDaysBefore">Lembrar quantos dias antes? *</label>
+              <input id="reminderDaysBefore" type="number" min="0" max="30" step="1" formControlName="reminderDaysBefore" [attr.aria-invalid]="!!fieldError('reminderDaysBefore')" aria-describedby="reminderDaysBefore-error">
+              <p id="reminderDaysBefore-error" class="field-error">{{ fieldError('reminderDaysBefore') }}</p>
+            </div>
+            <div class="field wide" [class.field--invalid]="!!fieldError('notes')">
+              <label for="notes">Notas</label>
+              <textarea id="notes" rows="3" maxlength="2000" formControlName="notes" [attr.aria-invalid]="!!fieldError('notes')" aria-describedby="notes-help notes-error"></textarea>
+              <small id="notes-help">Até 2000 caracteres. Não incluídas no e-mail.</small>
+              <p id="notes-error" class="field-error">{{ fieldError('notes') }}</p>
+            </div>
             <label class="checkbox"><input type="checkbox" formControlName="active"> Recorrência ativa</label>
             <label class="checkbox"><input type="checkbox" formControlName="emailEnabled"> Lembretes por e-mail</label>
           </div>
         </fieldset>
-        <p class="hint">Desmarque “Recorrência ativa” para pausar. Desligar o e-mail mantém as previsões quando a recorrência está ativa.</p>
-        <p class="hint">Lembretes usam seu e-mail atual confirmado, a partir das 08h em America/Sao_Paulo. O cadastro não dispara um envio imediato. Uma comunicação já em envio pode chegar após pausar ou desligar os lembretes.</p>
-        <div class="actions">
-          <button class="primary" type="submit" [disabled]="busy() || !!recovery() || reviewing()">{{ busy() ? 'Aguarde…' : 'Salvar recorrência' }}</button>
-          <button type="button" (click)="closeEditor()" [disabled]="busy() || !!recovery()">Fechar</button>
+        <details class="form-help">
+          <summary>Sobre as previsões e os lembretes</summary>
+          <p class="hint">Desmarque “Recorrência ativa” para pausar. Desligar o e-mail mantém as previsões quando a recorrência está ativa.</p>
+          <p class="hint">Lembretes usam seu e-mail atual confirmado, a partir das 08h em America/Sao_Paulo. O cadastro não dispara um envio imediato. Uma comunicação já em envio pode chegar após pausar ou desligar os lembretes.</p>
+        </details>
+        <div class="modal-actions">
+          <button class="btn-secondary" type="button" (click)="closeEditor()" [disabled]="busy() || !!recovery()">Cancelar</button>
+          <button class="btn-primary" type="submit" [disabled]="busy() || !!recovery() || reviewing()">
+            @if (busy()) { <span class="spinner" aria-hidden="true"></span> Salvando... } @else { Salvar recorrência }
+          </button>
         </div>
       </form>
-    </section>
-  }
-</div>
+    </div>
+  </dialog>
+}

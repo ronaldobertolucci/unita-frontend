@@ -1,6 +1,6 @@
 <div class="page">
   @if (recovery.cards() !== 'clear') {
-    <div class="creation-recovery" role="alert">
+    <div class="creation-recovery review-notice" role="alert">
       <p>Não foi possível confirmar a criação. Confira a lista antes de tentar novamente para evitar duplicidade.</p>
       @if (recovery.cards() === 'review') {
         <button type="button" class="btn-secondary" (click)="recovery.confirm('cards')">Conferi a lista</button>

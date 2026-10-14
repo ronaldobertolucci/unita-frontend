@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { RecurringBillsComponent } from './recurring-bills.component';
 import { RecurringBill } from '../../core/models/recurring-bill.model';
 import { RecurringBillService } from '../../core/services/recurring-bill.service';
+import { PageContextService } from '../../core/services/page-context.service';
 import { SessionService } from '../../core/services/session.service';
 import { syntheticSession } from '../../core/testing/session.mock';
 import { environment } from '../../../environments/environment';
@@ -19,6 +20,15 @@ describe('US-07 recurring panel', () => {
   let http: HttpTestingController;
   let session: SessionService;
   const url = `${environment.apiUrl}/recurring-bills`;
+  // jsdom does not implement the native dialog API.
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; };
+  });
+  afterAll(() => {
+    delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).showModal;
+    delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
+  });
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [RecurringBillsComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
     http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionService);
@@ -38,6 +48,71 @@ describe('US-07 recurring panel', () => {
   }
   function openEdit() { c.edit(7); http.expectOne(`${url}/7`).flush(bill); }
   function validCreate() { c.openCreate(); c.form.patchValue({ description: 'Renovação', firstDueDate: '2024-02-29', frequency: 'YEARLY' }); }
+
+  it('shows one panel at a time and preserves filters when switching tabs', () => {
+    fixture.detectChanges();
+    const upcoming = fixture.nativeElement.querySelector('#recurring-upcoming-panel');
+    const bills = fixture.nativeElement.querySelector('#recurring-bills-panel');
+    expect(upcoming.hidden).toBe(false);
+    expect(bills.hidden).toBe(true);
+    const billsTab = fixture.nativeElement.querySelector('#recurring-bills-tab');
+    billsTab.click(); fixture.detectChanges();
+    expect(upcoming.hidden).toBe(true);
+    expect(bills.hidden).toBe(false);
+    c.changeFilter('paused'); flushList([{ ...bill, active: false }]);
+    billsTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    fixture.detectChanges();
+    expect(upcoming.hidden).toBe(false);
+    expect(billsTab.getAttribute('aria-selected')).toBe('false');
+    fixture.nativeElement.querySelector('#recurring-bills-tab').click(); fixture.detectChanges();
+    expect(c.filter()).toBe('paused');
+    expect(fixture.nativeElement.querySelector('#active-filter').value).toBe('paused');
+    http.expectNone(r => r.method === 'GET');
+  });
+
+  it('opens the header action in a modal and cancels without sending a write', () => {
+    TestBed.inject(PageContextService).ctaCallback()!();
+    fixture.detectChanges();
+    const dialog: HTMLDialogElement = fixture.nativeElement.querySelector('dialog');
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector('#editor-title')?.textContent).toContain('Nova recorrência');
+    dialog.querySelector<HTMLButtonElement>('.modal-close')!.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('dialog')).toBeNull();
+    http.expectNone(r => r.method === 'POST' || r.method === 'PATCH');
+  });
+
+  it('opens a list item for editing and dismisses via backdrop or Escape', () => {
+    c.activeTab.set('bills');
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('[aria-label="Editar Internet"]').click();
+    http.expectOne(`${url}/7`).flush(bill);
+    fixture.detectChanges();
+    const dialog: HTMLDialogElement = fixture.nativeElement.querySelector('dialog');
+    expect(dialog.open).toBe(true);
+    expect(dialog.querySelector<HTMLInputElement>('#description')?.value).toBe('Internet');
+    dialog.click();
+    fixture.detectChanges();
+    expect(c.editorOpen()).toBe(false);
+    c.openCreate(); fixture.detectChanges();
+    const cancel = new Event('cancel', { cancelable: true });
+    fixture.nativeElement.querySelector('dialog').dispatchEvent(cancel);
+    fixture.detectChanges();
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(c.editorOpen()).toBe(false);
+  });
+
+  it('keeps the modal open while saving and shows server errors inside it', () => {
+    validCreate(); c.save(); fixture.detectChanges();
+    const dialog: HTMLDialogElement = fixture.nativeElement.querySelector('dialog');
+    dialog.click();
+    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
+    expect(c.editorOpen()).toBe(true);
+    http.expectOne(url).flush({ errors: [{ field: 'description' }] }, { status: 400, statusText: 'Bad Request' });
+    fixture.detectChanges();
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toContain('Dados inválidos');
+    expect(fixture.nativeElement.querySelector('.page [role="alert"]')).toBeNull();
+  });
 
   it('renders official LocalDate projection and unknown amounts independently of the list filter', () => {
     c.changeMonth('2027-02'); expect(flushUpcoming().request.params.get('month')).toBe('2027-02');
@@ -80,6 +155,7 @@ describe('US-07 recurring panel', () => {
   });
   it('queries list after lost POST and blocks creation across navigation until explicit review', () => {
     validCreate(); c.save(); http.expectOne(url).error(new ProgressEvent('error'));
+    expect(c.activeTab()).toBe('bills');
     c.openCreate(); c.save(); http.expectNone(r => r.method === 'POST');
     flushList(); flushUpcoming(); fixture.destroy();
     fixture = TestBed.createComponent(RecurringBillsComponent); c = fixture.componentInstance; fixture.detectChanges();

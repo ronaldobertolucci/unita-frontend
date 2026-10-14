@@ -1,0 +1,47 @@
+/* Feedback added to existing registration and recovery flows. */
+.review-notice {
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 0.845rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.review-notice > p + p { margin-top: 0.5rem; }
+.review-notice > button, .review-notice > .review-actions { margin-top: 0.75rem; }
+.review-notice > button + p { margin-top: 0.75rem; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.review-notice button.btn-secondary, .review-actions button.btn-secondary {
+  height: auto;
+  min-height: 40px;
+  padding: 0.6rem 1.1rem;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.review-notice .btn-secondary:disabled { opacity: 0.65; cursor: not-allowed; }
+.review-notice :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.review-history { list-style: none; margin: 0.75rem 0; }
+.review-history li { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle); }
+.review-history strong { color: var(--text-primary); font-size: 0.825rem; }
+.review-link { display: inline-block; color: var(--accent); text-underline-offset: 3px; }
+.review-link:hover { color: var(--accent-hover); }
+
+main[authAccessibility] .auth-notice {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+main[authAccessibility] .auth-recovery {
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+main[authAccessibility] .auth-recovery .auth-notice { margin: 0.75rem 0 0; }

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnDestroy, OnInit, effect, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -33,6 +33,7 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
   readonly loadingUpcoming = signal(false);
   readonly busy = signal(false);
   readonly editorOpen = signal(false);
+  private readonly editorDialog = viewChild<ElementRef<HTMLDialogElement>>('editorDialog');
   readonly editing = signal<RecurringBill | null>(null);
   readonly latest = signal<RecurringBill | null>(null);
   readonly reviewing = signal(false);
@@ -44,6 +45,7 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
   readonly success = signal('');
   readonly fieldErrors = signal<Record<string, string>>({});
   readonly filter = signal('all');
+  readonly activeTab = signal<'upcoming' | 'bills'>('upcoming');
   readonly month = signal(new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
   }).format(new Date()).slice(0, 7));
@@ -60,6 +62,10 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
   });
 
   constructor() {
+    effect(() => {
+      const dialog = this.editorDialog()?.nativeElement;
+      if (dialog && !dialog.open) dialog.showModal();
+    });
     this.session.registerCleanup(() => {
       this.inFlightWrite = null;
       this.page.set(null); this.occurrences.set([]); this.editorOpen.set(false);
@@ -103,6 +109,18 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
     });
   }
   changeFilter(value: string): void { this.filter.set(value); this.loadList(); }
+  onTabKeydown(event: KeyboardEvent): void {
+    let tab: 'upcoming' | 'bills';
+    if (event.key === 'Home') tab = 'upcoming';
+    else if (event.key === 'End') tab = 'bills';
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      tab = this.activeTab() === 'upcoming' ? 'bills' : 'upcoming';
+    } else return;
+    event.preventDefault();
+    this.activeTab.set(tab);
+    (event.currentTarget as HTMLElement).parentElement
+      ?.querySelector<HTMLButtonElement>(`#recurring-${tab}-tab`)?.focus();
+  }
   changeMonth(value: string): void { this.month.set(value); this.loadUpcoming(); }
   loadUpcoming(): void {
     this.upcomingRequest?.unsubscribe(); this.occurrences.set([]); this.upcomingError.set('');
@@ -126,7 +144,11 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
       this.fill(value); this.fieldErrors.set({}); this.editorOpen.set(true);
     }, error => this.handleReadError(error));
   }
-  closeEditor(): void { if (!this.busy() && !this.recovery()) this.editorOpen.set(false); }
+  closeEditor(): void {
+    if (this.busy() || this.recovery()) return;
+    this.editorDialog()?.nativeElement.close();
+    this.editorOpen.set(false);
+  }
   private fill(value: RecurringBillPayload): void {
     this.form.reset({ ...value, expectedAmount: value.expectedAmount === null ? '' : String(value.expectedAmount), notes: value.notes ?? '' });
   }
@@ -171,6 +193,7 @@ export class RecurringBillsComponent implements OnInit, OnDestroy {
   checkRecovery(): void {
     const state = this.recovery(); if (!state) return;
     if (state.kind === 'create') {
+      this.activeTab.set('bills');
       this.creationChecked.set(false); this.editorOpen.set(false); this.filter.set('all'); this.loadList(); this.loadUpcoming();
     } else {
       this.editorOpen.set(true); this.reviewing.set(true); this.latest.set(null);

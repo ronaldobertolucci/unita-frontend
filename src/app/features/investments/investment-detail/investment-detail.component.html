@@ -656,22 +656,24 @@
         @else { — }
       </p>
       @if (sellNeedsReview()) {
-      <div class="modal-error" role="status">
-        <div>
-          <p>Confira o resultado antes de reenviar.</p>
-          @if (sellReviewLoaded()) {
+      <section class="review-notice" role="status" aria-label="Revisão do resgate">
+        <p>Confira o resultado antes de reenviar.</p>
+        @if (sellReviewLoaded()) {
           <p>Estado: {{ statusLabel(asset()!.status) }}. Saldo da conta: {{ sellBalance() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}.</p>
-          @for (tx of transactions(); track tx.id) {
-          <p>{{ tx.transactionDate }} — {{ transactionLabel(tx.type) }}: {{ tx.amount | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</p>
-          }
-          <a [routerLink]="['/pockets', sellPocketId()]" target="_blank" rel="noopener">Conferir extrato da conta</a>
-          }
+          <ul class="review-history">
+            @for (tx of transactions(); track tx.id) {
+              <li><span>{{ tx.transactionDate | date:'dd/MM/yyyy' }} · {{ transactionLabel(tx.type) }}</span><strong>{{ tx.amount | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong></li>
+            }
+          </ul>
+          <a class="review-link" [routerLink]="['/pockets', sellPocketId()]" target="_blank" rel="noopener">Conferir extrato da conta</a>
+        }
+        <div class="review-actions">
           <button type="button" class="btn-secondary" (click)="refreshSellResult()" [disabled]="sellRefreshing()">{{ sellRefreshing() ? 'Consultando...' : 'Consultar resultado' }}</button>
           @if (sellReviewLoaded() && asset()?.status !== 'REDEEMED') {
-          <button type="button" class="btn-secondary" (click)="allowSellRetry()">Conferi os históricos e o resgate não foi registrado</button>
+            <button type="button" class="btn-secondary" (click)="allowSellRetry()">Conferi os históricos e o resgate não foi registrado</button>
           }
         </div>
-      </div>
+      </section>
       }
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>

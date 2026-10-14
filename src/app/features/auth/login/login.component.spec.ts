@@ -59,6 +59,19 @@ describe('LoginComponent', () => {
       expect(component).toBeTruthy();
     });
 
+    it('expands and collapses recovery instructions without submitting the form', () => {
+      (authServiceSpy.recoveryRequired as ReturnType<typeof signal<boolean>>).set(true);
+      fixture.detectChanges();
+      const button: HTMLButtonElement = fixture.nativeElement.querySelector('.recovery-toggle');
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+      button.click(); fixture.detectChanges();
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(fixture.nativeElement.querySelector('#recovery-help').textContent).toContain('revogação da sessão');
+      button.click(); fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('#recovery-help')).toBeNull();
+      expect(authServiceSpy.login).not.toHaveBeenCalled();
+    });
+
     it('should start with an invalid form', () => {
       expect(component.form.invalid).toBe(true);
     });

@@ -46,17 +46,27 @@
   }
 
   @if (canResendVerification()) {
-    <p><a routerLink="/verify-email" class="link-accent">Solicitar novo link de confirmação</a></p>
+    <p class="auth-notice"><a routerLink="/verify-email" class="link-accent">Solicitar novo link de confirmação</a></p>
   }
   @if (retrySeconds() > 0) {
-    <p role="status">Aguarde {{ retrySeconds() }} segundos antes de tentar novamente.</p>
+    <p class="auth-notice" role="status">Aguarde {{ retrySeconds() }} segundos antes de tentar novamente.</p>
   }
   @if (recoveryRequired()) {
-    <button type="button" class="link-secondary" (click)="showRecoveryHelp.set(!showRecoveryHelp())"
-      [attr.aria-expanded]="showRecoveryHelp()">Como recuperar o acesso</button>
-    @if (showRecoveryHelp()) {
-      <p role="status">O resultado da última operação não foi confirmado. Entre em contato com o responsável pela aplicação para confirmar o encerramento ou a revogação da sessão no servidor antes de entrar novamente. Recarregar a página não confirma esse resultado.</p>
-    }
+    <section class="auth-recovery" aria-label="Recuperar acesso">
+      <button type="button" class="recovery-toggle" (click)="showRecoveryHelp.set(!showRecoveryHelp())"
+        [attr.aria-expanded]="showRecoveryHelp()" aria-controls="recovery-help">
+        <span>Como recuperar o acesso</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+          [class.recovery-chevron--expanded]="showRecoveryHelp()" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+      </button>
+      @if (showRecoveryHelp()) {
+        <div id="recovery-help" class="recovery-help" role="status">
+          <p>Não foi possível confirmar o resultado da última operação.</p>
+          <p>Entre em contato com o responsável pela aplicação para confirmar o encerramento ou a revogação da sessão no servidor antes de entrar novamente.</p>
+          <p class="recovery-hint">Recarregar a página não confirma o encerramento da sessão.</p>
+        </div>
+      }
+    </section>
   }
 
   <!-- Formulário -->

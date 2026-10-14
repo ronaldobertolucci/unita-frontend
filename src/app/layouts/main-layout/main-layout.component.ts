@@ -25,11 +25,6 @@ export interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    label: 'Recorrentes',
-    path: '/recurring-bills',
-    icons: ['M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2', 'M8 14h3m-3 4h7'],
-  },
-  {
     label: 'Dashboard',
     path: '/dashboard',
     icons: [
@@ -68,6 +63,11 @@ const NAV_ITEMS: NavItem[] = [
       'M7 16V4m0 0L3 8m4-4l4 4',
       'M17 8v12m0 0l4-4m-4 4l-4-4',
     ],
+  },
+  {
+    label: 'Recorrentes',
+    path: '/recurring-bills',
+    icons: ['M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2', 'M8 14h3m-3 4h7'],
   },
   {
     label: 'Grupos',
