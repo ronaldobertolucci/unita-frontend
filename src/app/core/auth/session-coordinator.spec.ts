@@ -78,6 +78,24 @@ describe('cookie operations across independent Unita tabs', () => {
     }
   });
 
+  it.each(['login', 'refresh', 'logout'] as const)('a %s HTTP 429 allows an explicit retry after reload without uncertain invalidation', async operation => {
+    const a = client('A'), b = client('B');
+    const invalidation = jest.fn();
+    b.invalidations$.subscribe(invalidation);
+    for (const body of [undefined, 'Too many requests', { message: 'Too many requests' }]) {
+      await firstValueFrom(a.execute('login', () => of({})));
+      const error = { status: 429, error: body };
+      await expect(firstValueFrom(a.execute(operation, () => throwError(() => error)))).rejects.toEqual(error);
+      expect(JSON.parse(harness.storage.get(a.key)!).state).toBe('signed-out');
+      const reloaded = client(`reload-${operation}`);
+      const retry = jest.fn(() => of({}));
+      await expect(firstValueFrom(reloaded.execute('login', retry))).resolves.toEqual({});
+      expect(retry).toHaveBeenCalledTimes(1);
+      await expect(firstValueFrom(reloaded.execute('logout', () => of(undefined)))).resolves.toBeUndefined();
+    }
+    expect(invalidation).not.toHaveBeenCalled();
+  });
+
   it('invalidates other tabs immediately, persists only metadata and ignores delayed messages', async () => {
     const a = client('A'), b = client('B'); const received = jest.fn(); b.invalidations$.subscribe(received);
     a.announce('logout'); const old = harness.storage.get(a.invalidationKey)!;

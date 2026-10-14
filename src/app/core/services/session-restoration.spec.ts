@@ -74,6 +74,18 @@ describe('H06 bootstrap, guards and session restoration', () => {
     await flushCoordination(); expect(session.state()).toBe('blocked'); expect(auth.recoveryRequired()).toBe(true);
     expect(auth.sessionMessage()).not.toContain('senha inválidos'); expect(await auth.restoreSession()).toBe(false); http.expectNone('/api/auth/refresh');
   });
+  it('a rate-limited restoration permits explicit login without another automatic refresh', async () => {
+    setup(); await flushCoordination();
+    http.expectOne('/api/auth/refresh').flush('Too many requests', { status: 429, statusText: 'Too Many Requests' });
+    await flushCoordination();
+    expect(session.state()).toBe('anonymous'); expect(auth.recoveryRequired()).toBe(false);
+    expect(auth.sessionMessage()).toContain('Muitas solicitações');
+    expect(await auth.restoreSession()).toBe(false); http.expectNone('/api/auth/refresh');
+    const login = new Promise<void>((resolve, reject) => auth.login({ email: 'user1@example.com', password: 'p' })
+      .subscribe({ next: () => resolve(), error: reject }));
+    await flushCoordination(); http.expectOne('/api/auth/login').flush(syntheticSession());
+    await login; expect(auth.isAuthenticated()).toBe(true);
+  });
   it('malformed restoration cannot open access', async () => {
     setup(); await flushCoordination(); http.expectOne('/api/auth/refresh').flush({ ...syntheticSession(), expiresIn: -1 });
     await flushCoordination(); expect(session.state()).toBe('blocked'); expect(auth.currentUser()).toBeNull();

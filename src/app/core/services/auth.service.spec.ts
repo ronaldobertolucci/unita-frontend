@@ -83,6 +83,19 @@ describe('coordinated login/logout in memory', () => {
     expect(auth.sessionMessage()).toContain('não foi confirmada');
     await expect(firstValueFrom(auth.refresh())).rejects.toThrow(SessionOperationError); http.expectNone('/api/auth/refresh');
   });
+  it('a rate-limited logout keeps local access closed and permits an explicit logout retry', async () => {
+    const { promise, request } = await start(); request.flush(syntheticSession()); await promise;
+    auth.logout(); await flushCoordination();
+    http.expectOne('/api/auth/logout').flush(null, { status: 429, statusText: 'Too Many Requests' });
+    await flushCoordination();
+    expect(auth.logoutStatus()).toBe('rejected'); expect(session.state()).toBe('anonymous');
+    expect(auth.recoveryRequired()).toBe(false); expect(auth.getToken()).toBeNull();
+    expect(auth.sessionMessage()).toContain('recusou a revogação');
+    http.expectNone('/api/auth/logout');
+    auth.logout(); await flushCoordination();
+    http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+    await flushCoordination(); expect(auth.logoutStatus()).toBe('confirmed');
+  });
   it('closes locally on a remote account change and suppresses its own old response', async () => {
     const { promise, request } = await start(); const old = promise.catch(error => error);
     const coordinator = new CookieSessionCoordinatorEngineForTest(harness.browser('B'));

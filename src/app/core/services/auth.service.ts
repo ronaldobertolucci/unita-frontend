@@ -26,7 +26,7 @@ export class AuthService {
   private migrationFailed = false;
   private renewal: { version: number; promise: Promise<LoginResponse> } | null = null;
   private readonly _message = signal<string | null>(null);
-  private readonly _logoutStatus = signal<'idle' | 'pending' | 'confirmed' | 'uncertain'>('idle');
+  private readonly _logoutStatus = signal<'idle' | 'pending' | 'confirmed' | 'rejected' | 'uncertain'>('idle');
   readonly sessionMessage = this._message.asReadonly();
   readonly logoutStatus = this._logoutStatus.asReadonly();
   readonly token = this.session.token;
@@ -81,7 +81,7 @@ export class AuthService {
     } catch (error) {
       if (this.session.version() === version) {
         const kind = classifyAuthError('login', error).kind;
-        const rejected = ['credentials', 'email-not-verified', 'account-disabled', 'csrf', 'validation'].includes(kind);
+        const rejected = ['credentials', 'email-not-verified', 'account-disabled', 'csrf', 'validation', 'rate-limited'].includes(kind);
         this.session.invalidate(rejected ? 'cancelled' : 'blocked');
         this._message.set(error instanceof SessionOperationError ? error.message : classifyAuthError('login', error).message);
       }
@@ -149,9 +149,12 @@ export class AuthService {
       return response;
     } catch (error) {
       if (version === this.session.version()) {
-        const rejected = error instanceof SessionSignedOutError || classifyAuthError('refresh', error).kind === 'session-expired';
-        this.session.invalidate(rejected ? 'cancelled' : 'blocked');
-        this._message.set(rejected ? 'Sua sessão terminou. Entre novamente para continuar.'
+        const presentation = classifyAuthError('refresh', error);
+        const rejected = error instanceof SessionSignedOutError || presentation.kind === 'session-expired';
+        const rateLimited = presentation.kind === 'rate-limited';
+        this.session.invalidate(rejected || rateLimited ? 'cancelled' : 'blocked');
+        this._message.set(rateLimited ? presentation.message : rejected
+          ? 'Sua sessão terminou. Entre novamente para continuar.'
           : 'Não foi possível confirmar a renovação da sessão. Consulte as orientações de recuperação.');
         this.navigateFromPrivatePage();
       }
@@ -225,10 +228,13 @@ export class AuthService {
       ).pipe(map(response => parseEmptyAuthSuccess(response, 204))), () => this.session.version() === version));
       this._logoutStatus.set('confirmed');
       if (version === this.session.version()) this._message.set(null);
-    } catch {
-      this._logoutStatus.set('uncertain');
-      if (version === this.session.version()) this.session.invalidate('blocked');
-      this._message.set('Você saiu da aplicação, mas a revogação no servidor não foi confirmada. Aguarde a reconciliação antes de entrar novamente.');
+    } catch (error) {
+      const rateLimited = classifyAuthError('logout', error).kind === 'rate-limited';
+      this._logoutStatus.set(rateLimited ? 'rejected' : 'uncertain');
+      if (version === this.session.version()) this.session.invalidate(rateLimited ? 'cancelled' : 'blocked');
+      this._message.set(rateLimited
+        ? 'Você saiu da aplicação, mas o servidor recusou a revogação por excesso de solicitações. Aguarde antes de tentar novamente.'
+        : 'Você saiu da aplicação, mas a revogação no servidor não foi confirmada. Aguarde a reconciliação antes de entrar novamente.');
     } finally { this.logoutPending = false; }
   }
 

@@ -8,6 +8,9 @@ import { AuthService } from '../../../core/services/auth.service';
 import { LoginResponse } from '../../../core/models/auth.model';
 import { signal } from '@angular/core';
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { COORDINATION_BROWSER } from '../../../core/services/cookie-session-coordinator.service';
+import { coordinationHarness, flushCoordination } from '../../../core/testing/session-browser.mock';
 
 const mockLoginResponse: LoginResponse = {
   token: 'fake-token',
@@ -231,5 +234,58 @@ describe('LoginComponent', () => {
       expect(authServiceSpy.cancelPendingLogin).toHaveBeenCalled();
       jest.advanceTimersByTime(11000); expect(component.retrySeconds()).toBe(10);
     });
+  });
+});
+
+describe('LoginComponent with real session coordination after HTTP 429', () => {
+  let fixture: ComponentFixture<LoginComponent>;
+  let auth: AuthService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    const harness = coordinationHarness();
+    TestBed.configureTestingModule({
+      imports: [LoginComponent, RouterTestingModule, HttpClientTestingModule],
+      providers: [
+        { provide: ActivatedRoute, useValue: buildActivatedRoute(false) },
+        { provide: COORDINATION_BROWSER, useValue: harness.browser('A') },
+      ],
+    });
+    auth = TestBed.inject(AuthService);
+    http = TestBed.inject(HttpTestingController);
+    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    fixture = TestBed.createComponent(LoginComponent);
+    fixture.componentInstance.form.setValue({ email: 'joao@email.com', password: 'p' });
+    fixture.detectChanges();
+  });
+  afterEach(() => {
+    try { http.verify(); } finally { TestBed.resetTestingModule(); jest.useRealTimers(); }
+  });
+
+  it.each(['2', undefined])('allows manual login after 429 with Retry-After %s without replaying the first request', async retryAfter => {
+    jest.useFakeTimers();
+    const page = fixture.componentInstance;
+    page.onSubmit(); await flushCoordination();
+    http.expectOne('/api/auth/login').flush(null, {
+      status: 429, statusText: 'Too Many Requests',
+      headers: retryAfter === undefined ? {} : { 'Retry-After': retryAfter },
+    });
+    await flushCoordination(); fixture.detectChanges();
+    expect(auth.recoveryRequired()).toBe(false);
+    expect(page.isLoading()).toBe(false);
+    expect(page.errorMessage()).toContain('Muitas solicitações');
+    expect(fixture.nativeElement.querySelector('.auth-recovery')).toBeNull();
+    if (retryAfter !== undefined) {
+      expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBe(true);
+      page.onSubmit(); http.expectNone('/api/auth/login');
+      jest.advanceTimersByTime(2001); await flushCoordination(); fixture.detectChanges();
+    }
+    http.expectNone('/api/auth/login');
+    expect(fixture.nativeElement.querySelector('button[type="submit"]').disabled).toBe(false);
+    page.onSubmit(); await flushCoordination();
+    http.expectOne('/api/auth/login').flush(mockLoginResponse);
+    await flushCoordination();
+    expect(auth.isAuthenticated()).toBe(true);
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/dashboard']);
   });
 });

@@ -54,6 +54,9 @@ function parseInvalidation(raw: string | null): SessionInvalidation | null {
 
 function definitiveRejection(operation: CookieOperation, error: unknown): boolean {
   if (!isRecord(error)) return false;
+  // Rate limiting rejects the request before cookie issuance/rotation/revocation.
+  // A proxy may return an empty or non-JSON body, so status is the evidence.
+  if (error['status'] === 429) return true;
   let body: unknown = error['error'];
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { return false; } }
   if (!isRecord(body)) return false;
