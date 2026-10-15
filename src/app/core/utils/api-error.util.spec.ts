@@ -35,6 +35,16 @@ describe('translateApiError', () => {
   });
 
   describe('known messages — legal entities', () => {
+    it('describes duplicate CNPJ in the authenticated user registrations', () => {
+      expect(translateApiError('A legal entity with this CNPJ already exists in your registrations')).toBe(
+        'Já existe uma empresa com este CNPJ nos seus cadastros.'
+      );
+    });
+
+    it('does not disclose whether an unavailable institution belongs to someone else', () => {
+      expect(translateApiError('Legal entity not found')).toBe('Cadastro indisponível. Atualize a seleção.');
+    });
+
     it('should translate Legal entity is in use and cannot be deleted', () => {
       expect(translateApiError('Legal entity is in use and cannot be deleted')).toBe(
         'Esta empresa está em uso e não pode ser excluída.'
@@ -43,7 +53,7 @@ describe('translateApiError', () => {
 
     it('should translate A legal entity with this CNPJ already exists', () => {
       expect(translateApiError('A legal entity with this CNPJ already exists')).toBe(
-        'Já existe uma empresa cadastrada com este CNPJ.'
+        'Já existe uma empresa com este CNPJ nos seus cadastros.'
       );
     });
   });

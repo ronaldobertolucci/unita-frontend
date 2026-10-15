@@ -17,6 +17,14 @@
   </div>
 }
 
+@else if (loadErrorMessage()) {
+  <div class="empty-state" role="alert">
+    <h3>Empresas indisponíveis</h3>
+    <p>{{ loadErrorMessage() }}</p>
+    <button class="btn-primary" (click)="loadEntities()">Tentar novamente</button>
+  </div>
+}
+
 <!-- ─── Empty state ─── -->
 @else if (legalEntities().length === 0) {
   <div class="empty-state">
@@ -92,12 +100,14 @@
       <form [formGroup]="form" (ngSubmit)="save()" novalidate>
 
         <div class="field" [class.field--invalid]="cnpjControl.invalid && cnpjControl.touched">
-          <label for="cnpj">CNPJ <span class="field-hint">14 dígitos, sem máscara</span></label>
-          <input id="cnpj" type="text" formControlName="cnpj" placeholder="00000000000000" inputmode="numeric" autocomplete="off" maxlength="14" />
+          <label for="cnpj">CNPJ <span class="field-hint">numérico ou alfanumérico</span></label>
+          <input id="cnpj" type="text" formControlName="cnpj" placeholder="00.000.000/E08G-12" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="18" aria-describedby="cnpj-hint cnpj-error" [attr.aria-invalid]="cnpjControl.invalid && cnpjControl.touched" />
+          <span id="cnpj-hint" class="field-hint">12 letras ou números e 2 dígitos finais. Aceita a máscara completa.</span>
           @if (cnpjControl.invalid && cnpjControl.touched) {
-            <span class="field-error">
+            <span id="cnpj-error" class="field-error">
               @if (cnpjControl.hasError('required')) { CNPJ é obrigatório }
-              @else if (cnpjControl.hasError('pattern') || cnpjControl.hasError('minlength') || cnpjControl.hasError('maxlength')) { CNPJ deve ter exatamente 14 dígitos numéricos }
+              @else if (cnpjControl.hasError('pattern')) { Informe 12 letras ou números e 2 dígitos finais, com ou sem a máscara completa. }
+              @else if (cnpjControl.hasError('server')) { {{ cnpjControl.getError('server') }} }
             </span>
           }
         </div>
@@ -109,6 +119,7 @@
             <span class="field-error">
               @if (corporateNameControl.hasError('required')) { Razão social é obrigatória }
               @else if (corporateNameControl.hasError('maxlength')) { Máximo de 255 caracteres }
+              @else if (corporateNameControl.hasError('server')) { {{ corporateNameControl.getError('server') }} }
             </span>
           }
         </div>
@@ -117,13 +128,16 @@
           <label for="tradeName">Nome fantasia <span class="field-hint">opcional</span></label>
           <input id="tradeName" type="text" formControlName="tradeName" placeholder="Ex: Empresa Exemplo" autocomplete="off" />
           @if (tradeNameControl.invalid && tradeNameControl.touched) {
-            <span class="field-error">Máximo de 255 caracteres</span>
+            <span class="field-error">{{ tradeNameControl.getError('server') || 'Máximo de 255 caracteres' }}</span>
           }
         </div>
 
-        <div class="field">
+        <div class="field" [class.field--invalid]="stateRegistrationControl.invalid && stateRegistrationControl.touched">
           <label for="stateRegistration">Inscrição estadual <span class="field-hint">opcional</span></label>
           <input id="stateRegistration" type="text" formControlName="stateRegistration" placeholder="Ex: 123456789" autocomplete="off" />
+          @if (stateRegistrationControl.invalid && stateRegistrationControl.touched) {
+            <span class="field-error">{{ stateRegistrationControl.getError('server') || 'Máximo de 50 caracteres' }}</span>
+          }
         </div>
 
         <div class="modal-actions">
@@ -168,7 +182,7 @@
 <!-- ─── Template: banner de erro ─── -->
 <ng-template #errorBanner>
   @if (errorMessage()) {
-    <div class="modal-error">
+    <div class="modal-error" role="alert">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>

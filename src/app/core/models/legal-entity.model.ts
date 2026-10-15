@@ -1,7 +1,9 @@
 // ─── Pessoa Jurídica ─────────────────────────────────────────────────────────
 
 export interface LegalEntityDto {
+  // This legacy endpoint still returns numeric IDs. V2 IDs use a separate contract.
   id: number;
+  // Text preserves leading zeros, letters and historical values returned by the API.
   cnpj: string;
   corporateName: string;
   tradeName: string | null;
