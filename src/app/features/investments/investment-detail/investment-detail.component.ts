@@ -189,7 +189,11 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   categoryLabel(category: string): string {
-    return category === 'RENDA_FIXA' ? 'Renda Fixa' : 'Previdência';
+    switch (category) {
+      case 'RENDA_FIXA': return 'Renda Fixa';
+      case 'PREVIDENCIA': return 'Previdência';
+      default: return 'Categoria não reconhecida';
+    }
   }
 
   transactionLabel(type: InvestmentTransactionType): string {
@@ -542,7 +546,11 @@ export class InvestmentDetailComponent implements OnInit {
     const cat = this.categoryBuy();
     this.buyForm = this.fb.group({
       amount: ['', [Validators.required, Validators.min(0.01)]],
-      quantity: ['', [Validators.required, Validators.min(0)]],
+      quantity: ['', [Validators.required, (control: AbstractControl) => {
+        if (control.value == null || control.value === '') return null;
+        const quantity = Number(control.value);
+        return Number.isFinite(quantity) && quantity > 0 ? null : { positiveQuantity: true };
+      }]],
       pocketId: ['', Validators.required],
       transactionDate: [this.toLocalDateString(new Date()), Validators.required],
       categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],

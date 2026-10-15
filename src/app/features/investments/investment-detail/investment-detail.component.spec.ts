@@ -336,6 +336,10 @@ describe('InvestmentDetailComponent', () => {
       expect(component.categoryLabel('PREVIDENCIA')).toBe('Previdência');
     });
 
+    it.each(['FII', 'DESCONHECIDA', '', 'constructor'])('uses an explicit fallback for category %s', category => {
+      expect(component.categoryLabel(category)).toBe('Categoria não reconhecida');
+    });
+
     it('transactionLabel should map all types', () => {
       expect(component.transactionLabel('BUY')).toBe('Aporte');
       expect(component.transactionLabel('SELL')).toBe('Resgate');
@@ -480,6 +484,13 @@ describe('InvestmentDetailComponent', () => {
 
   // ─── onBuy() ──────────────────────────────────────────────────────────────
 
+  it('renders an unknown category explicitly in the investment detail', () => {
+    setup({ ...mockDetail, category: 'DESCONHECIDA' as AssetDetailDto['category'], fixedIncomeDetails: null });
+    const badge = fixture.nativeElement.querySelector('.badge-category');
+    expect(badge?.textContent).toContain('Categoria não reconhecida');
+    expect(badge?.textContent).not.toContain('Previdência');
+  });
+
   describe('onBuy()', () => {
     beforeEach(() => setup());
 
@@ -487,6 +498,51 @@ describe('InvestmentDetailComponent', () => {
       component.openModal('buy');
       component.onBuy();
       expect(assetServiceSpy.buy).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -1, -0.00000001, NaN, Infinity, -Infinity, '', null])('rejects quantity %s before any write', quantity => {
+      component.openModal('buy');
+      component.buyForm.patchValue({ amount: 1000, quantity, pocketId: 5, transactionDate: '2025-01-15' });
+      component.onBuy();
+      expect(component.buyForm.get('quantity')?.invalid).toBe(true);
+      expect(component.buyForm.get('quantity')?.touched).toBe(true);
+      expect(assetServiceSpy.buy).not.toHaveBeenCalled();
+      expect(component.financialRecovery.state()).toBe('clear');
+      expect(component.asset()).toEqual(mockDetail);
+      expect(component.isSaving()).toBe(false);
+    });
+
+    it('shows the existing error style and associates the positive quantity error with its input', () => {
+      component.openModal('buy');
+      component.buyForm.patchValue({ amount: 1000, pocketId: 5, transactionDate: '2025-01-15' });
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      const input = element.querySelector<HTMLInputElement>('#buy-quantity')!;
+      input.value = '0';
+      input.dispatchEvent(new Event('input'));
+      element.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('aria-describedby')).toBe('buy-quantity-error');
+      expect(input.closest('.field')?.classList.contains('field--invalid')).toBe(true);
+      expect(element.querySelector('#buy-quantity-error')?.textContent).toContain('maior que zero');
+      expect(assetServiceSpy.buy).not.toHaveBeenCalled();
+    });
+
+    it.each(['0.00000001', '0.125', '2'])('submits a positive quantity %s without rounding or multiplying the unit price', quantity => {
+      assetServiceSpy.buy.mockReturnValue(of(mockTxBuy));
+      component.openModal('buy');
+      component.buyForm.patchValue({ amount: 100.12, pocketId: 5, transactionDate: '2025-01-15' });
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      const input = element.querySelector<HTMLInputElement>('#buy-quantity')!;
+      input.value = quantity;
+      input.dispatchEvent(new Event('input'));
+      expect(input.validity.stepMismatch).toBe(false);
+      element.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      expect(assetServiceSpy.buy).toHaveBeenCalledWith(1, expect.objectContaining({
+        amount: 100.12, quantity: Number(quantity), pocketId: 5, categoryId: 11,
+      }));
     });
 
     it('should call buy with correct payload (categoryId from getRawValue)', () => {

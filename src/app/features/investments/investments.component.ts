@@ -15,7 +15,7 @@ import {
 import { AssetService } from '../../core/services/asset.service';
 import { LegalEntityService } from '../../core/services/legal-entity.service';
 import { PageContextService } from '../../core/services/page-context.service';
-import { AssetSummaryDto, AssetCategory } from '../../core/models/asset.model';
+import { AssetSummaryDto } from '../../core/models/asset.model';
 import { translateApiError } from '../../core/utils/api-error.util';
 
 type AssetTab = 'fixed-income' | 'pension';
@@ -146,8 +146,12 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
   }
 
   // ── Helpers de exibição ───────────────────────────────────────────────────
-  categoryLabel(category: AssetCategory): string {
-    return category === 'RENDA_FIXA' ? 'Renda Fixa' : 'Previdência';
+  categoryLabel(category: string): string {
+    switch (category) {
+      case 'RENDA_FIXA': return 'Renda Fixa';
+      case 'PREVIDENCIA': return 'Previdência';
+      default: return 'Categoria não reconhecida';
+    }
   }
 
   statusLabel(status: string): string {

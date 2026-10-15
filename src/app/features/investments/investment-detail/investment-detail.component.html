@@ -422,18 +422,20 @@
     <form [formGroup]="buyForm" (ngSubmit)="onBuy()" novalidate>
       <div class="form-row">
         <div class="field" [class.field--invalid]="ctrl(buyForm,'amount').invalid && ctrl(buyForm,'amount').touched">
-          <label>Valor (R$)</label>
-          <input type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0,00" />
+          <label for="buy-amount">Preço unitário (R$)</label>
+          <input id="buy-amount" type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0,00" />
           @if (ctrl(buyForm,'amount').invalid && ctrl(buyForm,'amount').touched) {
           <span class="field-error">Valor inválido</span>
           }
         </div>
         <div class="field"
           [class.field--invalid]="ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched">
-          <label>Quantidade</label>
-          <input type="number" formControlName="quantity" min="0" step="0.0001" placeholder="1" />
+          <label for="buy-quantity">Quantidade</label>
+          <input id="buy-quantity" type="number" formControlName="quantity" step="any" placeholder="1"
+            [attr.aria-invalid]="ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched"
+            [attr.aria-describedby]="ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched ? 'buy-quantity-error' : null" />
           @if (ctrl(buyForm,'quantity').invalid && ctrl(buyForm,'quantity').touched) {
-          <span class="field-error">Quantidade inválida</span>
+          <span id="buy-quantity-error" class="field-error">Informe uma quantidade maior que zero.</span>
           }
         </div>
       </div>

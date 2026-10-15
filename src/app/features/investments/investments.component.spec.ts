@@ -449,11 +449,24 @@ describe('InvestmentsComponent', () => {
       expect(component.categoryLabel('PREVIDENCIA')).toBe('Previdência');
     });
 
+    it.each(['FII', 'DESCONHECIDA', '', 'constructor'])('uses an explicit fallback for category %s', category => {
+      expect(component.categoryLabel(category)).toBe('Categoria não reconhecida');
+    });
+
     it('statusLabel should map all statuses', () => {
       expect(component.statusLabel('ACTIVE')).toBe('Ativo');
       expect(component.statusLabel('MATURED')).toBe('Vencido');
       expect(component.statusLabel('REDEEMED')).toBe('Resgatado');
     });
+  });
+
+  it.each(['ACTIVE', 'REDEEMED'] as const)('renders an unknown category explicitly for an %s asset', status => {
+    setup([{ ...mockAsset, status, category: 'DESCONHECIDA' as AssetSummaryDto['category'] }]);
+    component.redeemedVisible.set(true);
+    fixture.detectChanges();
+    const badge = fixture.nativeElement.querySelector('.badge-category');
+    expect(badge?.textContent).toContain('Categoria não reconhecida');
+    expect(badge?.textContent).not.toContain('Previdência');
   });
 
   // ─── onSubmit() — Renda Fixa ──────────────────────────────────────────────

@@ -245,6 +245,63 @@ describe('AssetService', () => {
     });
   });
 
+  describe('INV-002 custodian summary after writes', () => {
+    const custodian = {
+      id: 9, cnpj: '98765432000111', corporateName: 'Custodiante LTDA',
+      tradeName: 'Custodiante', stateRegistration: null,
+    };
+
+    describe.each(['fixed-income', 'pension', 'update', 'position'] as const)('%s', operation => {
+      it.each([
+        { entity: custodian, expected: 'Custodiante' },
+        { entity: { ...custodian, tradeName: null }, expected: 'Custodiante LTDA' },
+        { entity: null, expected: null },
+      ])('uses the custodian name $expected independently of the issuer', ({ entity, expected }) => {
+        const detail: AssetDetailDto = {
+          ...mockDetail,
+          custodianLegalEntity: entity,
+          ...(operation === 'pension' ? {
+            category: 'PREVIDENCIA' as const,
+            fixedIncomeDetails: null,
+            pensionDetails: { pensionType: 'VGBL' as const, taxRegime: 'REGRESSIVO' as const },
+          } : {}),
+        };
+        service.assets.set(operation === 'update' || operation === 'position'
+          ? [mockSummary2, mockSummary] : [mockSummary2]);
+        const custodianLegalEntityId = entity?.id ?? null;
+        if (operation === 'fixed-income') {
+          service.createFixedIncome({
+            name: detail.name, legalEntityId: detail.legalEntity.id,
+            indexer: 'CDI', annualRate: 0.12, maturityDate: '2027-01-15',
+            taxFree: false, liquidityType: 'DIARIA', custodianLegalEntityId,
+          }).subscribe();
+        } else if (operation === 'pension') {
+          service.createPension({
+            name: detail.name, legalEntityId: detail.legalEntity.id,
+            pensionType: 'VGBL', taxRegime: 'REGRESSIVO', custodianLegalEntityId,
+          }).subscribe();
+        } else if (operation === 'update') {
+          service.updateAsset(detail.id, { custodianLegalEntityId }).subscribe();
+        } else {
+          service.updatePosition(detail.id, {
+            currentValue: detail.position.currentValue, lastValuationDate: '2025-01-15',
+          }).subscribe();
+        }
+        const suffix = operation === 'update' ? '/1' : operation === 'position' ? '/1/position' : `/${operation}`;
+        const request = http.expectOne(`${base}${suffix}`);
+        expect(request.request.method).toBe(operation === 'update' ? 'PUT' : operation === 'position' ? 'PATCH' : 'POST');
+        request.flush(detail);
+        expect(service.assets()).toHaveLength(2);
+        expect(service.assets().at(-1)).toEqual({
+          ...mockSummary,
+          category: detail.category,
+          custodianLegalEntityName: expected,
+        });
+        expect(service.assets()[0]).toEqual(mockSummary2);
+      });
+    });
+  });
+
   // ─── getTransactions() ────────────────────────────────────────────────────
 
   describe('getTransactions()', () => {
