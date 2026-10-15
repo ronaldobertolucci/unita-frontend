@@ -23,6 +23,31 @@ describe('DashboardService', () => {
     expect(service).toBeTruthy();
   });
 
+  describe('INV-001 investment result HTTP contract', () => {
+    // Observe the response, not the legacy tax formula. Its correction belongs to INV-002.
+    it.each([123.45, 0, -21.12])('preserves the authoritative personal result %s', result => {
+      const received = jest.fn();
+      service.getNetProfit().subscribe(received);
+      const request = httpMock.expectOne(`${baseUrl}/dashboard/net-profit`);
+      expect(request.request.method).toBe('GET');
+      request.flush(result);
+      expect(received).toHaveBeenCalledWith(result);
+    });
+
+    it('preserves unavailable group investment results as null', () => {
+      const response = { members: [
+        { user: { id: 91001, firstName: 'Synthetic', lastName: 'A', email: 'a@example.invalid' }, netProfit: 123.45 },
+        { user: { id: 91002, firstName: 'Synthetic', lastName: 'B', email: 'b@example.invalid' }, netProfit: null },
+      ] };
+      const received = jest.fn();
+      service.getGroupNetProfit(7).subscribe(received);
+      const request = httpMock.expectOne(`${baseUrl}/groups/7/dashboard/net-profit`);
+      expect(request.request.method).toBe('GET');
+      request.flush(response);
+      expect(received).toHaveBeenCalledWith(response);
+    });
+  });
+
   // ─── getDashboard() ───────────────────────────────────────────────────────
 
   describe('getDashboard()', () => {

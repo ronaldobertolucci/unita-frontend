@@ -13,6 +13,7 @@ import { AssetService } from '../../core/services/asset.service';
 import { LegalEntityService } from '../../core/services/legal-entity.service';
 import { AssetSummaryDto } from '../../core/models/asset.model';
 import { LegalEntityDto } from '../../core/models/legal-entity.model';
+import { investmentBaseline } from '../../core/testing/investment-baseline.fixture';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,19 @@ describe('InvestmentsComponent', () => {
   }
 
   // ─── Inicialização ────────────────────────────────────────────────────────
+
+  it('INV-001 keeps active, matured and redeemed assets in the existing visual sections', () => {
+    const { summaries, fixedIncome, pension, redeemed } = investmentBaseline();
+    setup(summaries);
+    const element: HTMLElement = fixture.nativeElement;
+    expect(Array.from(element.querySelectorAll('.assets-list:not(.assets-list--redeemed) .asset-name'))
+      .map(node => node.textContent?.trim())).toEqual([fixedIncome.name, pension.name]);
+    (element.querySelector('.section-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(element.querySelector('.assets-list--redeemed .asset-name')?.textContent).toContain(redeemed.name);
+    expect(element.querySelector('.assets-list--redeemed .asset-current-value')?.textContent).toMatch(/1\.085,00/);
+    expect(component.redeemedAssets()[0].totalInvested).toBe(1000);
+  });
 
   describe('initialization', () => {
     beforeEach(() => setup());

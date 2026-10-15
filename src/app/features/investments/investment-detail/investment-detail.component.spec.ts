@@ -20,6 +20,7 @@ import { AssetDetailDto, InvestmentTransactionDto } from '../../../core/models/a
 import { CategoryDto } from '../../../core/models/category.model';
 import { PocketSummaryDto } from '../../../core/models/pocket.model';
 import { LegalEntityDto } from '../../../core/models/legal-entity.model';
+import { investmentBaseline } from '../../../core/testing/investment-baseline.fixture';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -179,6 +180,49 @@ describe('InvestmentDetailComponent', () => {
   }
 
   // ─── Inicialização ────────────────────────────────────────────────────────
+
+  describe('INV-001 readable legacy baseline', () => {
+    it.each(['fixedIncome', 'pension', 'redeemed'] as const)('renders %s and preserves its original position', kind => {
+      const data = investmentBaseline();
+      const transactions = kind === 'fixedIncome' ? data.transactions
+        : kind === 'pension' ? data.pensionTransactions : data.redemptionTransactions;
+      setup(data[kind], transactions);
+      const element: HTMLElement = fixture.nativeElement;
+      expect(element.querySelector('.asset-title')?.textContent).toContain(data[kind].name);
+      expect(component.asset()?.position).toEqual(data[kind].position);
+      expect(element.querySelectorAll('.tx-item')).toHaveLength(transactions.length);
+      for (const movement of transactions) {
+        if (movement.notes !== null) expect(element.textContent).toContain(movement.notes);
+      }
+      expect(component.transactions()).toEqual([...transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
+      if (kind === 'pension') {
+        expect(element.querySelector('.detail-chips')?.textContent).toContain('VGBL');
+        expect(element.querySelector('.detail-chips')?.textContent).toContain('Regressivo');
+      }
+      if (kind === 'redeemed') expect(element.querySelector('.btn-tx--sell')).toBeNull();
+    });
+
+    it('reviews the S01 net credit after an uncertain sell and blocks a second redemption', () => {
+      const data = investmentBaseline();
+      setup({ ...data.redeemed, status: 'ACTIVE', position: { ...data.redeemed.position, currentValue: 1100 } });
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
+      assetServiceSpy.getAsset.mockReturnValue(of(data.redeemed));
+      assetServiceSpy.getTransactions.mockReturnValue(of(data.redemptionTransactions));
+      pocketServiceSpy.getBalance.mockReturnValue(of(1085));
+      component.openModal('sell');
+      component.sellForm.patchValue({ grossAmount: 1100, taxAmount: 15, pocketId: 5,
+        categoryId: 13, transactionDate: '2026-10-12', notes: 'S01 gross 1100; net cash 1085' });
+      component.onSell();
+      component.allowSellRetry();
+      component.onSell();
+      fixture.detectChanges();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(component.asset()).toEqual(data.redeemed);
+      expect(component.transactions()).toHaveLength(3);
+      expect(component.sellBalance()).toBe(1085);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.btn-tx--sell')).toBeNull();
+    });
+  });
 
   describe('initialization', () => {
     beforeEach(() => setup());

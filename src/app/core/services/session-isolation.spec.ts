@@ -14,6 +14,9 @@ import { NotificationService } from './notification.service';
 import { COORDINATION_BROWSER } from './cookie-session-coordinator.service';
 import { coordinationHarness, flushCoordination } from '../testing/session-browser.mock';
 import { syntheticSession } from '../testing/session.mock';
+import { investmentBaseline } from '../testing/investment-baseline.fixture';
+import { DashboardService } from './dashboard.service';
+import { Observable } from 'rxjs';
 
 const pocket = { id: 1, type: 'BANK_ACCOUNT', label: 'Conta A', active: true, balance: 100 };
 const asset = { id: 1, name: 'Investimento A', category: 'RENDA_FIXA', status: 'ACTIVE', legalEntityName: 'Empresa', custodianLegalEntityName: null, currentValue: 100, totalInvested: 100, redeemedValue: 0 };
@@ -65,6 +68,60 @@ describe('private stores bound to the session context', () => {
     const old = http.expectOne('/api/pockets/bank-accounts');
     session.invalidate('login', 'unknown'); session.accept(syntheticSession(2), session.version());
     expect(old.cancelled).toBe(true); http.expectNone('/api/pockets/my'); expect(pockets.pockets()).toEqual([]);
+  });
+
+  const investmentRequests: [string, (service: AssetService) => Observable<unknown>][] = [
+    ['fixed-income creation', service => service.createFixedIncome(investmentBaseline().fixedIncomeCreate)],
+    ['pension creation', service => service.createPension(investmentBaseline().pensionCreate)],
+    ['metadata update', service => service.updateAsset(93002, { name: 'A private name', custodianLegalEntityId: null })],
+    ['position update', service => service.updatePosition(93002, { currentValue: 550.87654321, lastValuationDate: '2025-12-31' })],
+    ['deletion', service => service.deleteAsset(93002)],
+    ['buy', service => service.buy(93002, investmentBaseline().buy)],
+    ['yield', service => service.recordYield(93002, investmentBaseline().yieldPayload)],
+    ['sell', service => service.sell(93001, investmentBaseline().sell)],
+    ['detail', service => service.getAsset(93002)],
+    ['history', service => service.getTransactions(93002)],
+  ];
+
+  it.each(investmentRequests)('cancels investment %s on account change without delivering stale data', (_name, request) => {
+    const assets = TestBed.inject(AssetService);
+    assets.loadAssets(); http.expectOne('/api/assets').flush(investmentBaseline().summaries);
+    const received = jest.fn(), completed = jest.fn();
+    request(assets).subscribe({ next: received, complete: completed });
+    const pending = http.expectOne(request => request.url.startsWith('/api/assets/'));
+    session.invalidate('login', 'unknown');
+    session.accept(syntheticSession(2), session.version());
+    expect(pending.cancelled).toBe(true);
+    expect(received).not.toHaveBeenCalled();
+    expect(completed).toHaveBeenCalledTimes(1);
+    expect(assets.assets()).toEqual([]);
+    expect(assets.isLoading()).toBe(false);
+    http.expectNone(request => true);
+  });
+
+  it.each(investmentRequests)('never starts investment %s captured in a previous session', (_name, request) => {
+    const assets = TestBed.inject(AssetService);
+    const oldOperation = request(assets);
+    session.invalidate('login', 'unknown');
+    session.accept(syntheticSession(2), session.version());
+    const received = jest.fn();
+    oldOperation.subscribe(received);
+    expect(received).not.toHaveBeenCalled();
+    expect(assets.assets()).toEqual([]);
+    http.expectNone(request => true);
+  });
+
+  it('cancels personal and group investment profit reads on session change', () => {
+    const dashboard = TestBed.inject(DashboardService);
+    const received = jest.fn();
+    dashboard.getNetProfit().subscribe(received);
+    dashboard.getGroupNetProfit(8).subscribe(received);
+    const personal = http.expectOne('/api/dashboard/net-profit');
+    const group = http.expectOne('/api/groups/8/dashboard/net-profit');
+    session.invalidate('logout');
+    expect(personal.cancelled).toBe(true);
+    expect(group.cancelled).toBe(true);
+    expect(received).not.toHaveBeenCalled();
   });
 
   it('closes stream and ignores queued events from the old connection', async () => {

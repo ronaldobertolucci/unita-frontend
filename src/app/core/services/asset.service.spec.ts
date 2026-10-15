@@ -8,6 +8,7 @@ import {
   InvestmentTransactionDto,
 } from '../models/asset.model';
 import { environment } from '../../../environments/environment';
+import { investmentBaseline } from '../testing/investment-baseline.fixture';
 
 const base = `${environment.apiUrl}/assets`;
 
@@ -206,11 +207,13 @@ describe('AssetService', () => {
   // ─── updateAsset() ────────────────────────────────────────────────────────
 
   describe('updateAsset()', () => {
-    it('should PATCH /assets/:id and replace summary in signal', () => {
+    it('should PUT /assets/:id and replace summary in signal', () => {
       service.assets.set([mockSummary]);
       const updated: AssetDetailDto = { ...mockDetail, name: 'CDB Banco X Atualizado' };
       service.updateAsset(1, { name: 'CDB Banco X Atualizado', custodianLegalEntityId: null }).subscribe();
-      http.expectOne(`${base}/1`).flush(updated);
+      const request = http.expectOne(`${base}/1`);
+      expect(request.request.method).toBe('PUT');
+      request.flush(updated);
       expect(service.assets()[0].name).toBe('CDB Banco X Atualizado');
     });
   });
@@ -303,6 +306,106 @@ describe('AssetService', () => {
       expect(result!.length).toBe(2);
       expect(result![0].type).toBe('SELL');
       expect(result![1].type).toBe('TAX');
+    });
+  });
+
+  describe('INV-001 legacy HTTP baseline', () => {
+    const baseline = investmentBaseline;
+
+    it.each(['fixedIncome', 'pension', 'redeemed'] as const)('preserves the original %s detail without extra writes', kind => {
+      const detail = baseline()[kind];
+      const received = jest.fn();
+      service.getAsset(detail.id).subscribe(received);
+      const request = http.expectOne(`${base}/${detail.id}`);
+      expect(request.request.method).toBe('GET');
+      request.flush(detail);
+      expect(received).toHaveBeenCalledWith(detail);
+      http.expectNone(request => request.method !== 'GET');
+    });
+
+    it('keeps all movement IDs, eight decimals, notes, dates and absent/shared cash references', () => {
+      const { fixedIncome, transactions } = baseline();
+      const received = jest.fn();
+      service.getTransactions(fixedIncome.id).subscribe(received);
+      const request = http.expectOne(`${base}/${fixedIncome.id}/transactions`);
+      expect(request.request.method).toBe('GET');
+      // Equal-day ordering is not specified by the old API; preserve what the server sent.
+      request.flush(transactions);
+      expect(received).toHaveBeenCalledWith(transactions);
+      http.expectNone(request => request.method !== 'GET');
+    });
+
+    it.each(['fixedIncome', 'pension'] as const)('sends the complete %s creation contract', kind => {
+      const data = baseline();
+      const payload = kind === 'fixedIncome' ? data.fixedIncomeCreate : data.pensionCreate;
+      const result = kind === 'fixedIncome'
+        ? service.createFixedIncome(data.fixedIncomeCreate)
+        : service.createPension(data.pensionCreate);
+      result.subscribe();
+      const request = http.expectOne(`${base}/${kind === 'fixedIncome' ? 'fixed-income' : 'pension'}`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual(payload);
+      request.flush(data[kind]);
+      expect(service.assets()[0]).toMatchObject({ id: data[kind].id, category: data[kind].category });
+    });
+
+    it('preserves null custodian on PUT and the original valuation date on PATCH', () => {
+      const { fixedIncome } = baseline();
+      const update = { name: 'Cadastro atualizado', custodianLegalEntityId: null, liquidityType: 'DIARIA' as const };
+      service.updateAsset(fixedIncome.id, update).subscribe();
+      const metadata = http.expectOne(`${base}/${fixedIncome.id}`);
+      expect(metadata.request.method).toBe('PUT');
+      expect(metadata.request.body).toEqual(update);
+      metadata.flush({ ...fixedIncome, custodianLegalEntity: null });
+      const valuation = { currentValue: 550.87654321, lastValuationDate: '2025-12-31' };
+      service.updatePosition(fixedIncome.id, valuation).subscribe();
+      const position = http.expectOne(`${base}/${fixedIncome.id}/position`);
+      expect(position.request.method).toBe('PATCH');
+      expect(position.request.body).toEqual(valuation);
+      position.flush(fixedIncome);
+    });
+
+    it('sends buy.amount as unit price without multiplying it by quantity', () => {
+      const { fixedIncome, buy, transactions } = baseline();
+      service.buy(fixedIncome.id, buy).subscribe();
+      const request = http.expectOne(`${base}/${fixedIncome.id}/transactions/buy`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual(buy);
+      expect(request.request.serializeBody()).toBe(JSON.stringify(buy));
+      request.flush(transactions[1]);
+    });
+
+    it('preserves the yield amount, date, category, pocket and notes', () => {
+      const { fixedIncome, yieldPayload, transactions } = baseline();
+      service.recordYield(fixedIncome.id, yieldPayload).subscribe();
+      const request = http.expectOne(`${base}/${fixedIncome.id}/transactions/yield`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual(yieldPayload);
+      request.flush(transactions[2]);
+    });
+
+    it.each([0, 15, 1100])('sends gross and tax %s separately and preserves SELL/TAX responses', taxAmount => {
+      const { redeemed, sell, redemptionTransactions } = baseline();
+      const payload = { ...sell, taxAmount };
+      const response = [redemptionTransactions[1], { ...redemptionTransactions[2], amount: taxAmount }];
+      const received = jest.fn();
+      service.sell(redeemed.id, payload).subscribe(received);
+      const request = http.expectOne(`${base}/${redeemed.id}/transactions/sell`);
+      expect(request.request.method).toBe('POST');
+      expect(request.request.body).toEqual(payload);
+      request.flush(response);
+      expect(received).toHaveBeenCalledWith(response);
+    });
+
+    it.each([0, 400, 409, 500, 503])('does not automatically replay a legacy sell after HTTP %s', status => {
+      const { redeemed, sell } = baseline();
+      const failure = jest.fn();
+      service.sell(redeemed.id, sell).subscribe({ error: failure });
+      const request = http.expectOne(`${base}/${redeemed.id}/transactions/sell`);
+      if (status === 0) request.error(new ProgressEvent('error'));
+      else request.flush({ message: 'Synthetic failure' }, { status, statusText: 'Synthetic failure' });
+      expect(failure).toHaveBeenCalledWith(expect.objectContaining({ status }));
+      http.expectNone(request => request.method !== 'GET');
     });
   });
 });
