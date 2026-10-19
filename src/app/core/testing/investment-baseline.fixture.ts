@@ -97,9 +97,3 @@ export function investmentBaseline() {
   return { fixedIncome, pension, redeemed, transactions, redemptionTransactions, pensionTransactions, summaries,
     pocket, cashTransactions, fixedIncomeCreate, pensionCreate, buy, yieldPayload, sell };
 }
-
-// Future V2 domain acceptance inputs (S15); never coerce these into the numeric legacy DTOs.
-export const investmentPrecisionScenario = {
-  id: '9007199254740993', quantity: '0.000000000000000001',
-  grossAmount: '0.30', withheldTax: '0.20', netAmount: '0.10',
-} as const;
