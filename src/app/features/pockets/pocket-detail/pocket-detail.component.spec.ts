@@ -117,9 +117,20 @@ describe('PocketDetailComponent', () => {
       expect(component).toBeTruthy();
     });
 
-    it('should load transactions on init', () => {
-      setup();
-      expect(transactionServiceSpy.loadTransactions).toHaveBeenCalledWith(1, undefined, undefined);
+    it.each([
+      [new Date(2026, 9, 29, 23, 30), '2026-08-31', '2026-10-29'],
+      [new Date(2026, 0, 15, 0, 30), '2025-11-17', '2026-01-15'],
+      [new Date(2024, 2, 1, 12), '2024-01-02', '2024-03-01'],
+    ])('should request the last 60 calendar days on init (%s)', (now, startDate, endDate) => {
+      jest.useFakeTimers().setSystemTime(now);
+      try {
+        setup();
+        expect(component.filterForm.value).toEqual({ startDate, endDate });
+        expect(transactionServiceSpy.loadTransactions).toHaveBeenCalledTimes(1);
+        expect(transactionServiceSpy.loadTransactions).toHaveBeenCalledWith(1, startDate, endDate);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should set the pocket from the pockets signal', () => {

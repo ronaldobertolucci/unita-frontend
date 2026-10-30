@@ -52,9 +52,10 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
   readonly createDirection = signal<'INCOME' | 'EXPENSE'>('EXPENSE');
 
   // ─── Forms ───────────────────────────────────────────────────────
+  private readonly defaultPeriod = this.last60Days();
   readonly filterForm = this.fb.group({
-    startDate: [''],
-    endDate: ['']
+    startDate: [this.defaultPeriod.startDate],
+    endDate: [this.defaultPeriod.endDate]
   });
 
   readonly createForm = this.fb.group({
@@ -301,8 +302,19 @@ export class PocketDetailComponent implements OnInit, OnDestroy {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────
+  private last60Days(): { startDate: string; endDate: string } {
+    const end = new Date();
+    const start = new Date(end);
+    // Inclui hoje no intervalo de 60 dias, usando o calendário local.
+    start.setDate(start.getDate() - 59);
+    return { startDate: this.dateString(start), endDate: this.dateString(end) };
+  }
+
   private todayString(): string {
-    const d = new Date();
+    return this.dateString(new Date());
+  }
+
+  private dateString(d: Date): string {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
