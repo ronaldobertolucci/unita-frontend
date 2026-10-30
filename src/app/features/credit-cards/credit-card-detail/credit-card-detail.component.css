@@ -538,6 +538,13 @@
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.65; cursor: not-allowed; }
 
+.btn-primary--warning {
+  background: #fbbf24;
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.15);
+}
+
+.btn-primary--warning:hover:not(:disabled) { background: #f59e0b; }
+
 .btn-secondary {
   display: inline-flex;
   align-items: center;

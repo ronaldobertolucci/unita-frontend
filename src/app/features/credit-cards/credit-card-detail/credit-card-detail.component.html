@@ -274,10 +274,15 @@
           @if (fieldErrors()['installments']) { <p class="field-error">{{ fieldErrors()['installments'] }}</p> }
         </fieldset>
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" [disabled]="isSaving() || checkingComposition()" (click)="closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="isSaving() || checkingComposition() || financialRecovery.state() !== 'clear' || !ownedCardAvailable() || (editingPurchaseId() !== null && !canEditPurchase())">
+          @if (!editingPurchaseId()) {
+            <button type="button" class="btn-secondary" [disabled]="isSaving() || checkingComposition()" (click)="closeModal()">Cancelar</button>
+          }
+          <button type="submit" class="btn-primary" [class.btn-primary--warning]="editingPurchaseId() !== null" [disabled]="isSaving() || checkingComposition() || financialRecovery.state() !== 'clear' || !ownedCardAvailable() || (editingPurchaseId() !== null && !canEditPurchase())">
             @if (isSaving()) { <span class="spinner"></span> Salvando… } @else { {{ editingPurchaseId() ? 'Salvar correção' : 'Salvar compra' }} }
           </button>
+          @if (editingPurchaseId()) {
+            <button type="button" class="btn-secondary" [disabled]="isSaving() || checkingComposition()" (click)="closeModal()">Cancelar</button>
+          }
         </div>
       </form>
     </div>
@@ -315,8 +320,8 @@
         </div>
         @if (!canEditPurchase()) { <p class="plan-hint">Correção indisponível: há faturas protegidas. Faturas fechadas precisam ser reabertas explicitamente; faturas pagas permanecem protegidas.</p> }
         <div class="modal-actions">
+          <button type="button" class="btn-primary btn-primary--warning" [disabled]="!canEditPurchase() || checkingComposition() || financialRecovery.state() !== 'clear'" (click)="openEditPurchaseModal()">Corrigir compra</button>
           <button type="button" class="btn-secondary" [disabled]="checkingComposition()" (click)="closeModal()">Fechar</button>
-          <button type="button" class="btn-primary" [disabled]="!canEditPurchase() || checkingComposition() || financialRecovery.state() !== 'clear'" (click)="openEditPurchaseModal()">Corrigir compra</button>
         </div>
       }
     </div>
