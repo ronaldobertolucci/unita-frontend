@@ -159,9 +159,23 @@
       <h3 class="section-title">Compras</h3>
       <button type="button" class="btn-bill-action" [disabled]="isSaving() || checkingComposition()" (click)="refreshPurchaseHistory()">Atualizar histórico</button>
     </div>
+    <form class="purchase-filters" [formGroup]="purchaseFilterForm" (ngSubmit)="applyPurchaseFilter()">
+      <div class="field">
+        <label for="purchaseStartDate">Data da compra · De</label>
+        <input id="purchaseStartDate" type="date" formControlName="startDate" />
+      </div>
+      <div class="field">
+        <label for="purchaseEndDate">Até</label>
+        <input id="purchaseEndDate" type="date" formControlName="endDate" />
+      </div>
+      <button type="submit" class="btn-secondary">Filtrar</button>
+      <button type="button" class="btn-secondary" (click)="resetPurchaseFilter()">Últimos 30 dias</button>
+    </form>
+    @if (purchaseFilterError()) { <p class="field-error" role="alert">{{ purchaseFilterError() }}</p> }
+    @if (isLoadingPurchases()) { <p class="field-empty-hint" role="status">Carregando compras…</p> }
     @if (purchasesError()) { <p class="field-error" role="alert">{{ purchasesError() }}</p> }
-    <div class="bills-list">
-      @for (purchase of purchases(); track purchase.id) {
+    <div class="bills-list" [attr.aria-busy]="isLoadingPurchases()">
+      @for (purchase of (isLoadingPurchases() ? [] : visiblePurchases()); track purchase.id) {
         <div class="bill-item">
           <button type="button" class="bill-item-link purchase-link" [disabled]="isSaving() || checkingComposition()" (click)="openPurchaseDetail(purchase)">
             <span class="bill-dates">
@@ -172,7 +186,7 @@
             <span class="bill-amount">{{ formatCurrency(purchase.totalValue) }}</span>
           </button>
         </div>
-      } @empty { @if (!purchasesError()) { <p class="field-empty-hint">Nenhuma compra registrada.</p> } }
+      } @empty { @if (!purchasesError() && !isLoadingPurchases()) { <p class="field-empty-hint">Nenhuma compra encontrada no período selecionado.</p> } }
     </div>
 
   }

@@ -115,6 +115,80 @@ describe('CreditCardDetailComponent', () => {
 
   // ─── Inicialização ────────────────────────────────────────────────────────
 
+  it('preserves purchase order when opening and refreshing its details', () => {
+    setup();
+    const second = { ...mockPurchase, id: 101 };
+    const updated = { ...mockPurchase, description: 'Descrição atualizada' };
+    component.purchases.set([mockPurchase, second]);
+    creditCardServiceSpy.getPurchase.mockReturnValue(of(updated));
+
+    component.openPurchaseDetail(mockPurchase);
+
+    expect(component.purchases()).toEqual([updated, second]);
+    expect(component.currentPurchase()).toEqual(updated);
+    component.closeModal();
+    component.openPurchaseDetail(updated);
+    expect(component.purchases().map(p => p.id)).toEqual([100, 101]);
+  });
+
+  describe('purchase history filter', () => {
+    it.each([
+      ['2026-01-15T12:00:00', '2025-12-17', '2026-01-15'],
+      ['2024-03-01T12:00:00', '2024-02-01', '2024-03-01'],
+    ])('loads the last 30 calendar days at %s', (now, startDate, endDate) => {
+      jest.useFakeTimers().setSystemTime(new Date(now));
+      try {
+        setup();
+        expect(component.purchaseFilterForm.getRawValue()).toEqual({ startDate, endDate });
+        expect(creditCardServiceSpy.getPurchases).toHaveBeenCalledWith(1, startDate, endDate);
+      } finally { jest.useRealTimers(); }
+    });
+
+    it('rejects inverted dates without fetching or changing the applied period', () => {
+      setup();
+      const original = component.appliedPurchasePeriod();
+      creditCardServiceSpy.getPurchases.mockClear();
+      component.purchaseFilterForm.setValue({ startDate: '2026-10-30', endDate: '2026-09-01' });
+      component.applyPurchaseFilter();
+      expect(component.purchaseFilterError()).toBeTruthy();
+      expect(component.appliedPurchasePeriod()).toEqual(original);
+      expect(creditCardServiceSpy.getPurchases).not.toHaveBeenCalled();
+    });
+
+    it('keeps the applied dates on refresh and ignores older responses', () => {
+      setup();
+      const older = new Subject<CreditCardPurchaseDto[]>();
+      const newer = new Subject<CreditCardPurchaseDto[]>();
+      creditCardServiceSpy.getPurchases.mockReturnValueOnce(older).mockReturnValueOnce(newer);
+      component.purchaseFilterForm.setValue({ startDate: '2025-04-01', endDate: '2025-04-30' });
+      component.applyPurchaseFilter();
+      component.refreshPurchaseHistory();
+      newer.next([mockPurchase]); newer.complete();
+      older.next([]); older.complete();
+      expect(component.visiblePurchases()).toEqual([mockPurchase]);
+      expect(component.isLoadingPurchases()).toBe(false);
+      expect(creditCardServiceSpy.getPurchases).toHaveBeenLastCalledWith(1, '2025-04-01', '2025-04-30');
+    });
+
+    it('uses inclusive bounds, including after full-history reconciliation', () => {
+      setup();
+      component.purchaseFilterForm.setValue({ startDate: '2025-04-01', endDate: '2025-04-01' });
+      component.applyPurchaseFilter();
+      component.purchases.set([mockPurchase, { ...mockPurchase, id: 101, purchaseDate: '2025-03-31' }]);
+      expect(component.visiblePurchases()).toEqual([mockPurchase]);
+    });
+
+    it('supports an open range and restores the default period', () => {
+      setup();
+      const initial = component.appliedPurchasePeriod();
+      component.purchaseFilterForm.setValue({ startDate: '', endDate: '' });
+      component.applyPurchaseFilter();
+      expect(creditCardServiceSpy.getPurchases).toHaveBeenLastCalledWith(1, undefined, undefined);
+      component.resetPurchaseFilter();
+      expect(component.appliedPurchasePeriod()).toEqual(initial);
+    });
+  });
+
   describe('initialization', () => {
     beforeEach(() => setup());
 

@@ -91,6 +91,14 @@ describe('CreditCardService', () => {
   let service: CreditCardService;
   let http: HttpTestingController;
 
+  it('sends purchase date bounds to the API', () => {
+    service.getPurchases(1, '2026-09-01', '2026-10-30').subscribe();
+    const request = http.expectOne(req => req.url === `${base}/credit-cards/1/purchases`);
+    expect(request.request.params.get('startDate')).toBe('2026-09-01');
+    expect(request.request.params.get('endDate')).toBe('2026-10-30');
+    request.flush([]);
+  });
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [CreditCardService, provideHttpClient(), provideHttpClientTesting()],

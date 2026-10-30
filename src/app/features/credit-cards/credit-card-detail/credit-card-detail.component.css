@@ -846,3 +846,17 @@
 
   .bill-actions { flex-wrap: wrap; }
 }
+
+.purchase-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.purchase-filters .field {
+  flex: 1 1 160px;
+  margin-bottom: 0;
+  min-width: 0;
+}

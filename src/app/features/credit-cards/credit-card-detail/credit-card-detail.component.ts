@@ -76,6 +76,17 @@ export class CreditCardDetailComponent implements OnInit {
   );
 
   readonly purchases = signal<CreditCardPurchaseDto[]>([]);
+  private readonly defaultPurchasePeriod = this.last30Days();
+  readonly purchaseFilterForm = this.fb.nonNullable.group(this.defaultPurchasePeriod);
+  readonly purchaseFilterError = signal<string | null>(null);
+  readonly appliedPurchasePeriod = signal(this.defaultPurchasePeriod);
+  readonly isLoadingPurchases = signal(false);
+  private purchaseRequestVersion = 0;
+  readonly visiblePurchases = computed(() => {
+    const { startDate, endDate } = this.appliedPurchasePeriod();
+    return this.purchases().filter(p => (!startDate || p.purchaseDate >= startDate) &&
+      (!endDate || p.purchaseDate <= endDate));
+  });
   readonly purchasesError = signal<string | null>(null);
   readonly checkingComposition = signal(false);
   readonly currentPurchase = signal<CreditCardPurchaseDto | null>(null);
@@ -323,11 +334,38 @@ export class CreditCardDetailComponent implements OnInit {
 
   // ─── Compra com plano integral ───────────────────────────────────────────
 
+  applyPurchaseFilter(): void {
+    const period = this.purchaseFilterForm.getRawValue();
+    if (period.startDate && period.endDate && period.startDate > period.endDate) {
+      this.purchaseFilterError.set('A data inicial deve ser anterior ou igual à data final.');
+      return;
+    }
+    this.purchaseFilterError.set(null);
+    this.appliedPurchasePeriod.set(period);
+    this.loadPurchases();
+  }
+
+  resetPurchaseFilter(): void {
+    this.purchaseFilterForm.setValue(this.last30Days());
+    this.applyPurchaseFilter();
+  }
+
   private loadPurchases(): void {
-    this.creditCardService.getPurchases(this.cardId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: list => { this.purchases.set(list); this.purchasesError.set(null); },
-      error: () => this.purchasesError.set('Não foi possível consultar as compras. Atualize o histórico.'),
-    });
+    const version = ++this.purchaseRequestVersion;
+    const { startDate, endDate } = this.appliedPurchasePeriod();
+    this.isLoadingPurchases.set(true);
+    this.purchasesError.set(null);
+    this.creditCardService.getPurchases(this.cardId, startDate || undefined, endDate || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => {
+        if (version === this.purchaseRequestVersion) this.isLoadingPurchases.set(false);
+      })).subscribe({
+        next: list => { if (version === this.purchaseRequestVersion) this.purchases.set(list); },
+        error: () => {
+          if (version !== this.purchaseRequestVersion) return;
+          this.purchases.set([]);
+          this.purchasesError.set('Não foi possível consultar as compras. Atualize o histórico.');
+        },
+      });
   }
 
   refreshPurchaseHistory(): void {
@@ -503,7 +541,9 @@ export class CreditCardDetailComponent implements OnInit {
   }
 
   private replacePurchase(purchase: CreditCardPurchaseDto): void {
-    this.purchases.update(list => [...list.filter(p => p.id !== purchase.id), purchase]);
+    this.purchases.update(list => list.some(p => p.id === purchase.id)
+      ? list.map(p => p.id === purchase.id ? purchase : p)
+      : [purchase, ...list]);
   }
 
   sortedInstallments(purchase: CreditCardPurchaseDto) {
@@ -533,8 +573,18 @@ export class CreditCardDetailComponent implements OnInit {
     this.bills.update(list => list.map(b => b.id === updated.id ? updated : b));
   }
 
+  private last30Days(): { startDate: string; endDate: string } {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    return { startDate: this.dateString(start), endDate: this.dateString(end) };
+  }
+
   private todayString(): string {
-    const d = new Date();
+    return this.dateString(new Date());
+  }
+
+  private dateString(d: Date): string {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');

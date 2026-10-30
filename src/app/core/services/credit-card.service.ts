@@ -1,6 +1,6 @@
 import { inject, Injectable, signal, DestroyRef } from '@angular/core';
 import { SessionService } from './session.service';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
@@ -117,9 +117,12 @@ export class CreditCardService {
 
   // ─── Compras ─────────────────────────────────────────────────────────────
 
-  getPurchases(cardId: number): Observable<CreditCardPurchaseDto[]> {
+  getPurchases(cardId: number, startDate?: string, endDate?: string): Observable<CreditCardPurchaseDto[]> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
     return this.session.scoped(() => this.http.get<CreditCardPurchaseDto[]>(
-      `${this.base}/credit-cards/${cardId}/purchases`
+      `${this.base}/credit-cards/${cardId}/purchases`, { params }
     ));
   }
 
