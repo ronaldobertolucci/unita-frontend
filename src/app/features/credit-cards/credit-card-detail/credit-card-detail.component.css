@@ -851,12 +851,25 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: 0.6rem;
   margin-bottom: 1rem;
 }
 
 .purchase-filters .field {
-  flex: 1 1 160px;
+  gap: 0.3rem;
   margin-bottom: 0;
   min-width: 0;
+}
+
+.purchase-filters .field label {
+  font-size: 0.75rem;
+}
+
+.purchase-filters .field input {
+  width: auto;
+  height: 38px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  appearance: auto;
+  -webkit-appearance: auto;
 }
