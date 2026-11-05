@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed, effect, inject, DestroyRef } from '@angular/core';
-import { Observable, finalize, forkJoin } from 'rxjs';
+import { Observable, finalize, forkJoin, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -12,7 +12,7 @@ import {
 } from '@angular/forms';
 
 import { TransactionService } from '../../../core/services/transaction.service';
-import { redemptionNet } from '../../../core/utils/investment-redemption.util';
+import { redemptionNet, investmentUnits, investmentQuantityText, proportionalSaleValue } from '../../../core/utils/investment-redemption.util';
 import { AssetService } from '../../../core/services/asset.service';
 import { LegalEntityService } from '../../../core/services/legal-entity.service';
 import { CategoryService } from '../../../core/services/category.service';
@@ -134,6 +134,8 @@ export class InvestmentDetailComponent implements OnInit {
   buyForm!: FormGroup;
   yieldForm!: FormGroup;
   sellForm!: FormGroup;
+  private sellFormChanges = new Subscription();
+  private sellGrossEdited = false;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -248,7 +250,7 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
-    if (this.isSaving() || this.financialRecovery.state() !== 'clear' || (type === 'sell' && this.asset()?.status === 'REDEEMED')) return;
+    if (this.isSaving() || this.financialRecovery.state() !== 'clear' || (type === 'sell' && !this.canSell())) return;
     this.errorMessage.set('');
     this.activeModal.set(type);
 
@@ -384,6 +386,34 @@ export class InvestmentDetailComponent implements OnInit {
     });
   }
 
+  canSell(): boolean {
+    const asset = this.asset();
+    const available = investmentUnits(asset?.position.quantity);
+    return !!asset && (asset.status === 'ACTIVE' || asset.status === 'MATURED') && available !== null && available > 0n;
+  }
+
+  sellRemainingQuantity(): string | null {
+    const available = investmentUnits(this.asset()?.position.quantity);
+    const quantity = investmentUnits(this.sellForm?.controls['quantity'].value);
+    if (available === null || quantity === null || quantity <= 0n || quantity > available) return null;
+    return investmentQuantityText(available - quantity);
+  }
+
+  sellAll(): void {
+    this.sellForm.controls['quantity'].setValue(String(this.asset()!.position.quantity));
+    this.sellForm.controls['quantity'].markAsTouched();
+  }
+
+  applySellSuggestion(): void {
+    const available = investmentUnits(this.asset()?.position.quantity);
+    const quantity = investmentUnits(this.sellForm.controls['quantity'].value);
+    if (available === null || quantity === null) return;
+    const suggestion = proportionalSaleValue(this.asset()!.position.currentValue, quantity, available);
+    if (suggestion === null) return;
+    this.sellForm.controls['grossAmount'].setValue(suggestion, { emitEvent: false });
+    this.sellGrossEdited = false;
+  }
+
   sellNetAmount(): number | null {
     const { grossAmount, taxAmount } = this.sellForm.value;
     if (this.sellForm.controls['grossAmount'].invalid || this.sellForm.controls['taxAmount'].invalid ||
@@ -395,8 +425,9 @@ export class InvestmentDetailComponent implements OnInit {
     if (this.isSaving() || this.financialRecovery.state() !== 'clear' || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
     this.sellForm.markAllAsTouched();
     if (this.sellForm.invalid) return;
-    const quantity = this.asset()?.position.quantity;
-    if (quantity == null || !Number.isFinite(quantity) || quantity <= 0) return;
+    this.sellForm.controls['quantity'].updateValueAndValidity();
+    if (!this.canSell() || this.sellForm.invalid) return;
+    const quantity = Number(investmentQuantityText(investmentUnits(this.sellForm.controls['quantity'].value)!));
 
     this.isSaving.set(true);
     this.errorMessage.set('');
@@ -435,6 +466,7 @@ export class InvestmentDetailComponent implements OnInit {
           this.refreshSellAvailability();
         } else if (err?.status === 409) {
           this.sellNeedsReview.set(true);
+          this.errorMessage.set('A posição ou os dados da venda mudaram. Confira os saldos atualizados e revise a quantidade antes de enviar novamente.');
           this.refreshSellResult();
           this.categoryService.loadCategories().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => {} });
         } else if (err?.status === 0 || err?.status >= 500 || err?.name === 'TimeoutError') {
@@ -485,10 +517,12 @@ export class InvestmentDetailComponent implements OnInit {
         this.asset.set(asset);
         this.transactions.set([...history].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
         this.sellBalance.set(balance);
+        this.sellForm.controls['quantity'].updateValueAndValidity();
         this.sellReviewLoaded.set(true);
         this.sellRefreshing.set(false);
         this.assetService.loadAssets();
         if (asset.status === 'REDEEMED' || closeAfterSuccess) {
+          this.sellNeedsReview.set(false);
           this.closeModal();
         }
       },
@@ -573,6 +607,9 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   private buildSellForm(): void {
+    this.sellFormChanges.unsubscribe();
+    this.sellFormChanges = new Subscription();
+    this.sellGrossEdited = false;
     const cat = this.categorySell();
     const currentValue = this.asset()?.position.currentValue ?? '';
     const finiteAmount = (positive: boolean) => (control: AbstractControl) => {
@@ -582,6 +619,14 @@ export class InvestmentDetailComponent implements OnInit {
       return Number.isFinite(amount) && (positive ? amount > 0 : amount >= 0) ? null : { amount: true };
     };
     this.sellForm = this.fb.group({
+      quantity: [String(this.asset()?.position.quantity ?? ''), [Validators.required, (control: AbstractControl) => {
+        const quantity = investmentUnits(control.value);
+        const available = investmentUnits(this.asset()?.position.quantity);
+        if (quantity === null || quantity <= 0n) return { quantity: true };
+        // Reject decimal text that the numeric HTTP contract cannot represent faithfully.
+        if (investmentUnits(Number(investmentQuantityText(quantity))) !== quantity) return { quantity: true };
+        return available !== null && quantity <= available ? null : { available: true };
+      }]],
       grossAmount: [currentValue, [Validators.required, finiteAmount(true)]],
       taxAmount: ['', [Validators.required, finiteAmount(false)]],
       pocketId: ['', [Validators.required, (control: AbstractControl) =>
@@ -595,6 +640,12 @@ export class InvestmentDetailComponent implements OnInit {
       const tax = form.get('taxAmount');
       return gross?.valid && tax?.valid && Number(tax.value) > Number(gross.value) ? { taxExceedsGross: true } : null;
     } });
+    this.sellFormChanges.add(this.sellForm.controls['grossAmount'].valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.sellGrossEdited = true));
+    this.sellFormChanges.add(this.sellForm.controls['quantity'].valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+        if (!this.sellGrossEdited) this.applySellSuggestion();
+      }));
   }
 
   private toLocalDateString(date: Date): string {

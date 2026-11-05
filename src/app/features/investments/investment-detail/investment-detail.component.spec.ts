@@ -712,6 +712,107 @@ describe('InvestmentDetailComponent', () => {
     });
   });
 
+  describe('partial sales', () => {
+    beforeEach(() => setup({ ...mockDetail, position: { ...mockDetail.position,
+      quantity: 3, remainingCost: 3000, totalInvested: 3000, currentValue: 3300 } }));
+
+    function open(): void {
+      component.openModal('sell');
+      component.sellForm.patchValue({ taxAmount: 10, pocketId: 5, categoryId: 13 });
+      fixture.detectChanges();
+    }
+
+    it('shows 1 of 3 as 2 remaining, accessible input and no final-sale warning', () => {
+      open();
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('#sell-quantity');
+      input.value = '1'; input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(component.sellRemainingQuantity()).toBe('2');
+      expect(component.sellForm.value.grossAmount).toBe(1100);
+      expect(input.labels?.[0].textContent).toContain('Quantidade a vender');
+      expect(input.getAttribute('aria-describedby')).toContain('sell-quantity-error');
+      expect(fixture.nativeElement.textContent).toContain('Saldo previsto: 2');
+      expect(fixture.nativeElement.querySelector('.sell-final-warning')).toBeNull();
+      const all = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+      all.find(button => button.textContent?.includes('Vender tudo'))!.click();
+      fixture.detectChanges();
+      expect(component.sellForm.value.quantity).toBe('3');
+      expect(component.sellRemainingQuantity()).toBe('0');
+      expect(fixture.nativeElement.querySelector('.sell-final-warning')).not.toBeNull();
+    });
+
+    it.each(['', '0', '-1', '4', '0.000000001', 'Infinity', 'NaN', 'abc', '9999999999.999999999'])
+      ('rejects invalid or unavailable quantity %s before sending', quantity => {
+        open(); component.sellForm.patchValue({ quantity }); component.onSell(); fixture.detectChanges();
+        expect(component.sellForm.controls['quantity'].invalid).toBe(true);
+        expect(assetServiceSpy.sell).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.querySelector('#sell-quantity').getAttribute('aria-invalid')).toBe('true');
+        expect(fixture.nativeElement.querySelector('#sell-quantity-error').textContent).toContain('quantidade positiva');
+      });
+
+    it('preserves manually negotiated gross until explicitly reapplying suggestion', () => {
+      open();
+      component.sellForm.patchValue({ quantity: '1' });
+      component.sellForm.patchValue({ grossAmount: 900, taxAmount: 0 });
+      component.sellForm.patchValue({ quantity: '2', notes: 'Deságio' });
+      expect(component.sellForm.value.grossAmount).toBe(900);
+      component.applySellSuggestion();
+      expect(component.sellForm.value.grossAmount).toBe(2200);
+      component.sellForm.patchValue({ quantity: '1' });
+      expect(component.sellForm.value.grossAmount).toBe(1100);
+    });
+
+    it.each(['ACTIVE', 'MATURED'] as const)('sells a partial position in %s and leaves a new sale available after refresh', status => {
+      component.asset.set({ ...component.asset()!, status });
+      open(); component.sellForm.patchValue({ quantity: '1', grossAmount: 4000, taxAmount: 4000 });
+      expect(component.sellNetAmount()).toBe(0);
+      const remaining = { ...component.asset()!, position: { ...component.asset()!.position,
+        quantity: 2, remainingCost: 2000, currentValue: 2200 } };
+      assetServiceSpy.sell.mockReturnValue(of([mockTxSell, mockTxTax]));
+      assetServiceSpy.getAsset.mockReturnValue(of(remaining));
+      component.onSell();
+      expect(assetServiceSpy.sell).toHaveBeenCalledWith(1, expect.objectContaining({ quantity: 1, grossAmount: 4000, taxAmount: 4000 }));
+      expect(component.asset()).toEqual(remaining);
+      expect(component.canSell()).toBe(true);
+      expect(component.sellNeedsReview()).toBe(false);
+      component.openModal('sell');
+      expect(component.activeModal()).toBe('sell');
+      expect(component.sellForm.value.quantity).toBe('2');
+    });
+
+    it('uses decimal fractions without binary subtraction to decide closure', () => {
+      component.asset.set({ ...component.asset()!, position: { ...component.asset()!.position, quantity: 0.3 } });
+      open(); component.sellForm.patchValue({ quantity: '0,2' });
+      expect(component.sellRemainingQuantity()).toBe('0.1');
+      component.sellAll(); expect(component.sellRemainingQuantity()).toBe('0');
+      component.sellForm.patchValue({ quantity: '0.00000001', taxAmount: 0 });
+      assetServiceSpy.sell.mockReturnValue(of([mockTxSell, mockTxTax]));
+      component.onSell();
+      expect(assetServiceSpy.sell).toHaveBeenCalledWith(1, expect.objectContaining({ quantity: 0.00000001 }));
+    });
+
+    it('refreshes a conflict and requires review without resending or overwriting negotiated gross', () => {
+      open(); component.sellForm.patchValue({ quantity: '2', grossAmount: 2000 });
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 409 })));
+      assetServiceSpy.getAsset.mockReturnValue(of({ ...component.asset()!, position: { ...component.asset()!.position, quantity: 1 } }));
+      component.onSell();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(component.sellNeedsReview()).toBe(true);
+      expect(component.sellForm.controls['quantity'].hasError('available')).toBe(true);
+      expect(component.sellForm.value.grossAmount).toBe(2000);
+      component.onSell(); expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      component.allowSellRetry();
+      component.onSell(); expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not open a sale for a position without units or already redeemed', () => {
+      component.asset.set({ ...component.asset()!, position: { ...component.asset()!.position, quantity: 0 } });
+      component.openModal('sell'); expect(component.activeModal()).toBeNull();
+      component.asset.set({ ...mockDetail, status: 'REDEEMED' });
+      component.openModal('sell'); expect(component.activeModal()).toBeNull();
+    });
+  });
+
   describe('onSell()', () => {
     beforeEach(() => setup());
 
@@ -757,7 +858,7 @@ describe('InvestmentDetailComponent', () => {
       fixture.detectChanges();
       const element: HTMLElement = fixture.nativeElement;
       expect((element.querySelector('[formControlName="grossAmount"]') as HTMLInputElement).disabled).toBe(false);
-      expect(element.textContent).toContain('Registrar resgate integral');
+      expect(element.textContent).toContain('Vender/resgatar');
       expect(element.textContent).toContain('Líquido previsto:');
       expect(element.textContent).toMatch(/R\$\s*0,00/);
       const categories = element.querySelector('[formControlName="categoryId"]') as HTMLSelectElement;
