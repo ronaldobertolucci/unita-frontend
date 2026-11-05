@@ -599,6 +599,7 @@
     }
 
     <form [formGroup]="sellForm" (ngSubmit)="onSell()" novalidate>
+      <fieldset [disabled]="isSaving() || !!financialRecovery.operation()?.sale" style="border:0;padding:0;margin:0;min-width:0">
       <p id="sell-available">Quantidade disponível: {{ asset()!.position.quantity | number:'1.0-8':'pt-BR' }}</p>
       <div class="field" [class.field--invalid]="ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched">
         <label for="sell-quantity">Quantidade a vender</label>
@@ -686,6 +687,7 @@
         @if (sellNetAmount() !== null) { <strong>{{ sellNetAmount() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong> }
         @else { — }
       </p>
+      </fieldset>
       @if (sellNeedsReview()) {
       <section class="review-notice" role="status" aria-label="Revisão do resgate">
         <p>Confira o resultado antes de reenviar.</p>
@@ -700,7 +702,7 @@
         }
         <div class="review-actions">
           <button type="button" class="btn-secondary" (click)="refreshSellResult()" [disabled]="sellRefreshing()">{{ sellRefreshing() ? 'Consultando...' : 'Consultar resultado' }}</button>
-          @if (sellReviewLoaded() && asset()?.status !== 'REDEEMED') {
+          @if (sellReviewLoaded() && asset()?.status !== 'REDEEMED' && !financialRecovery.operation()?.sale) {
             <button type="button" class="btn-secondary" (click)="allowSellRetry()">Conferi os históricos e o resgate não foi registrado</button>
           }
         </div>

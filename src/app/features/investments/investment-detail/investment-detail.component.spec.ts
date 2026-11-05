@@ -101,6 +101,7 @@ const mockLegalEntity: LegalEntityDto = {
 
 function buildAssetService(detail: AssetDetailDto = mockDetail, txs: InvestmentTransactionDto[] = []) {
   return {
+    refreshAssets: jest.fn().mockReturnValue(of([])),
     loadAssets:     jest.fn(),
     getAsset:       jest.fn().mockReturnValue(of(detail)),
     getTransactions: jest.fn().mockReturnValue(of(txs)),
@@ -147,6 +148,9 @@ describe('InvestmentDetailComponent', () => {
   let legalEntityServiceSpy: ReturnType<typeof buildLegalEntityService>;
   let router: Router;
 
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => sessionStorage.clear());
+
   function setup(
     detail: AssetDetailDto = mockDetail,
     txs: InvestmentTransactionDto[] = [],
@@ -181,6 +185,8 @@ describe('InvestmentDetailComponent', () => {
       ],
     });
 
+    const session = TestBed.inject(SessionService);
+    session.accept(syntheticSession(), session.version());
     fixture   = TestBed.createComponent(InvestmentDetailComponent);
     component = fixture.componentInstance;
     router    = TestBed.inject(Router);
@@ -210,7 +216,7 @@ describe('InvestmentDetailComponent', () => {
       if (kind === 'redeemed') expect(element.querySelector('.btn-tx--sell')).toBeNull();
     });
 
-    it('reviews the S01 net credit after an uncertain sell and blocks a second redemption', () => {
+    it('preserves the same command when legacy history cannot identify the uncertain sale', () => {
       const data = investmentBaseline();
       setup({ ...data.redeemed, status: 'ACTIVE', position: { ...data.redeemed.position, quantity: 1, remainingCost: 1000, averagePrice: 1000, currentValue: 1100 } });
       assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
@@ -224,7 +230,8 @@ describe('InvestmentDetailComponent', () => {
       component.allowSellRetry();
       component.onSell();
       fixture.detectChanges();
-      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(2);
+      expect(assetServiceSpy.sell.mock.calls[1]).toEqual(assetServiceSpy.sell.mock.calls[0]);
       expect(component.asset()).toEqual(data.redeemed);
       expect(component.transactions()).toHaveLength(3);
       expect(component.sellBalance()).toBe(1085);
@@ -922,7 +929,21 @@ describe('InvestmentDetailComponent', () => {
       expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
       expect(TestBed.inject(TransactionService).loadTransactions).toHaveBeenCalledWith(5);
       component.allowSellRetry();
-      expect(component.sellNeedsReview()).toBe(false);
+      expect(component.sellNeedsReview()).toBe(true);
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(2);
+      expect(assetServiceSpy.sell.mock.calls[1]).toEqual(assetServiceSpy.sell.mock.calls[0]);
+    });
+
+    it('locks the form and offers only the same-sale recovery while the result is unknown', () => {
+      fillSell();
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
+      component.onSell(); fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('fieldset').disabled).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('Recuperar a mesma venda');
+      expect(fixture.nativeElement.textContent).not.toContain('Conciliei o resultado; liberar novas operações');
+      component.sellForm.patchValue({ quantity: '0.5', grossAmount: 999 });
+      component.allowSellRetry();
+      expect(assetServiceSpy.sell.mock.calls[1]).toEqual(assetServiceSpy.sell.mock.calls[0]);
     });
 
     it('keeps retry blocked when a result consultation fails', () => {
@@ -930,7 +951,6 @@ describe('InvestmentDetailComponent', () => {
       assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
       pocketServiceSpy.getBalance.mockReturnValue(throwError(() => ({ status: 500 })));
       component.onSell();
-      component.allowSellRetry();
       component.onSell();
       expect(component.sellReviewLoaded()).toBe(false);
       expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);

@@ -84,7 +84,11 @@ export class InvestmentDetailComponent implements OnInit {
   private assetId!: number;
 
   constructor() {
+    let hadPendingSale = false;
     effect(() => {
+      const pendingSale = !!this.financialRecovery.operation()?.sale;
+      if (hadPendingSale && this.financialRecovery.state() === 'clear') this.sellNeedsReview.set(false);
+      hadPendingSale = pendingSale;
       const review = this.financialRecovery.investment();
       if (review && review.asset.id === this.assetId) {
         this.asset.set(review.asset);
@@ -433,7 +437,7 @@ export class InvestmentDetailComponent implements OnInit {
     this.errorMessage.set('');
     const { grossAmount, taxAmount, pocketId, transactionDate, categoryId, notes } = this.sellForm.getRawValue();
     this.sellPocketId.set(Number(pocketId));
-    this.assetService.sell(this.assetId, {
+    this.financialRecovery.sell(this.assetId, {
       quantity, operationId: crypto.randomUUID(),
       grossAmount: Number(grossAmount), taxAmount: Number(taxAmount),
       pocketId: Number(pocketId), transactionDate, categoryId: Number(categoryId),
@@ -511,16 +515,18 @@ export class InvestmentDetailComponent implements OnInit {
       history: this.assetService.getTransactions(this.assetId),
       balance: this.pocketService.getBalance(pocketId),
       statement: this.transactionService.loadTransactions(pocketId),
+      summaries: this.assetService.refreshAssets(),
       pockets: this.pocketService.loadPockets(),
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ asset, history, balance }) => {
         this.asset.set(asset);
         this.transactions.set([...history].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)));
         this.sellBalance.set(balance);
+        this.financialRecovery.resolveSaleHistory(asset.id, history);
+        this.financialRecovery.finishSaleRefresh(asset.id);
         this.sellForm.controls['quantity'].updateValueAndValidity();
         this.sellReviewLoaded.set(true);
         this.sellRefreshing.set(false);
-        this.assetService.loadAssets();
         if (asset.status === 'REDEEMED' || closeAfterSuccess) {
           this.sellNeedsReview.set(false);
           this.closeModal();
@@ -534,6 +540,10 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   allowSellRetry(): void {
+    if (this.financialRecovery.operation()?.sale) {
+      this.financialRecovery.retrySale();
+      return;
+    }
     if (!this.sellReviewLoaded() || this.sellRefreshing() || this.asset()?.status === 'REDEEMED') return;
     this.sellNeedsReview.set(false);
     this.errorMessage.set('');

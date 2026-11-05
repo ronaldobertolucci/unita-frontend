@@ -1,7 +1,7 @@
 import { Injectable, signal, inject, DestroyRef } from '@angular/core';
 import { SessionService } from './session.service';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, finalize, defer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AssetSummaryDto,
@@ -29,26 +29,18 @@ export class AssetService {
   constructor(private http: HttpClient) {}
 
   loadAssets(): void {
-    this.isLoading.set(true);
-    this.session.scoped(() => this.http.get<AssetSummaryDto[]>(this.base)).subscribe({
-      next: (data) => {
-        // Ordena o array recebido
-        const sortedData = data.sort((a, b) => {
-          // Ordena primeiro pela propriedade "category"
-          if (a.category < b.category) return -1;
-          if (a.category > b.category) return 1;
+    this.refreshAssets().subscribe({ error: () => {} });
+  }
 
-          // Depois, desempata pela propriedade "name"
-          if (a.name < b.name) return -1;
-          if (a.name > b.name) return 1;
-
-          return 0;
-        });
-
-        this.assets.set(data);
-        this.isLoading.set(false);
-      },
-      error: () => this.isLoading.set(false),
+  refreshAssets(): Observable<AssetSummaryDto[]> {
+    return defer(() => {
+      this.isLoading.set(true);
+      return this.session.scoped(() => this.http.get<AssetSummaryDto[]>(this.base)).pipe(
+        tap(data => this.assets.set([...data].sort((a, b) =>
+          (a.category < b.category ? -1 : a.category > b.category ? 1 : 0) ||
+          (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)))),
+        finalize(() => this.isLoading.set(false)),
+      );
     });
   }
 

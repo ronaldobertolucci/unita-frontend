@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core'
 import { EMPTY, Observable, Subject, defer, filter, takeUntil } from 'rxjs';
 import { LoginResponse } from '../models/auth.model';
 import { UserDto } from '../models/user.model';
+import { INVESTMENT_SALE_STORAGE_KEY } from '../utils/investment-sale-storage';
 import { parseSession, sessionExpiresAt } from '../auth/auth-contract';
 
 export type SessionState = 'unknown' | 'authenticated' | 'anonymous' | 'blocked';
@@ -43,6 +44,9 @@ export class SessionService {
   }
 
   invalidate(reason: SessionEndReason, state: SessionState = reason === 'blocked' ? 'blocked' : 'anonymous'): number {
+    if (reason !== 'expired' && reason !== 'destroyed') {
+      try { sessionStorage.removeItem(INVESTMENT_SALE_STORAGE_KEY); } catch { /* Storage can be disabled. */ }
+    }
     if (this.expiryTimer !== null) clearTimeout(this.expiryTimer);
     this.expiryTimer = null;
     this._renewalOwner.set(reason === 'expired' ? this.user()?.id ?? this.renewalOwner() : null);

@@ -66,9 +66,15 @@ import { FinancialRecoveryService } from '../../core/services/financial-recovery
           }
           <p>A consulta mostra o estado atual. Ela não comprova, sozinha, o resultado de uma operação sem resposta. Contas removidas ou indisponíveis não aparecem.</p>
         }
+        @if (recovery.operation()?.sale; as sale) {
+          <p>{{ sale.confirmed ? 'Venda confirmada; falta atualizar e conferir os dados.' : 'A ausência no histórico ou o status ativo não comprovam falha. A recuperação usa exatamente a mesma venda.' }}</p>
+        }
         <div class="review-actions">
+          @if (recovery.operation()?.sale && !recovery.operation()?.sale?.confirmed) {
+            <button type="button" class="btn-secondary" [disabled]="recovery.state() === 'checking'" (click)="recovery.retrySale()">Recuperar a mesma venda</button>
+          }
           <button type="button" class="btn-secondary" [disabled]="recovery.state() === 'checking'" (click)="recovery.check()">{{ recovery.state() === 'checking' ? 'Consultando…' : 'Consultar estado atual' }}</button>
-          @if (recovery.state() === 'review') {
+          @if (recovery.state() === 'review' && (!recovery.operation()?.sale || recovery.operation()?.sale?.confirmed)) {
             <button type="button" class="btn-secondary" (click)="recovery.confirm()">Conciliei o resultado; liberar novas operações</button>
           }
         </div>
