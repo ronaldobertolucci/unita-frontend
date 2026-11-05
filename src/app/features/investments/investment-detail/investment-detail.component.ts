@@ -395,12 +395,15 @@ export class InvestmentDetailComponent implements OnInit {
     if (this.isSaving() || this.financialRecovery.state() !== 'clear' || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
     this.sellForm.markAllAsTouched();
     if (this.sellForm.invalid) return;
+    const quantity = this.asset()?.position.quantity;
+    if (quantity == null || !Number.isFinite(quantity) || quantity <= 0) return;
 
     this.isSaving.set(true);
     this.errorMessage.set('');
     const { grossAmount, taxAmount, pocketId, transactionDate, categoryId, notes } = this.sellForm.getRawValue();
     this.sellPocketId.set(Number(pocketId));
     this.assetService.sell(this.assetId, {
+      quantity, operationId: crypto.randomUUID(),
       grossAmount: Number(grossAmount), taxAmount: Number(taxAmount),
       pocketId: Number(pocketId), transactionDate, categoryId: Number(categoryId),
       notes: notes?.trim() || undefined,

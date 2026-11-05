@@ -220,7 +220,7 @@ describe('Financial recovery with the actual HTTP read services', () => {
     backend.expectOne(`${base}/assets/30`).flush({ id: 30, name: 'CDB', position: { currentValue: 180, totalInvested: 180 } });
     expect(service.state()).toBe('checking'); service.confirm(); expect(service.state()).toBe('checking');
     backend.expectOne(`${base}/assets/30/transactions`).flush([
-      { id: 81, type: 'BUY', amount: 80, transactionDate: '2026-10-14', notes: null, pocketTransactionId: 101 },
+      { id: 81, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 80, transactionDate: '2026-10-14', notes: null, pocketTransactionId: 101 },
     ]);
     expect(service.state()).toBe('review'); expect(service.investment()?.transactions[0].pocketTransactionId).toBe(101);
     expect(service.pockets()[0].transactions[0].id).toBe(101);

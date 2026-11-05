@@ -26,7 +26,7 @@ export function investmentBaseline() {
     // A valid readable detail; the SQL audit fixture separately covers broken FKs.
     custodianLegalEntity: custodian,
     position: {
-      quantity: 5.12345678, averagePrice: 97.59036012, totalInvested: 500.12345678,
+      quantity: 5.12345678, averagePrice: 97.59036012, remainingCost: 500.12345678, totalInvested: 500.12345678,
       currentValue: 550.87654321, redeemedValue: 12.34, lastValuationDate: '2025-12-31',
     },
     fixedIncomeDetails: { indexer: 'CDI', annualRate: 1.1, maturityDate: '2027-10-01', taxFree: false },
@@ -36,7 +36,7 @@ export function investmentBaseline() {
     id: 93003, name: 'S14 matured pension', category: 'PREVIDENCIA', status: 'MATURED',
     liquidityType: 'PREVIDENCIARIA', legalEntity: issuer, custodianLegalEntity: null,
     position: {
-      quantity: 2, averagePrice: 100, totalInvested: 200, currentValue: 220,
+      quantity: 2, averagePrice: 100, remainingCost: 200, totalInvested: 200, currentValue: 220,
       redeemedValue: 0, lastValuationDate: '2026-01-31',
     },
     fixedIncomeDetails: null, pensionDetails: { pensionType: 'VGBL', taxRegime: 'REGRESSIVO' },
@@ -45,27 +45,27 @@ export function investmentBaseline() {
     id: 93001, name: 'S01 full redemption', category: 'RENDA_FIXA', status: 'REDEEMED',
     liquidityType: 'DIARIA', legalEntity: issuer, custodianLegalEntity: custodian,
     position: {
-      quantity: 0, averagePrice: 0, totalInvested: 1000, currentValue: 0,
+      quantity: 0, averagePrice: 0, remainingCost: 0, totalInvested: 1000, currentValue: 0,
       redeemedValue: 1085, lastValuationDate: '2026-10-12',
     },
     fixedIncomeDetails: { indexer: 'PREFIXADO', annualRate: 0.1, maturityDate: '2026-10-01', taxFree: false },
     pensionDetails: null,
   };
   const transactions: InvestmentTransactionDto[] = [
-    { id: 97004, type: 'BUY', amount: 200, transactionDate: '2026-03-01', notes: 'S14 first buy', pocketTransactionId: 95004 },
-    { id: 97005, type: 'BUY', amount: 300.12345678, transactionDate: '2026-04-01', notes: 'S14 eight-decimal second buy', pocketTransactionId: 95005 },
-    { id: 97006, type: 'YIELD', amount: 12.34, transactionDate: '2026-10-12', notes: 'S14 same-day yield', pocketTransactionId: 95006 },
-    { id: 97007, type: 'YIELD', amount: 15.12345678, transactionDate: '2026-10-12', notes: 'S14 detached cash reference; keep original notes: "á"', pocketTransactionId: null },
-    { id: 97008, type: 'SELL', amount: 5, transactionDate: '2026-10-12', notes: 'S14 ambiguous shared cash reference', pocketTransactionId: 95006 },
-    { id: 97009, type: 'TAX', amount: 1, transactionDate: '2026-10-12', notes: 'S14 same-day tax is not paired by proximity', pocketTransactionId: null },
+    { id: 97004, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 200, transactionDate: '2026-03-01', notes: 'S14 first buy', pocketTransactionId: 95004 },
+    { id: 97005, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 300.12345678, transactionDate: '2026-04-01', notes: 'S14 eight-decimal second buy', pocketTransactionId: 95005 },
+    { id: 97006, type: 'YIELD', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 12.34, transactionDate: '2026-10-12', notes: 'S14 same-day yield', pocketTransactionId: 95006 },
+    { id: 97007, type: 'YIELD', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 15.12345678, transactionDate: '2026-10-12', notes: 'S14 detached cash reference; keep original notes: "á"', pocketTransactionId: null },
+    { id: 97008, type: 'SELL', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 5, transactionDate: '2026-10-12', notes: 'S14 ambiguous shared cash reference', pocketTransactionId: 95006 },
+    { id: 97009, type: 'TAX', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 1, transactionDate: '2026-10-12', notes: 'S14 same-day tax is not paired by proximity', pocketTransactionId: null },
   ];
   const redemptionTransactions: InvestmentTransactionDto[] = [
-    { id: 97001, type: 'BUY', amount: 1000, transactionDate: '2026-02-01', notes: 'S01 principal 1000', pocketTransactionId: 95002 },
-    { id: 97002, type: 'SELL', amount: 1100, transactionDate: '2026-10-12', notes: 'S01 gross 1100; net cash 1085', pocketTransactionId: 95003 },
-    { id: 97003, type: 'TAX', amount: 15, transactionDate: '2026-10-12', notes: 'S01 supplied tax; no explicit SELL link', pocketTransactionId: null },
+    { id: 97001, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 1000, transactionDate: '2026-02-01', notes: 'S01 principal 1000', pocketTransactionId: 95002 },
+    { id: 97002, type: 'SELL', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 1100, transactionDate: '2026-10-12', notes: 'S01 gross 1100; net cash 1085', pocketTransactionId: 95003 },
+    { id: 97003, type: 'TAX', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 15, transactionDate: '2026-10-12', notes: 'S01 supplied tax; no explicit SELL link', pocketTransactionId: null },
   ];
   const pensionTransactions: InvestmentTransactionDto[] = [
-    { id: 97010, type: 'BUY', amount: 200, transactionDate: '2026-01-31', notes: null, pocketTransactionId: null },
+    { id: 97010, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 200, transactionDate: '2026-01-31', notes: null, pocketTransactionId: null },
   ];
   const pocket: PocketSummaryDto = { id: 94001, type: 'CASH', label: 'Synthetic cash A', active: true, balance: 1612.46 };
   const cashTransactions: TransactionDto[] = [{
@@ -92,7 +92,7 @@ export function investmentBaseline() {
     transactionDate: '2026-04-01', notes: 'Preço unitário legado; não multiplicar no cliente' };
   const yieldPayload: YieldPayload = { amount: 12.34, pocketId: pocket.id, categoryId: 40,
     transactionDate: '2026-10-12', notes: 'Rendimento manual: "á"' };
-  const sell: SellPayload = { grossAmount: 1100, taxAmount: 15, pocketId: pocket.id, categoryId: 41,
+  const sell: SellPayload = { quantity: 1, operationId: "f627f953-ffbd-4e4b-92c3-333ce72f22d5", grossAmount: 1100, taxAmount: 15, pocketId: pocket.id, categoryId: 41,
     transactionDate: '2026-10-12', notes: 'S01 gross 1100; net cash 1085' };
   return { fixedIncome, pension, redeemed, transactions, redemptionTransactions, pensionTransactions, summaries,
     pocket, cashTransactions, fixedIncomeCreate, pensionCreate, buy, yieldPayload, sell };

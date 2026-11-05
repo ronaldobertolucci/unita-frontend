@@ -6,6 +6,14 @@ import { of, throwError, Subject, TimeoutError } from 'rxjs';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 
+const saleUuid = 'f627f953-ffbd-4e4b-92c3-333ce72f22d5';
+const originalRandomUuid = Object.getOwnPropertyDescriptor(crypto, 'randomUUID');
+beforeAll(() => Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: () => saleUuid }));
+afterAll(() => {
+  if (originalRandomUuid) Object.defineProperty(crypto, 'randomUUID', originalRandomUuid);
+  else Reflect.deleteProperty(crypto, 'randomUUID');
+});
+
 registerLocaleData(localePt, 'pt-BR');
 
 import { InvestmentDetailComponent } from './investment-detail.component';
@@ -40,7 +48,7 @@ const mockDetail: AssetDetailDto = {
   },
   custodianLegalEntity: null,
   position: {
-    quantity: 1, averagePrice: 10000, totalInvested: 10000,
+    quantity: 1, averagePrice: 10000, remainingCost: 10000, totalInvested: 10000,
     currentValue: 10500, redeemedValue: 0, lastValuationDate: '2025-01-15',
   },
   fixedIncomeDetails: {
@@ -58,23 +66,23 @@ const mockDetailRedeemed: AssetDetailDto = {
   ...mockDetail,
   status: 'REDEEMED',
   custodianLegalEntity: null,
-  position: { ...mockDetail.position, currentValue: 0, redeemedValue: 10800 },
+  position: { ...mockDetail.position, quantity: 0, remainingCost: 0, averagePrice: 0, currentValue: 0, redeemedValue: 10800 },
 };
 
 const mockTxBuy: InvestmentTransactionDto = {
-  id: 10, type: 'BUY', amount: 10000, transactionDate: '2024-01-15', notes: null,
+  id: 10, type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 10000, transactionDate: '2024-01-15', notes: null,
 };
 
 const mockTxYield: InvestmentTransactionDto = {
-  id: 11, type: 'YIELD', amount: 500, transactionDate: '2025-01-10', notes: 'Rendimento mensal',
+  id: 11, type: 'YIELD', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 500, transactionDate: '2025-01-10', notes: 'Rendimento mensal',
 };
 
 const mockTxSell: InvestmentTransactionDto = {
-  id: 12, type: 'SELL', amount: 10500, transactionDate: '2025-02-01', notes: null,
+  id: 12, type: 'SELL', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 10500, transactionDate: '2025-02-01', notes: null,
 };
 
 const mockTxTax: InvestmentTransactionDto = {
-  id: 13, type: 'TAX', amount: 150, transactionDate: '2025-02-01', notes: null,
+  id: 13, type: 'TAX', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 150, transactionDate: '2025-02-01', notes: null,
 };
 
 const mockCategoryBuy: CategoryDto  = { id: 11, name: 'Aporte em Investimento',    type: 'EXPENSE', global: true };
@@ -204,7 +212,7 @@ describe('InvestmentDetailComponent', () => {
 
     it('reviews the S01 net credit after an uncertain sell and blocks a second redemption', () => {
       const data = investmentBaseline();
-      setup({ ...data.redeemed, status: 'ACTIVE', position: { ...data.redeemed.position, currentValue: 1100 } });
+      setup({ ...data.redeemed, status: 'ACTIVE', position: { ...data.redeemed.position, quantity: 1, remainingCost: 1000, averagePrice: 1000, currentValue: 1100 } });
       assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 0 })));
       assetServiceSpy.getAsset.mockReturnValue(of(data.redeemed));
       assetServiceSpy.getTransactions.mockReturnValue(of(data.redemptionTransactions));
@@ -735,7 +743,8 @@ describe('InvestmentDetailComponent', () => {
       assetServiceSpy.getAsset.mockReturnValue(of(mockDetailRedeemed));
       component.onSell();
       expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
-      expect(assetServiceSpy.sell.mock.calls[0][1]).not.toHaveProperty('quantity');
+      expect(assetServiceSpy.sell.mock.calls[0][1]).toHaveProperty('quantity', mockDetail.position.quantity);
+      expect(assetServiceSpy.sell.mock.calls[0][1]).toHaveProperty('operationId', saleUuid);
       expect(component.asset()?.status).toBe('REDEEMED');
       expect(pocketServiceSpy.getBalance).toHaveBeenCalledWith(5);
       expect(TestBed.inject(TransactionService).loadTransactions).toHaveBeenCalledWith(5);

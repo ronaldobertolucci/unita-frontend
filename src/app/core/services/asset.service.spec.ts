@@ -51,7 +51,7 @@ const mockDetail: AssetDetailDto = {
   custodianLegalEntity: null,
   position: {
     quantity: 1,
-    averagePrice: 10000,
+    averagePrice: 10000, remainingCost: 10000,
     totalInvested: 10000,
     currentValue: 10500,
     redeemedValue: 0,
@@ -68,7 +68,7 @@ const mockDetail: AssetDetailDto = {
 
 const mockTransaction: InvestmentTransactionDto = {
   id: 10,
-  type: 'BUY',
+  type: 'BUY', quantity: null, costBasis: null, relatedSellId: null, operationId: null,
   amount: 10000,
   transactionDate: '2024-01-15',
   notes: null,
@@ -334,7 +334,7 @@ describe('AssetService', () => {
 
   describe('recordYield()', () => {
     it('should POST /assets/:id/transactions/yield with correct payload', () => {
-      const yieldTx: InvestmentTransactionDto = { ...mockTransaction, id: 11, type: 'YIELD', amount: 500 };
+      const yieldTx: InvestmentTransactionDto = { ...mockTransaction, id: 11, type: 'YIELD', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 500 };
       let result: InvestmentTransactionDto | undefined;
       const payload = { amount: 500, pocketId: 5, transactionDate: '2025-01-15', categoryId: 12 };
       service.recordYield(1, payload).subscribe(r => result = r);
@@ -345,14 +345,44 @@ describe('AssetService', () => {
     });
   });
 
+
+  it.each([1, 2, 0.12500001])('sends explicit sale quantity %s and UUID without multiplying gross proceeds', quantity => {
+    const operationId = 'f627f953-ffbd-4e4b-92c3-333ce72f22d5';
+    const payload = { quantity, operationId, grossAmount: 1050, taxAmount: 10,
+      pocketId: 5, categoryId: 13, transactionDate: '2026-11-04' };
+    const response: InvestmentTransactionDto[] = [
+      { ...mockTransaction, id: 12, type: 'SELL', amount: 1050, quantity, costBasis: 1000, relatedSellId: null, operationId },
+      { ...mockTransaction, id: 13, type: 'TAX', amount: 10, quantity: null, costBasis: null, relatedSellId: 12, operationId },
+    ];
+    const received = jest.fn();
+    service.sell(1, payload).subscribe(received);
+    const request = http.expectOne(`${base}/1/transactions/sell`);
+    expect(request.request.body).toEqual(payload);
+    expect(request.request.body.grossAmount).toBe(1050);
+    request.flush(response);
+    expect(received).toHaveBeenCalledWith(response);
+  });
+
+  it('preserves known BUY units and unknown legacy units side by side', () => {
+    const legacy = investmentBaseline().transactions[0];
+    const known: InvestmentTransactionDto = { ...legacy, id: 999, quantity: 0.12500001 };
+    const received = jest.fn();
+    service.getTransactions(1).subscribe(received);
+    http.expectOne(`${base}/1/transactions`).flush([legacy, known]);
+    expect(received).toHaveBeenCalledWith([legacy, known]);
+    expect(received.mock.calls[0][0][0].quantity).toBeNull();
+    expect(received.mock.calls[0][0][1].quantity).toBe(0.12500001);
+  });
+
   // ─── sell() ───────────────────────────────────────────────────────────────
 
   describe('sell()', () => {
     it('should POST /assets/:id/transactions/sell and return two items (SELL + TAX)', () => {
-      const sellTx: InvestmentTransactionDto = { ...mockTransaction, id: 12, type: 'SELL', amount: 10500 };
-      const taxTx: InvestmentTransactionDto = { ...mockTransaction, id: 13, type: 'TAX', amount: 150 };
+      const sellTx: InvestmentTransactionDto = { ...mockTransaction, id: 12, type: 'SELL', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 10500 };
+      const taxTx: InvestmentTransactionDto = { ...mockTransaction, id: 13, type: 'TAX', quantity: null, costBasis: null, relatedSellId: null, operationId: null, amount: 150 };
       let result: InvestmentTransactionDto[] | undefined;
       const payload = {
+        quantity: 1, operationId: "f627f953-ffbd-4e4b-92c3-333ce72f22d5",
         grossAmount: 10500, taxAmount: 150,
         pocketId: 5, transactionDate: '2025-01-15', categoryId: 13,
       };

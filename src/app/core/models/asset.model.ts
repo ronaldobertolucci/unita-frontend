@@ -21,6 +21,7 @@ export interface AssetSummaryDto {
 export interface AssetPositionDto {
   quantity: number;
   averagePrice: number;
+  remainingCost: number;
   totalInvested: number;
   currentValue: number;
   redeemedValue: number;
@@ -71,6 +72,10 @@ export interface InvestmentTransactionDto {
   transactionDate: string;
   notes: string | null;
   pocketTransactionId?: number | null;
+  quantity: number | null;
+  costBasis: number | null;
+  relatedSellId: number | null;
+  operationId: string | null;
 }
 
 // ── Payloads de criação ──────────────────────────────────────────────────────
@@ -126,6 +131,8 @@ export interface YieldPayload {
 }
 
 export interface SellPayload {
+  quantity: number;
+  operationId: string;
   grossAmount: number;
   taxAmount: number;
   pocketId: number;
