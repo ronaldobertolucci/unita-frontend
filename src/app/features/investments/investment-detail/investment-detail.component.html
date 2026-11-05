@@ -110,47 +110,45 @@
       }
     </div>
 
+    <p class="modal-description">Avaliação manual do saldo restante, reduzida proporcionalmente nas vendas e independente do preço negociado. Pode ser atualizada manualmente.</p>
     <div class="position-grid">
-      <!-- FIX 2: exibe valor correto conforme status -->
       <div class="position-item">
-        <span class="position-label">
-          {{ a.status === 'REDEEMED' ? 'Valor resgatado' : 'Valor atual' }}
-        </span>
-        <span class="position-value position-value--highlight">
-          {{ displayCurrentValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
-        </span>
-        <span class="position-variation" [class.position-variation--positive]="variation() >= 0"
-          [class.position-variation--negative]="variation() < 0">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-            stroke-linejoin="round">
-            @if (variation() >= 0) {
-            <polyline points="2 10 8 4 14 10" /> }
-            @else {
-            <polyline points="2 6 8 12 14 6" /> }
-          </svg>
-          {{ variation() | number:'1.2-2':'pt-BR' }}%
-        </span>
+        <span class="position-label">Avaliação restante</span>
+        <span class="position-value position-value--highlight">{{ displayCurrentValue() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
       </div>
-
       <div class="position-item">
-        <span class="position-label">Total investido</span>
+        <span class="position-label">Quantidade restante</span>
+        <span class="position-value">{{ a.position.quantity | number:'1.0-8':'pt-BR' }}</span>
+      </div>
+      <div class="position-item">
+        <span class="position-label">Custo restante</span>
+        <span class="position-value">{{ a.position.remainingCost | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+      </div>
+      <div class="position-item">
+        <span class="position-label">Preço médio</span>
+        <span class="position-value">{{ a.position.averagePrice | currency:'BRL':'symbol':'1.2-8':'pt-BR' }}</span>
+      </div>
+      <div class="position-item">
+        <span class="position-label">Total de aportes</span>
         <span class="position-value">{{ a.position.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
       </div>
-
-      @if (a.status !== 'REDEEMED') {
       <div class="position-item">
-        <span class="position-label">Resgatado</span>
+        <span class="position-label">Recebido acumulado</span>
         <span class="position-value">{{ a.position.redeemedValue | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
       </div>
-      }
-
       <div class="position-item">
-        <span class="position-label">Última atualização</span>
-        <span class="position-value">
-          {{ a.position.lastValuationDate ? (a.position.lastValuationDate | date:'dd/MM/yyyy') : '—' }}
-        </span>
+        <span class="position-label">Resultado acumulado simples</span>
+        <span class="position-value">{{ accumulatedResult() | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+        @if (variation() !== null) {
+          <span class="position-variation" [class.position-variation--positive]="variation()! >= 0" [class.position-variation--negative]="variation()! < 0">{{ variation() | number:'1.2-2':'pt-BR' }}%</span>
+        } @else { <span>Sem base de cálculo</span> }
+      </div>
+      <div class="position-item">
+        <span class="position-label">Última avaliação manual</span>
+        <span class="position-value">{{ a.position.lastValuationDate ? (a.position.lastValuationDate | date:'dd/MM/yyyy') : '—' }}</span>
       </div>
     </div>
+    <p class="modal-description">Resultado acumulado: avaliação restante + recebido acumulado − total de aportes. Não representa lucro realizado nem rentabilidade anualizada.</p>
   </div>
 
   <!-- Ações de transação -->
@@ -199,7 +197,7 @@
   } @else {
   <ul class="tx-list">
     @for (tx of transactions(); track tx.id) {
-    <li class="tx-item">
+    <li class="tx-item" [attr.id]="'investment-tx-' + tx.id">
       <div class="tx-icon" [class]="'tx-icon--' + tx.type.toLowerCase()">
         @if (tx.type === 'BUY') {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -229,7 +227,17 @@
       </div>
 
       <div class="tx-info">
-        <span class="tx-label">{{ transactionLabel(tx.type) }}</span>
+        <span class="tx-label">{{ transactionLabel(tx.type) }} · #{{ tx.id }}</span>
+        @if (tx.type === 'BUY' || tx.type === 'SELL') {
+          <span class="tx-notes">Quantidade: @if (tx.quantity != null) { {{ tx.quantity | number:'1.0-8':'pt-BR' }} } @else { Não disponível no histórico }</span>
+        }
+        @if (tx.type === 'SELL') {
+          <span class="tx-notes">Custo baixado: @if (tx.costBasis != null) { {{ tx.costBasis | currency:'BRL':'symbol':'1.2-2':'pt-BR' }} } @else { Não disponível no histórico }</span>
+        }
+        @if (tx.type === 'TAX') {
+          <span class="tx-notes">@if (tx.relatedSellId != null) { Imposto da venda #{{ tx.relatedSellId }} } @else { Venda vinculada: Não disponível no histórico }</span>
+          <span class="tx-notes">Já descontado do crédito líquido da venda.</span>
+        }
         @if (tx.notes) {
         <span class="tx-notes">{{ tx.notes }}</span>
         }

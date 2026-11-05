@@ -147,8 +147,25 @@ describe('InvestmentsComponent', () => {
     (element.querySelector('.section-toggle') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(element.querySelector('.assets-list--redeemed .asset-name')?.textContent).toContain(redeemed.name);
-    expect(element.querySelector('.assets-list--redeemed .asset-current-value')?.textContent).toMatch(/1\.085,00/);
+    expect(element.querySelector('.assets-list--redeemed .asset-current-value')?.textContent).toMatch(/0,00/);
     expect(component.redeemedAssets()[0].totalInvested).toBe(1000);
+  });
+
+  it('renders cumulative result and receipts for a partial sale in the list', () => {
+    const partial = { ...mockAsset, currentValue: 2200, redeemedValue: 1040, totalInvested: 3000 };
+    setup([partial]);
+    expect(component.variation(partial)).toBe(8);
+    expect(component.accumulatedResult(partial)).toBe(240);
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Resultado acumulado simples');
+    expect(text).toMatch(/240,00/); expect(text).toContain('8,00%');
+    expect(text).toMatch(/Recebido acumulado:[\s\S]*1\.040,00/);
+  });
+
+  it('renders absence of a percentage base without hiding the absolute result', () => {
+    setup([{ ...mockAsset, totalInvested: 0, currentValue: 100, redeemedValue: 50 }]);
+    expect(fixture.nativeElement.textContent).toContain('Sem base de cálculo');
+    expect(fixture.nativeElement.textContent).toMatch(/150,00/);
   });
 
   describe('initialization', () => {
@@ -413,8 +430,8 @@ describe('InvestmentsComponent', () => {
       expect(component.displayValue(mockAsset)).toBe(10500);
     });
 
-    it('should return redeemedValue for REDEEMED asset', () => {
-      expect(component.displayValue(mockAssetRedeemed)).toBe(5300);
+    it('should show zero remaining valuation for REDEEMED asset', () => {
+      expect(component.displayValue(mockAssetRedeemed)).toBe(0);
     });
   });
 
@@ -431,8 +448,8 @@ describe('InvestmentsComponent', () => {
       expect(component.variation(mockAssetRedeemed)).toBeCloseTo(6, 0);
     });
 
-    it('should return 0 when totalInvested is 0', () => {
-      expect(component.variation({ ...mockAsset, totalInvested: 0 })).toBe(0);
+    it('should return no calculation base when totalInvested is 0', () => {
+      expect(component.variation({ ...mockAsset, totalInvested: 0 })).toBeNull();
     });
   });
 

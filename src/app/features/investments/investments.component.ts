@@ -1,3 +1,4 @@
+import { investmentResult, investmentVariation } from '../../core/utils/investment-result.util';
 import { Component, OnInit, OnDestroy, signal, inject, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -164,13 +165,15 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
   }
 
   displayValue(asset: AssetSummaryDto): number {
-    return asset.status === 'REDEEMED' ? asset.redeemedValue : asset.currentValue;
+    return asset.currentValue;
   }
 
-  variation(asset: AssetSummaryDto): number {
-    if (!asset.totalInvested) return 0;
-    const reference = asset.status === 'REDEEMED' ? asset.redeemedValue : asset.currentValue;
-    return ((reference - asset.totalInvested) / asset.totalInvested) * 100;
+  variation(asset: AssetSummaryDto): number | null {
+    return investmentVariation(asset);
+  }
+
+  accumulatedResult(asset: AssetSummaryDto): number {
+    return investmentResult(asset);
   }
 
   // ── Navegação ─────────────────────────────────────────────────────────────

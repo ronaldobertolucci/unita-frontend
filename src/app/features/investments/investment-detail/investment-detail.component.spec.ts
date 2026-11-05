@@ -274,6 +274,44 @@ describe('InvestmentDetailComponent', () => {
 
   // ─── variation() / displayCurrentValue ───────────────────────────────────
 
+  describe('position and mixed investment history', () => {
+    it('shows the partial-sale example as 240 result and 8 percent with distinct balances', () => {
+      setup({ ...mockDetail, position: { ...mockDetail.position, quantity: 2, averagePrice: 1000,
+        remainingCost: 2000, totalInvested: 3000, currentValue: 2200, redeemedValue: 1040 } });
+      expect(component.accumulatedResult()).toBe(240); expect(component.variation()).toBe(8);
+      const text = fixture.nativeElement.textContent;
+      for (const label of ['Quantidade restante', 'Custo restante', 'Preço médio', 'Total de aportes', 'Recebido acumulado', 'Resultado acumulado simples']) expect(text).toContain(label);
+      expect(text).toMatch(/240,00/); expect(text).toContain('8,00%');
+      expect(text).toContain('Não representa lucro realizado');
+    });
+
+    it('keeps zero remaining value and cumulative receipts visible after final sale', () => {
+      setup(mockDetailRedeemed);
+      const rows = Array.from(fixture.nativeElement.querySelectorAll('.position-item')) as HTMLElement[];
+      expect(rows.find(row => row.textContent?.includes('Avaliação restante'))?.textContent).toMatch(/0,00/);
+      expect(rows.find(row => row.textContent?.includes('Recebido acumulado'))?.textContent).toMatch(/10\.800,00/);
+      expect(rows.find(row => row.textContent?.includes('Custo restante'))?.textContent).toMatch(/0,00/);
+    });
+
+    it('shows known fractional units, zero cost and explicit tax linkage without inferring legacy data', () => {
+      setup(mockDetail, [mockTxBuy, { ...mockTxSell, quantity: 0.00000001, costBasis: 0 },
+        { ...mockTxTax, relatedSellId: mockTxSell.id }, { ...mockTxTax, id: 14 }]);
+      const element: HTMLElement = fixture.nativeElement;
+      expect(element.querySelector('#investment-tx-10')?.textContent).toContain('Não disponível no histórico');
+      expect(element.querySelector('#investment-tx-12')?.textContent).toContain('0,00000001');
+      expect(element.querySelector('#investment-tx-12')?.textContent).toMatch(/Custo baixado:[\s\S]*0,00/);
+      expect(element.querySelector('#investment-tx-13')?.textContent).toContain('Imposto da venda #12');
+      expect(element.querySelector('#investment-tx-14')?.textContent).toContain('Venda vinculada: Não disponível no histórico');
+      expect(element.querySelector('#investment-tx-14')?.textContent).not.toContain('Imposto da venda #12');
+    });
+
+    it('shows no percentage base when contributions are zero', () => {
+      setup({ ...mockDetail, position: { ...mockDetail.position, totalInvested: 0 } });
+      expect(fixture.nativeElement.textContent).toContain('Sem base de cálculo');
+      expect(fixture.nativeElement.querySelector('.position-variation')).toBeNull();
+    });
+  });
+
   describe('variation()', () => {
     it('should calculate based on currentValue for ACTIVE asset', () => {
       setup();
@@ -285,9 +323,9 @@ describe('InvestmentDetailComponent', () => {
       expect(component.variation()).toBeCloseTo(8, 0);
     });
 
-    it('should return 0 when totalInvested is 0', () => {
+    it('should show no calculation base when totalInvested is 0', () => {
       setup({ ...mockDetail, position: { ...mockDetail.position, totalInvested: 0 } });
-      expect(component.variation()).toBe(0);
+      expect(component.variation()).toBeNull();
     });
   });
 
@@ -297,9 +335,9 @@ describe('InvestmentDetailComponent', () => {
       expect(component.displayCurrentValue()).toBe(10500);
     });
 
-    it('should return redeemedValue for REDEEMED asset', () => {
+    it('should show zero remaining valuation for REDEEMED asset', () => {
       setup(mockDetailRedeemed);
-      expect(component.displayCurrentValue()).toBe(10800);
+      expect(component.displayCurrentValue()).toBe(0);
     });
   });
 

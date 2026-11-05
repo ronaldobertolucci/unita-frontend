@@ -1,3 +1,4 @@
+import { investmentResult, investmentVariation } from '../../../core/utils/investment-result.util';
 import { Component, OnInit, signal, computed, effect, inject, DestroyRef } from '@angular/core';
 import { Observable, finalize, forkJoin, Subscription } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -98,19 +99,9 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  readonly variation = computed(() => {
-    const a = this.asset();
-    if (!a || !a.position.totalInvested) return 0;
-    const reference =
-      a.status === 'REDEEMED' ? a.position.redeemedValue : a.position.currentValue;
-    return ((reference - a.position.totalInvested) / a.position.totalInvested) * 100;
-  });
-
-  readonly displayCurrentValue = computed(() => {
-    const a = this.asset();
-    if (!a) return 0;
-    return a.status === 'REDEEMED' ? a.position.redeemedValue : a.position.currentValue;
-  });
+  readonly variation = computed(() => this.asset() ? investmentVariation(this.asset()!.position) : null);
+  readonly accumulatedResult = computed(() => this.asset() ? investmentResult(this.asset()!.position) : 0);
+  readonly displayCurrentValue = computed(() => this.asset()?.position.currentValue ?? 0);
 
   readonly eligiblePockets = computed(() =>
     this.pocketService

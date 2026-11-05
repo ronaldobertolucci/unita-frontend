@@ -186,6 +186,18 @@ describe('DashboardComponent', () => {
 
   // ─── Inicialização ────────────────────────────────────────────────────────
 
+  it('labels both net-profit indicators as results of fully redeemed investments without changing their values', () => {
+    setup();
+    component.onGroupSelect({ target: { value: '10' } } as unknown as Event);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text.split('Resultado dos investimentos encerrados').length - 1).toBe(2);
+    expect(text.split('Vendas parciais de posições abertas não entram neste indicador.').length - 1).toBe(2);
+    expect(component.netProfitData()).toBe(mockNetProfit);
+    component.selectedMemberIds.set([mockUser1.id, mockUser2.id]);
+    expect(component.groupNetProfit()).toBeCloseTo(4841.36, 2);
+  });
+
   describe('initialization', () => {
     beforeEach(() => setup());
 

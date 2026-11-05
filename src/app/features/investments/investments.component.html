@@ -80,20 +80,14 @@
         <span class="asset-current-value">
           {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
         </span>
-        <div class="asset-variation" [class.asset-variation--positive]="variation(asset) >= 0"
-          [class.asset-variation--negative]="variation(asset) < 0">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-            stroke-linejoin="round">
-            @if (variation(asset) >= 0) {
-            <polyline points="2 10 8 4 14 10" />
-            } @else {
-            <polyline points="2 6 8 12 14 6" />
-            }
-          </svg>
-          {{ variation(asset) | number:'1.2-2':'pt-BR' }}%
-        </div>
+        <span class="asset-invested">Avaliação restante</span>
+        <span class="asset-invested">Resultado acumulado simples: {{ accumulatedResult(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+        @if (variation(asset) !== null) {
+          <div class="asset-variation" [class.asset-variation--positive]="variation(asset)! >= 0" [class.asset-variation--negative]="variation(asset)! < 0">{{ variation(asset) | number:'1.2-2':'pt-BR' }}%</div>
+        } @else { <span class="asset-invested">Sem base de cálculo</span> }
+        <span class="asset-invested">Recebido acumulado: {{ asset.redeemedValue | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
         <span class="asset-invested">
-          Investido: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+          Total de aportes: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
         </span>
       </div>
 
@@ -159,20 +153,14 @@
         <span class="asset-current-value">
           {{ displayValue(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
         </span>
-        <div class="asset-variation" [class.asset-variation--positive]="variation(asset) >= 0"
-          [class.asset-variation--negative]="variation(asset) < 0">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-            stroke-linejoin="round">
-            @if (variation(asset) >= 0) {
-            <polyline points="2 10 8 4 14 10" />
-            } @else {
-            <polyline points="2 6 8 12 14 6" />
-            }
-          </svg>
-          {{ variation(asset) | number:'1.2-2':'pt-BR' }}%
-        </div>
+        <span class="asset-invested">Avaliação restante</span>
+        <span class="asset-invested">Resultado acumulado simples: {{ accumulatedResult(asset) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
+        @if (variation(asset) !== null) {
+          <div class="asset-variation" [class.asset-variation--positive]="variation(asset)! >= 0" [class.asset-variation--negative]="variation(asset)! < 0">{{ variation(asset) | number:'1.2-2':'pt-BR' }}%</div>
+        } @else { <span class="asset-invested">Sem base de cálculo</span> }
+        <span class="asset-invested">Recebido acumulado: {{ asset.redeemedValue | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</span>
         <span class="asset-invested">
-          Investido: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
+          Total de aportes: {{ asset.totalInvested | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}
         </span>
       </div>
 
