@@ -31,7 +31,7 @@
         <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
         <polyline points="16 7 22 7 22 13" />
       </svg>
-      } @else {
+      } @else if (a.category === 'PREVIDENCIA') {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
         stroke-linejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -72,8 +72,11 @@
     </div>
   </div>
 
+  @if (!supportsOperations()) {
+    <p role="status">Categoria não reconhecida. Posição e histórico continuam disponíveis; movimentações não estão habilitadas para esta categoria.</p>
+  }
   <!-- Detalhes do tipo -->
-  @if (a.fixedIncomeDetails) {
+  @if (a.category === 'RENDA_FIXA' && a.fixedIncomeDetails) {
   <div class="detail-chips">
     <span class="detail-chip">{{ a.fixedIncomeDetails.indexer }}</span>
     <span class="detail-chip">{{ a.fixedIncomeDetails.annualRate | number:'1.2-2':'pt-BR' }}% a.a.</span>
@@ -85,7 +88,7 @@
   </div>
   }
 
-  @if (a.pensionDetails) {
+  @if (a.category === 'PREVIDENCIA' && a.pensionDetails) {
   <div class="detail-chips">
     <span class="detail-chip">{{ pensionTypeLabel(a.pensionDetails.pensionType) }}</span>
     <span class="detail-chip">Regime {{ taxRegimeLabel(a.pensionDetails.taxRegime) }}</span>
@@ -98,7 +101,7 @@
     <div class="position-card-header">
       <span class="position-card-title">Posição atual</span>
       <!-- FIX 5: botão só aparece se não for REDEEMED -->
-      @if (a.status !== 'REDEEMED') {
+      @if (a.status !== 'REDEEMED' && supportsOperations()) {
       <button class="btn-action" (click)="openModal('update-position')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
           stroke-linejoin="round">
@@ -152,7 +155,7 @@
   </div>
 
   <!-- Ações de transação -->
-  @if (a.status !== 'REDEEMED') {
+  @if (a.status !== 'REDEEMED' && supportsOperations()) {
   <div class="action-row">
     <button class="btn-tx btn-tx--buy" (click)="openModal('buy')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -162,13 +165,13 @@
       </svg>
       Aporte
     </button>
-    <button class="btn-tx btn-tx--yield" (click)="openModal('yield')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
+    <button class="btn-tx btn-tx--yield" (click)="openModal('yield')" [disabled]="isSaving() || !canReceiveYield() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
         stroke-linejoin="round">
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
         <polyline points="17 6 23 6 23 12" />
       </svg>
-      Resgate parcial
+      Receber rendimento
     </button>
     <button class="btn-tx btn-tx--sell" (click)="openModal('sell')" [disabled]="isSaving() || !canSell() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -499,7 +502,7 @@
 <div class="modal-overlay" (click)="closeModal()">
   <div class="modal modal--wide" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>Registrar resgate parcial antecipado</h3>
+      <h3>Receber rendimento</h3>
       <button class="modal-close" (click)="closeModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           stroke-linejoin="round">
@@ -509,8 +512,9 @@
       </button>
     </div>
 
-    <p class="modal-description">Use para rendimentos creditados diretamente em conta. Para atualizar o valor do ativo,
-      use "Atualizar posição".</p>
+    <p class="modal-description">Este recebimento não reduz unidades nem custo do investimento. O valor deve estar incluído na avaliação atual e será descontado dela ao ser creditado na conta.</p>
+    <p class="modal-description">Para retirar dinheiro vendendo unidades, use Vender/resgatar.</p>
+    <button type="button" class="btn-secondary" (click)="openModal('sell')" [disabled]="isSaving() || !canSell() || financialRecovery.state() !== 'clear'">Vender/resgatar</button>
 
     @if (errorMessage()) {
     <div class="modal-error">
@@ -527,10 +531,11 @@
       <div class="form-row">
         <div class="field"
           [class.field--invalid]="ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched">
-          <label>Valor (R$)</label>
-          <input type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0,00" />
+          <label for="yield-amount">Valor recebido (R$)</label>
+          <input id="yield-amount" type="number" formControlName="amount" min="0.00000001" step="0.00000001" placeholder="0,00" aria-describedby="yield-amount-help yield-amount-error" />
+          <span id="yield-amount-help">Limite: {{ asset()!.position.currentValue | currency:'BRL':'symbol':'1.2-8':'pt-BR' }}</span>
           @if (ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched) {
-          <span class="field-error">Valor inválido</span>
+          <span id="yield-amount-error" class="field-error">Informe um valor positivo, com até 8 casas decimais, dentro da avaliação atual.</span>
           }
         </div>
         <div class="field"
@@ -570,7 +575,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
+        <button type="submit" class="btn-primary" [disabled]="isSaving() || !canReceiveYield() || yieldForm.invalid || financialRecovery.state() !== 'clear'">
           @if (isSaving()) { <span class="spinner"></span> Salvando... } @else { Registrar }
         </button>
       </div>

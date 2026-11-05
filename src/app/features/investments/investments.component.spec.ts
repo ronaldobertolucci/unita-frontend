@@ -168,6 +168,15 @@ describe('InvestmentsComponent', () => {
     expect(fixture.nativeElement.textContent).toMatch(/150,00/);
   });
 
+  it('does not default an unrecognized creation tab to pension', () => {
+    setup(); component.openModal();
+    component.activeTab.set('unknown' as ReturnType<typeof component.activeTab>);
+    component.onSubmit(); fixture.detectChanges();
+    expect(assetServiceSpy.createPension).not.toHaveBeenCalled();
+    expect(assetServiceSpy.createFixedIncome).not.toHaveBeenCalled();
+    expect(component.errorMessage()).toContain('Categoria não reconhecida');
+  });
+
   describe('initialization', () => {
     beforeEach(() => setup());
 

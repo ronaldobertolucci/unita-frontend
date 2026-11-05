@@ -212,8 +212,10 @@ export class InvestmentsComponent implements OnInit, OnDestroy {
   onSubmit(): void {
     if (this.activeTab() === 'fixed-income') {
       this.submitFixedIncome();
-    } else {
+    } else if (this.activeTab() === 'pension') {
       this.submitPension();
+    } else {
+      this.errorMessage.set('Categoria não reconhecida. Escolha um tipo de investimento suportado.');
     }
   }
 

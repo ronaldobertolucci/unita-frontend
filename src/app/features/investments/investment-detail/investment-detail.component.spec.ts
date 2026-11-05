@@ -631,6 +631,57 @@ describe('InvestmentDetailComponent', () => {
 
   // ─── onYield() ────────────────────────────────────────────────────────────
 
+  describe('yield meaning and category capabilities', () => {
+    it('explains receipts without reducing units and directs unit sales to the sell form', () => {
+      setup(); component.openModal('yield'); fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      expect(element.querySelector('.btn-tx--yield')?.textContent).toContain('Receber rendimento');
+      expect(element.textContent).toContain('não reduz unidades nem custo');
+      expect(element.textContent).toContain('incluído na avaliação atual');
+      expect(element.textContent).not.toContain('Resgate parcial');
+      expect(element.textContent).not.toContain('resgate parcial antecipado');
+      const button = Array.from(element.querySelectorAll<HTMLButtonElement>('.modal button')).find(item => item.textContent?.trim() === 'Vender/resgatar');
+      button!.click(); fixture.detectChanges();
+      expect(component.activeModal()).toBe('sell');
+      expect(element.querySelector('#sell-quantity')).not.toBeNull();
+      expect(assetServiceSpy.recordYield).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -1, 10500.00000001, Infinity, NaN, 0.000000001])('rejects receipt %s outside supported positive valuation balance', amount => {
+      setup(); component.openModal('yield');
+      component.yieldForm.patchValue({ amount, pocketId: 5 }); component.onYield();
+      expect(component.yieldForm.controls['amount'].invalid).toBe(true);
+      expect(assetServiceSpy.recordYield).not.toHaveBeenCalled();
+    });
+
+    it.each(['RENDA_FIXA', 'PREVIDENCIA'] as const)('refreshes a receipt for %s while preserving authoritative units and cost', category => {
+      const data = { ...mockDetail, category };
+      setup(data); component.openModal('yield');
+      const updated = { ...data, position: { ...data.position, currentValue: 10000, redeemedValue: 500 } };
+      assetServiceSpy.recordYield.mockReturnValue(of(mockTxYield));
+      assetServiceSpy.getAsset.mockReturnValue(of(updated));
+      component.yieldForm.patchValue({ amount: 500, pocketId: 5 }); component.onYield();
+      expect(assetServiceSpy.recordYield).toHaveBeenCalledWith(1, expect.objectContaining({ amount: 500 }));
+      expect(component.asset()?.position.quantity).toBe(data.position.quantity);
+      expect(component.asset()?.position.remainingCost).toBe(data.position.remainingCost);
+      expect(component.asset()?.position.currentValue).toBe(10000);
+      expect(component.asset()?.position.redeemedValue).toBe(500);
+    });
+
+    it('renders unknown categories without inheriting details, icons or operations', () => {
+      setup({ ...mockDetail, category: 'FUNDOS' as AssetDetailDto['category'] });
+      const element: HTMLElement = fixture.nativeElement;
+      expect(element.textContent).toContain('Categoria não reconhecida');
+      expect(element.querySelector('.detail-chips')).toBeNull();
+      expect(element.querySelector('.asset-header-icon svg')).toBeNull();
+      expect(element.querySelector('.action-row')).toBeNull();
+      for (const action of ['buy', 'yield', 'sell', 'update-position'] as const) component.openModal(action);
+      component.onBuy(); component.onYield(); component.onSell(); component.onUpdatePosition();
+      expect(component.activeModal()).toBeNull(); expect(component.canSell()).toBe(false);
+      expect(assetServiceSpy.buy).not.toHaveBeenCalled(); expect(assetServiceSpy.recordYield).not.toHaveBeenCalled();
+    });
+  });
+
   describe('onYield()', () => {
     beforeEach(() => setup());
 

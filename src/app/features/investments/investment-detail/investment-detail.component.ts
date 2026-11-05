@@ -1,3 +1,4 @@
+import { supportsInvestmentOperations } from '../../../core/utils/investment-category.util';
 import { investmentResult, investmentVariation } from '../../../core/utils/investment-result.util';
 import { Component, OnInit, signal, computed, effect, inject, DestroyRef } from '@angular/core';
 import { Observable, finalize, forkJoin, Subscription } from 'rxjs';
@@ -245,6 +246,8 @@ export class InvestmentDetailComponent implements OnInit {
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
+    if (['buy', 'yield', 'sell', 'update-position'].includes(type ?? '') && !this.supportsOperations()) return;
+    if (type === 'yield' && !this.canReceiveYield()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear' || (type === 'sell' && !this.canSell())) return;
     this.errorMessage.set('');
     this.activeModal.set(type);
@@ -294,6 +297,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onUpdatePosition(): void {
+    if (!this.supportsOperations()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.positionForm.markAllAsTouched();
     if (this.positionForm.invalid) return;
@@ -322,6 +326,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onBuy(): void {
+    if (!this.supportsOperations()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.buyForm.markAllAsTouched();
     if (this.buyForm.invalid) return;
@@ -344,6 +349,8 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onYield(): void {
+    if (!this.canReceiveYield()) return;
+    this.yieldForm.controls['amount'].updateValueAndValidity();
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.yieldForm.markAllAsTouched();
     if (this.yieldForm.invalid) return;
@@ -356,7 +363,7 @@ export class InvestmentDetailComponent implements OnInit {
 
     this.submitInvestmentTransaction('Rendimento', Number(pocketId), this.assetService
       .recordYield(this.assetId, {
-        amount: Number(amount),
+        amount: Number(investmentQuantityText(investmentUnits(amount)!)),
         pocketId: Number(pocketId),
         transactionDate,
         categoryId: Number(categoryId),
@@ -381,10 +388,18 @@ export class InvestmentDetailComponent implements OnInit {
     });
   }
 
+  supportsOperations(): boolean {
+    return supportsInvestmentOperations(this.asset()?.category);
+  }
+
+  canReceiveYield(): boolean {
+    return this.supportsOperations() && this.asset()?.status === 'ACTIVE';
+  }
+
   canSell(): boolean {
     const asset = this.asset();
     const available = investmentUnits(asset?.position.quantity);
-    return !!asset && (asset.status === 'ACTIVE' || asset.status === 'MATURED') && available !== null && available > 0n;
+    return this.supportsOperations() && !!asset && (asset.status === 'ACTIVE' || asset.status === 'MATURED') && available !== null && available > 0n;
   }
 
   sellRemainingQuantity(): string | null {
@@ -417,6 +432,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onSell(): void {
+    if (!this.supportsOperations()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear' || this.sellRefreshing() || this.sellNeedsReview() || this.asset()?.status === 'REDEEMED') return;
     this.sellForm.markAllAsTouched();
     if (this.sellForm.invalid) return;
@@ -599,7 +615,11 @@ export class InvestmentDetailComponent implements OnInit {
   private buildYieldForm(): void {
     const cat = this.categoryYield();
     this.yieldForm = this.fb.group({
-      amount: ['', [Validators.required, Validators.min(0.01)]],
+      amount: ['', [Validators.required, (control: AbstractControl) => {
+        const amount = investmentUnits(control.value);
+        const available = investmentUnits(this.asset()?.position.currentValue);
+        return amount !== null && amount > 0n && available !== null && amount <= available ? null : { amount: true };
+      }]],
       pocketId: ['', Validators.required],
       transactionDate: [this.toLocalDateString(new Date()), Validators.required],
       categoryId: [{ value: cat?.id ?? '', disabled: true }, Validators.required],
