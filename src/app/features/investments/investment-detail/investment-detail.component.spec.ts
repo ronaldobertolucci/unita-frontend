@@ -818,6 +818,22 @@ describe('InvestmentDetailComponent', () => {
       fixture.detectChanges();
     }
 
+    it('renders minimum fractional units in position and sale preview while keeping currency at two decimals', () => {
+      component.asset.set({ ...component.asset()!, position: { ...component.asset()!.position,
+        quantity: 0.00000002, currentValue: 20, remainingCost: 20 } });
+      open();
+      component.sellForm.patchValue({ quantity: '0.00000001', grossAmount: 10.25, taxAmount: 0.25 });
+      fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      const rows = Array.from(element.querySelectorAll('.position-item'));
+      expect(rows.find(row => row.textContent?.includes('Quantidade restante'))?.textContent).toContain('0,00000002');
+      expect(element.querySelector('#sell-available')?.textContent).toContain('0,00000002');
+      expect(element.textContent).toContain('Saldo previsto: 0,00000001');
+      expect(element.textContent).toMatch(/Líquido previsto:\s*R\$\s*10,00/);
+      expect(element.querySelector('.sell-final-warning')).toBeNull();
+      expect(component.sellForm.valid).toBe(true);
+    });
+
     it('shows 1 of 3 as 2 remaining, accessible input and no final-sale warning', () => {
       open();
       const input: HTMLInputElement = fixture.nativeElement.querySelector('#sell-quantity');
@@ -983,6 +999,45 @@ describe('InvestmentDetailComponent', () => {
       component.closeModal();
       expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
       expect(component.activeModal()).toBe('sell');
+    });
+
+    it('renders a pending sale without closing or changing the authoritative position', () => {
+      fillSell();
+      const response = new Subject<InvestmentTransactionDto[]>();
+      assetServiceSpy.sell.mockReturnValue(response);
+      const original = component.asset();
+      component.onSell(); fixture.detectChanges();
+      const element: HTMLElement = fixture.nativeElement;
+      expect(element.querySelector<HTMLFieldSetElement>('fieldset')?.disabled).toBe(true);
+      expect(element.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+      expect(element.textContent).toContain('Salvando...');
+      expect(component.asset()).toBe(original);
+      expect(component.activeModal()).toBe('sell');
+      response.error({ status: 400, error: { message: 'Invalid sale request' } });
+      fixture.detectChanges();
+      expect(element.textContent).not.toContain('Salvando...');
+      expect(element.querySelector('.modal-error')?.textContent?.trim()).toBeTruthy();
+      expect(component.asset()).toBe(original);
+    });
+
+    it.each(['quantity', 'operationId'])('keeps a contract rejection for %s visibly unsuccessful without a fallback sale', field => {
+      fillSell();
+      const original = component.asset();
+      const previousReads = assetServiceSpy.getAsset.mock.calls.length;
+      assetServiceSpy.sell.mockReturnValue(throwError(() => ({ status: 400, error: {
+        errors: [{ field, message: 'must not be null' }],
+      } })));
+      component.onSell(); fixture.detectChanges();
+      expect(assetServiceSpy.sell).toHaveBeenCalledTimes(1);
+      expect(assetServiceSpy.sell.mock.calls[0][1]).toEqual(expect.objectContaining({
+        quantity: mockDetail.position.quantity, operationId: saleUuid,
+      }));
+      expect(component.asset()).toBe(original);
+      expect(component.activeModal()).toBe('sell');
+      expect(component.isSaving()).toBe(false);
+      expect(component.sellNeedsReview()).toBe(false);
+      expect(assetServiceSpy.getAsset).toHaveBeenCalledTimes(previousReads);
+      expect(fixture.nativeElement.querySelector('.modal-error')?.textContent).toContain('Revise os campos');
     });
 
     it('marks API field errors and permits correction', () => {
