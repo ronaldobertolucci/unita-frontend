@@ -260,14 +260,14 @@
 
 .btn-action svg { width: 14px; height: 14px; }
 
-.btn-action:hover {
+.btn-action:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
 .btn-action--danger { color: var(--error); border-color: var(--error-border); }
-.btn-action--danger:hover { background: var(--error-dim); }
+.btn-action--danger:hover:not(:disabled) { background: var(--error-dim); }
 
 /* ─── Botões de transação ─── */
 .action-row {
@@ -293,7 +293,7 @@
 }
 
 .btn-tx svg { width: 15px; height: 15px; }
-.btn-tx:hover { transform: translateY(-1px); }
+.btn-tx:hover:not(:disabled) { transform: translateY(-1px); }
 
 .btn-tx--buy {
   background: var(--accent-dim);
@@ -301,7 +301,7 @@
   color: var(--accent);
 }
 
-.btn-tx--buy:hover { background: rgba(25, 229, 168, 0.16); }
+.btn-tx--buy:hover:not(:disabled) { background: rgba(25, 229, 168, 0.16); }
 
 .btn-tx--yield {
   background: rgba(79, 70, 229, 0.1);
@@ -309,7 +309,7 @@
   color: #818cf8;
 }
 
-.btn-tx--yield:hover { background: rgba(79, 70, 229, 0.16); }
+.btn-tx--yield:hover:not(:disabled) { background: rgba(79, 70, 229, 0.16); }
 
 .btn-tx--sell {
   background: rgba(255, 107, 107, 0.1);
@@ -317,7 +317,7 @@
   color: var(--error);
 }
 
-.btn-tx--sell:hover { background: rgba(255, 107, 107, 0.16); }
+.btn-tx--sell:hover:not(:disabled) { background: rgba(255, 107, 107, 0.16); }
 
 /* ─── Seção histórico ─── */
 .section-header {
@@ -461,7 +461,6 @@
 }
 
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
-.btn-primary:disabled { opacity: 0.65; cursor: not-allowed; }
 
 .btn-secondary {
   display: inline-flex;
@@ -479,7 +478,7 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.btn-secondary:hover { background: rgba(255, 255, 255, 0.08); color: var(--text-primary); }
+.btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: var(--text-primary); }
 
 .btn-danger {
   display: inline-flex;
@@ -499,7 +498,16 @@
 }
 
 .btn-danger:hover:not(:disabled) { opacity: 0.88; }
-.btn-danger:disabled { opacity: 0.65; cursor: not-allowed; }
+
+button:disabled {
+  background: var(--input-bg);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
 
 /* ─── Modal ─── */
 .modal-overlay {
@@ -586,7 +594,7 @@
   transition: color 0.15s ease, background 0.15s ease;
 }
 
-.modal-close:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.06); }
+.modal-close:hover:not(:disabled) { color: var(--text-primary); background: rgba(255, 255, 255, 0.06); }
 .modal-close svg { width: 16px; height: 16px; }
 
 .modal-description {
