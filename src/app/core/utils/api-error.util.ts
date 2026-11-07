@@ -22,6 +22,7 @@ const ERROR_MAP: Record<string, string> = {
   'Only closed bills can be reopened': 'Somente faturas fechadas podem ser reabertas.',
   'taxAmount must not exceed grossAmount': 'O imposto não pode ser maior que o valor bruto.',
   'Asset has already been fully redeemed': 'Este investimento já foi resgatado integralmente.',
+  'Cannot value a position without units': 'Não é possível atualizar a posição de um investimento sem quantidade disponível. Registre um aporte antes de continuar.',
   'User not found': 'Usuário não encontrado. Verifique o e-mail informado.',
   'User is already a member': 'Este usuário já é membro do grupo.',
   'User already has a pending invitation': 'Este usuário já possui um convite pendente.',

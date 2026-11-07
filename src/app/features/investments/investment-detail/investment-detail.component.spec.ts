@@ -524,6 +524,23 @@ describe('InvestmentDetailComponent', () => {
       expect(component.asset()?.position.currentValue).toBe(11000);
     });
 
+    it('shows a translated error when updating a position without units', () => {
+      assetServiceSpy.updatePosition.mockReturnValue(
+        throwError(() => ({ status: 400, error: { message: 'Cannot value a position without units' } })),
+      );
+      component.openModal('update-position');
+      component.positionForm.patchValue({ currentValue: 100, lastValuationDate: '2025-02-01' });
+      component.onUpdatePosition();
+      fixture.detectChanges();
+      expect(assetServiceSpy.updatePosition).toHaveBeenCalled();
+      expect(fixture.nativeElement.textContent).toContain(
+        'Não é possível atualizar a posição de um investimento sem quantidade disponível. Registre um aporte antes de continuar.'
+      );
+      expect(fixture.nativeElement.textContent).not.toContain('Cannot value a position without units');
+      expect(component.activeModal()).toBe('update-position');
+      expect(component.isSaving()).toBe(false);
+    });
+
     it('should set errorMessage on failure', () => {
       assetServiceSpy.updatePosition.mockReturnValue(
         throwError(() => ({ error: { message: 'Erro' } })),
