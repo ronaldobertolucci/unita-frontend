@@ -247,6 +247,7 @@ export class InvestmentDetailComponent implements OnInit {
   // ── Modal ─────────────────────────────────────────────────────────────────
   openModal(type: ModalType): void {
     if (['buy', 'yield', 'sell', 'update-position'].includes(type ?? '') && !this.supportsOperations()) return;
+    if (type === 'buy' && !this.canBuy()) return;
     if (type === 'yield' && !this.canReceiveYield()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear' || (type === 'sell' && !this.canSell())) return;
     this.errorMessage.set('');
@@ -326,7 +327,7 @@ export class InvestmentDetailComponent implements OnInit {
   }
 
   onBuy(): void {
-    if (!this.supportsOperations()) return;
+    if (!this.canBuy()) return;
     if (this.isSaving() || this.financialRecovery.state() !== 'clear') return;
     this.buyForm.markAllAsTouched();
     if (this.buyForm.invalid) return;
@@ -390,6 +391,10 @@ export class InvestmentDetailComponent implements OnInit {
 
   supportsOperations(): boolean {
     return supportsInvestmentOperations(this.asset()?.category);
+  }
+
+  canBuy(): boolean {
+    return this.supportsOperations() && this.asset()?.status === 'ACTIVE';
   }
 
   canReceiveYield(): boolean {

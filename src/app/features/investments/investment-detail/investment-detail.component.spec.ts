@@ -564,6 +564,32 @@ describe('InvestmentDetailComponent', () => {
   describe('onBuy()', () => {
     beforeEach(() => setup());
 
+    it('blocks contributions for a matured investment while allowing position updates and sales', () => {
+      component.asset.set({ ...mockDetail, status: 'MATURED' });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.btn-tx--buy').disabled).toBe(true);
+      expect(fixture.nativeElement.querySelector('.btn-tx--yield').disabled).toBe(true);
+      expect(fixture.nativeElement.querySelector('.btn-tx--sell').disabled).toBe(false);
+      component.openModal('buy');
+      expect(component.activeModal()).toBeNull();
+      component.onBuy();
+      expect(assetServiceSpy.buy).not.toHaveBeenCalled();
+      component.openModal('update-position');
+      expect(component.activeModal()).toBe('update-position');
+      component.closeModal();
+      component.openModal('sell');
+      expect(component.activeModal()).toBe('sell');
+    });
+
+    it('blocks submission if the investment matures while the contribution form is open', () => {
+      component.openModal('buy');
+      component.buyForm.patchValue({ amount: 1000, quantity: '1', pocketId: 5, transactionDate: '2025-01-15' });
+      component.asset.set({ ...mockDetail, status: 'MATURED' });
+      component.onBuy();
+      expect(assetServiceSpy.buy).not.toHaveBeenCalled();
+      expect(component.isSaving()).toBe(false);
+    });
+
     it('should not submit when form is invalid', () => {
       component.openModal('buy');
       component.onBuy();

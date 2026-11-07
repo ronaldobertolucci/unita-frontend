@@ -157,7 +157,7 @@
   <!-- Ações de transação -->
   @if (a.status !== 'REDEEMED' && supportsOperations()) {
   <div class="action-row">
-    <button class="btn-tx btn-tx--buy" (click)="openModal('buy')" [disabled]="isSaving() || financialRecovery.state() !== 'clear'">
+    <button class="btn-tx btn-tx--buy" (click)="openModal('buy')" [disabled]="isSaving() || !canBuy() || financialRecovery.state() !== 'clear'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
         stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19" />
