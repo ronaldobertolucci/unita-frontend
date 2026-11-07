@@ -102,7 +102,7 @@ export class CreditCardDetailComponent implements OnInit {
   readonly purchaseForm = this.fb.group({
     description: ['', [Validators.required, Validators.maxLength(255), (c: AbstractControl) =>
       String(c.value ?? '').trim() ? null : { required: true }]],
-    totalValue: ['', [Validators.required, purchaseMoneyValidator]],
+    totalValue: ['', { validators: [Validators.required, purchaseMoneyValidator], updateOn: 'blur' }],
     purchaseDate: ['', [Validators.required, purchaseDateValidator]],
     installmentsCount: [1, [Validators.required, installmentCountValidator]],
     categoryId: [null as number | null, Validators.required],

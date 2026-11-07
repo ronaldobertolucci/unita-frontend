@@ -507,6 +507,59 @@ describe('CreditCardDetailComponent', () => {
 
     beforeEach(() => setup());
 
+    it.each([',', '.'])('updates the preview only after blur when typing decimal separator %s', separator => {
+      component.openCreatePurchaseModal();
+      component.purchaseForm.patchValue({ installmentsCount: 3 });
+      fixture.detectChanges();
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('#purchaseValue');
+      const preview = () => fixture.nativeElement.querySelector('.plan-preview');
+      const type = (value: string) => {
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+      };
+      const blur = () => {
+        input.dispatchEvent(new Event('blur'));
+        fixture.detectChanges();
+      };
+
+      type('100');
+      expect(preview()).toBeNull();
+      type(`100${separator}`);
+      expect(preview()).toBeNull();
+      type(`100${separator}50`);
+      expect(preview()).toBeNull();
+      blur();
+      expect(preview()).not.toBeNull();
+      expect(component.automaticAmounts()).toEqual([3350, 3350, 3350]);
+
+      const previousPreview = preview();
+      type(`200${separator}`);
+      expect(preview()).toBe(previousPreview);
+      expect(component.controlError('totalValue')).toBeNull();
+      type(`200${separator}10`);
+      expect(component.automaticAmounts()).toEqual([3350, 3350, 3350]);
+      blur();
+      expect(component.automaticAmounts()).toEqual([6670, 6670, 6670]);
+
+      component.purchaseForm.patchValue({ installmentsCount: 2 });
+      fixture.detectChanges();
+      expect(component.automaticAmounts()).toEqual([10005, 10005]);
+      type(`200${separator}`);
+      expect(preview()).not.toBeNull();
+      blur();
+      expect(preview()).toBeNull();
+      expect(component.controlError('totalValue')).toContain('valor positivo');
+
+      type(`200${separator}10`);
+      blur();
+      expect(preview()).not.toBeNull();
+      component.closeModal();
+      component.openCreatePurchaseModal();
+      fixture.detectChanges();
+      expect(preview()).toBeNull();
+    });
+
     it('sends one complete automatic POST, omits installments and shows the official response', () => {
       fill();
       const official = { ...mockPurchase, totalValue: 100, installments: mockPurchase.installments.map((i, index) => ({
