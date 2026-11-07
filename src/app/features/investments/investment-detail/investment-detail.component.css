@@ -709,6 +709,16 @@
 
 .field-hint { font-size: 0.775rem; color: var(--text-muted); line-height: 1.5; }
 
+.sell-balance { font-size: 0.775rem; color: var(--text-muted); line-height: 1.5; }
+.sell-balance p { margin: 0; }
+.sell-balance--error { color: var(--error); }
+
+.input-action-row { display: flex; align-items: center; gap: 8px; }
+.input-action-row input { flex: 1; min-width: 0; }
+.btn-input-action { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.btn-input-action svg { width: 16px; height: 16px; }
+.btn-input-action:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
 .field-input--disabled {
   opacity: 0.5;
   cursor: not-allowed;

@@ -843,7 +843,6 @@ describe('InvestmentDetailComponent', () => {
       const element: HTMLElement = fixture.nativeElement;
       const rows = Array.from(element.querySelectorAll('.position-item'));
       expect(rows.find(row => row.textContent?.includes('Quantidade restante'))?.textContent).toContain('0,00000002');
-      expect(element.querySelector('#sell-available')?.textContent).toContain('0,00000002');
       expect(element.textContent).toContain('Saldo previsto: 0,00000001');
       expect(element.textContent).toMatch(/Líquido previsto:\s*R\$\s*10,00/);
       expect(element.querySelector('.sell-final-warning')).toBeNull();
@@ -861,12 +860,35 @@ describe('InvestmentDetailComponent', () => {
       expect(input.getAttribute('aria-describedby')).toContain('sell-quantity-error');
       expect(fixture.nativeElement.textContent).toContain('Saldo previsto: 2');
       expect(fixture.nativeElement.querySelector('.sell-final-warning')).toBeNull();
-      const all = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
-      all.find(button => button.textContent?.includes('Vender tudo'))!.click();
+      const sellAll: HTMLButtonElement = input.parentElement!.querySelector('button[aria-label="Vender tudo"]')!;
+      expect(sellAll.title).toBe('Vender tudo');
+      expect(sellAll.querySelector('svg')).not.toBeNull();
+      sellAll.click();
       fixture.detectChanges();
       expect(component.sellForm.value.quantity).toBe('3');
       expect(component.sellRemainingQuantity()).toBe('0');
-      expect(fixture.nativeElement.querySelector('.sell-final-warning')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('#sell-balance')?.textContent).toContain('Saldo previsto: 0');
+      expect(fixture.nativeElement.textContent).not.toContain('A venda de todas as unidades encerrará o investimento');
+    });
+
+    it('shows an insufficient balance error immediately when the entered quantity exceeds availability', () => {
+      open();
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('#sell-quantity');
+      input.value = '4';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      const balance: HTMLElement = fixture.nativeElement.querySelector('#sell-balance');
+      expect(balance.textContent).toContain('Saldo insuficiente.');
+      expect(balance.classList.contains('sell-balance--error')).toBe(true);
+      expect(balance.textContent).not.toContain('Saldo previsto:');
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+
+      input.value = '2';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(balance.classList.contains('sell-balance--error')).toBe(false);
+      expect(balance.textContent).toContain('Saldo previsto: 1');
+      expect(input.getAttribute('aria-invalid')).toBe('false');
     });
 
     it.each(['', '0', '-1', '4', '0.000000001', 'Infinity', 'NaN', 'abc', '9999999999.999999999'])
@@ -875,7 +897,11 @@ describe('InvestmentDetailComponent', () => {
         expect(component.sellForm.controls['quantity'].invalid).toBe(true);
         expect(assetServiceSpy.sell).not.toHaveBeenCalled();
         expect(fixture.nativeElement.querySelector('#sell-quantity').getAttribute('aria-invalid')).toBe('true');
-        expect(fixture.nativeElement.querySelector('#sell-quantity-error').textContent).toContain('quantidade positiva');
+        if (quantity === '4') {
+          expect(fixture.nativeElement.querySelector('#sell-balance').textContent).toContain('Saldo insuficiente');
+        } else {
+          expect(fixture.nativeElement.querySelector('#sell-quantity-error').textContent).toContain('quantidade positiva');
+        }
       });
 
     it('preserves manually negotiated gross until explicitly reapplying suggestion', () => {

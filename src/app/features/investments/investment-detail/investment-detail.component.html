@@ -611,34 +611,44 @@
 
     <form [formGroup]="sellForm" (ngSubmit)="onSell()" novalidate>
       <fieldset [disabled]="isSaving() || !!financialRecovery.operation()?.sale" style="border:0;padding:0;margin:0;min-width:0">
-      <p id="sell-available">Quantidade disponível: {{ asset()!.position.quantity | number:'1.0-8':'pt-BR' }}</p>
-      <div class="field" [class.field--invalid]="ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched">
+      <div class="field" [class.field--invalid]="ctrl(sellForm,'quantity').hasError('available') || (ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched)">
         <label for="sell-quantity">Quantidade a vender</label>
-        <input id="sell-quantity" type="text" inputmode="decimal" formControlName="quantity"
-          aria-describedby="sell-available sell-quantity-help sell-quantity-error"
-          [attr.aria-invalid]="ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched" />
-        <span id="sell-quantity-help">Informe até 8 casas decimais, sem superar o saldo disponível.</span>
-        <span id="sell-quantity-error" class="field-error">
-          @if (ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched) {
+        <div class="input-action-row">
+          <input id="sell-quantity" type="text" inputmode="decimal" formControlName="quantity"
+            aria-describedby="sell-quantity-error sell-balance"
+            [attr.aria-invalid]="ctrl(sellForm,'quantity').hasError('available') || (ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched)" />
+          <button type="button" class="btn-secondary btn-input-action" (click)="sellAll()" aria-label="Vender tudo" title="Vender tudo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m5 6 6 6-6 6m7-12 6 6-6 6M21 5v14" />
+            </svg>
+          </button>
+        </div>
+        @if (ctrl(sellForm,'quantity').invalid && ctrl(sellForm,'quantity').touched && !ctrl(sellForm,'quantity').hasError('available')) {
+          <span id="sell-quantity-error" class="field-error">
             {{ ctrl(sellForm,'quantity').getError('server') || 'Informe uma quantidade positiva válida, com até 8 casas decimais e dentro do saldo disponível.' }}
-          }
-        </span>
-        <button type="button" class="btn-secondary" (click)="sellAll()">Vender tudo</button>
-      </div>
-      <div aria-live="polite">
-        @if (sellRemainingQuantity() !== null) {
-          <p>Saldo previsto: {{ sellRemainingQuantity() | number:'1.0-8':'pt-BR' }}</p>
-          @if (sellRemainingQuantity() === '0') {
-            <p class="sell-final-warning">A venda de todas as unidades encerrará o investimento, inclusive se o líquido for zero.</p>
-          }
+          </span>
         }
+        <div id="sell-balance" class="sell-balance" [class.sell-balance--error]="ctrl(sellForm,'quantity').hasError('available')" aria-live="polite">
+          @if (ctrl(sellForm,'quantity').hasError('available')) {
+            <p>Saldo insuficiente.</p>
+          } @else if (sellRemainingQuantity() !== null) {
+            <p>Saldo previsto: {{ sellRemainingQuantity() | number:'1.0-8':'pt-BR' }}</p>
+          }
+        </div>
       </div>
-      <button type="button" class="btn-secondary" (click)="applySellSuggestion()" [disabled]="ctrl(sellForm,'quantity').invalid">Reaplicar sugestão de bruto</button>
       <div class="form-row">
         <div class="field"
           [class.field--invalid]="ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched">
           <label for="sell-gross">Valor bruto total (R$)</label>
-          <input id="sell-gross" type="number" formControlName="grossAmount" min="0" step="0.01" />
+          <div class="input-action-row">
+            <input id="sell-gross" type="number" formControlName="grossAmount" min="0" step="0.01" />
+            <button type="button" class="btn-secondary btn-input-action" (click)="applySellSuggestion()"
+              [disabled]="ctrl(sellForm,'quantity').invalid" aria-label="Reaplicar sugestão de bruto" title="Reaplicar sugestão de bruto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 8h11a6 6 0 0 1 0 12M3 8l6-6M3 8l6 6" />
+              </svg>
+            </button>
+          </div>
           @if (ctrl(sellForm,'grossAmount').invalid && ctrl(sellForm,'grossAmount').touched) {
           <span class="field-error">{{ ctrl(sellForm,'grossAmount').getError('server') || 'Informe um valor bruto maior que zero.' }}</span>
           }
