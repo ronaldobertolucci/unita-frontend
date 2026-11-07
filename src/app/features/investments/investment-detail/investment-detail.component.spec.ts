@@ -649,7 +649,7 @@ describe('InvestmentDetailComponent', () => {
   // ─── onYield() ────────────────────────────────────────────────────────────
 
   describe('yield meaning and category capabilities', () => {
-    it('explains receipts without reducing units and directs unit sales to the sell form', () => {
+    it('explains receipts without showing a sale message or button in the yield form', () => {
       setup(); component.openModal('yield'); fixture.detectChanges();
       const element: HTMLElement = fixture.nativeElement;
       expect(element.querySelector('.btn-tx--yield')?.textContent).toContain('Receber rendimento');
@@ -657,10 +657,9 @@ describe('InvestmentDetailComponent', () => {
       expect(element.textContent).toContain('incluído na avaliação atual');
       expect(element.textContent).not.toContain('Resgate parcial');
       expect(element.textContent).not.toContain('resgate parcial antecipado');
-      const button = Array.from(element.querySelectorAll<HTMLButtonElement>('.modal button')).find(item => item.textContent?.trim() === 'Vender/resgatar');
-      button!.click(); fixture.detectChanges();
-      expect(component.activeModal()).toBe('sell');
-      expect(element.querySelector('#sell-quantity')).not.toBeNull();
+      expect(element.querySelector('.modal')?.textContent).not.toContain('Vender/resgatar');
+      expect(element.querySelector('.modal')?.textContent).not.toContain('Para retirar dinheiro vendendo unidades');
+      expect(component.activeModal()).toBe('yield');
       expect(assetServiceSpy.recordYield).not.toHaveBeenCalled();
     });
 

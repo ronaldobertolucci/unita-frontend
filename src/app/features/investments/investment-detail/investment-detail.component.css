@@ -707,6 +707,8 @@
 
 .field-error { font-size: 0.775rem; color: var(--error); }
 
+.field-hint { font-size: 0.775rem; color: var(--text-muted); line-height: 1.5; }
+
 .field-input--disabled {
   opacity: 0.5;
   cursor: not-allowed;

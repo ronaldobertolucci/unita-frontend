@@ -513,8 +513,6 @@
     </div>
 
     <p class="modal-description">Este recebimento não reduz unidades nem custo do investimento. O valor deve estar incluído na avaliação atual e será descontado dela ao ser creditado na conta.</p>
-    <p class="modal-description">Para retirar dinheiro vendendo unidades, use Vender/resgatar.</p>
-    <button type="button" class="btn-secondary" (click)="openModal('sell')" [disabled]="isSaving() || !canSell() || financialRecovery.state() !== 'clear'">Vender/resgatar</button>
 
     @if (errorMessage()) {
     <div class="modal-error">
@@ -533,7 +531,7 @@
           [class.field--invalid]="ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched">
           <label for="yield-amount">Valor recebido (R$)</label>
           <input id="yield-amount" type="number" formControlName="amount" min="0.00000001" step="0.00000001" placeholder="0,00" aria-describedby="yield-amount-help yield-amount-error" />
-          <span id="yield-amount-help">Limite: {{ asset()!.position.currentValue | currency:'BRL':'symbol':'1.2-8':'pt-BR' }}</span>
+          <span id="yield-amount-help" class="field-hint">Limite: {{ asset()!.position.currentValue | currency:'BRL':'symbol':'1.2-8':'pt-BR' }}</span>
           @if (ctrl(yieldForm,'amount').invalid && ctrl(yieldForm,'amount').touched) {
           <span id="yield-amount-error" class="field-error">Informe um valor positivo, com até 8 casas decimais, dentro da avaliação atual.</span>
           }
